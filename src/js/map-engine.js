@@ -23,6 +23,13 @@ class MapEngine {
     this.collisionCache = new Map(); // 碰撞检测缓存
     this.pathCache = new Map(); // 路径计算缓存
     
+    // 动画相关
+    this.animations = new Map(); // 存储动画对象
+    this.animationQueue = []; // 动画队列
+    this.blockAnimations = new Map(); // 方块动画状态
+    this.gridAnimation = null; // 网格动画
+    this.pulseAnimation = null; // 脉冲动画
+    
     this.init();
   }
   
@@ -57,12 +64,24 @@ class MapEngine {
     
     // 加载门
     if (mapData.gates) {
-      mapData.gates.forEach(gate => this.addGate(gate));
+      mapData.gates.forEach((gate, index) => {
+        this.addGate(gate);
+        // 延迟触发门脉冲动画
+        setTimeout(() => {
+          this.animateGatePulse(gate);
+        }, index * 300);
+      });
     }
     
     // 加载俄罗斯方块
     if (mapData.tetrisBlocks) {
-      mapData.tetrisBlocks.forEach(block => this.addTetrisBlock(block));
+      mapData.tetrisBlocks.forEach((block, index) => {
+        this.addTetrisBlock(block);
+        // 延迟触发进入动画
+        setTimeout(() => {
+          this.animateBlockEnter(block);
+        }, index * 200);
+      });
     }
     
     // 加载冰层
@@ -121,15 +140,14 @@ class MapEngine {
    * @param {Object} block - 方块配置 {id, color, position, shape, layer}
    */
   addTetrisBlock(block) {
-    // 处理形状数据
-    let shapeData;
-    if (typeof block.shape === 'string') {
-      // 字符串形状，需要从 BLOCK_SHAPES 获取
-      shapeData = this.getShapeData(block.shape);
-    } else {
-      // 对象形状，直接使用
-      shapeData = block.shape;
+    // 使用 block.js 中的 createBlock 函数
+    if (typeof createBlock === 'undefined') {
+      console.error('createBlock 函数未找到，请确保 block.js 已加载');
+      return;
     }
+    
+    const blockElement = createBlock(block);
+    console.log('创建方块元素:', block.id, 'shapeData:', blockElement.shapeData);
     
     const element = {
       id: block.id,
@@ -137,12 +155,14 @@ class MapEngine {
       color: block.color,
       position: block.position, // {x, y}
       shape: block.shape, // 原始形状数据
-      shapeData: shapeData, // 处理后的形状数据
+      shapeData: blockElement.shapeData, // 处理后的形状数据
       layer: block.layer || 0,
       movable: true,
-      occupiedCells: this.calculateOccupiedCells(block.position, shapeData)
+      occupiedCells: this.calculateOccupiedCells(block.position, blockElement.shapeData),
+      blockElement: blockElement // 保存 block.js 创建的元素
     };
     
+    console.log('添加方块到地图:', element.id, 'occupiedCells:', element.occupiedCells);
     this.addElement(element);
   }
   
@@ -231,20 +251,26 @@ class MapEngine {
    * @returns {Array} 格子坐标数组
    */
   calculateOccupiedCells(position, shapeData) {
+    console.log('calculateOccupiedCells 输入:', { position, shapeData });
     const cells = [];
     if (shapeData.blocks) {
       // 新的格式：blocks 数组
+      console.log('使用 blocks 数组:', shapeData.blocks);
       shapeData.blocks.forEach(block => {
         cells.push(`${position.x + block[0]},${position.y + block[1]}`);
       });
     } else if (shapeData.width && shapeData.height) {
       // 旧的格式：width, height
+      console.log('使用 width/height:', { width: shapeData.width, height: shapeData.height });
       for (let x = position.x; x < position.x + shapeData.width; x++) {
         for (let y = position.y; y < position.y + shapeData.height; y++) {
           cells.push(`${x},${y}`);
         }
       }
+    } else {
+      console.warn('无法识别的 shapeData 格式:', shapeData);
     }
+    console.log('计算出的 cells:', cells);
     return cells;
   }
   
@@ -407,6 +433,19 @@ class MapEngine {
     element.position = newPosition;
     element.occupiedCells = newCells;
     
+    // 如果方块有 blockElement，使用 block.js 的移动动画
+    if (element.blockElement && typeof moveBlock !== 'undefined') {
+      moveBlock(element.blockElement, newPosition, () => {
+        // 移动完成后的回调
+        this.checkIceMelting();
+        this.checkForExit(element);
+      });
+    } else {
+      // 否则直接检查
+      this.checkIceMelting();
+      this.checkForExit(element);
+    }
+    
     // 记录移动历史
     this.moveHistory.push({
       elementId: element.id,
@@ -567,11 +606,19 @@ class MapEngine {
   exitThroughGate(element, gate) {
     console.log(`方块 ${element.id} 通过 ${gate.color} 门离开`);
     
-    this.removeElement(element.id);
-    this.selectedElement = null;
-    
-    // 检查是否通关
-    this.checkWinCondition();
+    // 如果方块有 blockElement，使用 block.js 的退出动画
+    if (element.blockElement && typeof exitBlock !== 'undefined') {
+      exitBlock(element.blockElement, () => {
+        this.removeElement(element.id);
+        this.selectedElement = null;
+        this.checkWinCondition();
+      });
+    } else {
+      // 否则直接移除
+      this.removeElement(element.id);
+      this.selectedElement = null;
+      this.checkWinCondition();
+    }
   }
   
   /**
@@ -594,6 +641,11 @@ class MapEngine {
   removeElement(elementId) {
     const element = this.elementRegistry.get(elementId);
     if (!element) return;
+    
+    // 如果方块有 blockElement，清理 block.js 的元素
+    if (element.blockElement && typeof destroyBlock !== 'undefined') {
+      destroyBlock(element.blockElement);
+    }
     
     const layer = this.layers.get(element.layer);
     layer.elements.delete(elementId);
@@ -732,6 +784,393 @@ class MapEngine {
   }
   
   /**
+   * 初始化动画系统
+   */
+  initAnimations() {
+    try {
+      // 检查 GSAP 是否可用
+      if (typeof gsap === 'undefined' || !gsap) {
+        console.warn('GSAP 不可用，使用静态效果');
+        this.initFallbackAnimations();
+        return;
+      }
+
+      // 注册Physics2D插件
+      if (gsap.registerPlugin && typeof Physics2DPlugin !== 'undefined') {
+        gsap.registerPlugin(Physics2DPlugin);
+        console.log('Physics2D插件已注册');
+      }
+
+      // 创建动画目标对象 - 使用更丰富的属性
+      this.animationTargets = {
+        grid: { 
+          scale: 1, 
+          rotation: 0, 
+          alpha: 1,
+          glow: 0,
+          pulse: 0
+        },
+        pulse: { 
+          scale: 1, 
+          alpha: 1,
+          rotation: 0,
+          bounce: 0
+        },
+        blocks: { 
+          scale: 1, 
+          rotation: 0, 
+          alpha: 1,
+          bounce: 0,
+          glow: 0
+        },
+        gates: { 
+          scale: 1, 
+          alpha: 1, 
+          glow: 0,
+          pulse: 0,
+          rotation: 0
+        }
+      };
+
+      // 网格呼吸动画 - 使用更复杂的缓动
+      this.gridAnimation = gsap.to(this.animationTargets.grid, {
+        scale: 1.03,
+        alpha: 0.85,
+        glow: 0.3,
+        duration: 2.8,
+        ease: "power2.inOut",
+        repeat: -1,
+        yoyo: true,
+        paused: false
+      });
+
+      // 脉冲动画 - 使用弹性缓动
+      this.pulseAnimation = gsap.to(this.animationTargets.pulse, {
+        scale: 1.12,
+        alpha: 0.7,
+        rotation: 1,
+        duration: 2.2,
+        ease: "elastic.out(1, 0.4)",
+        repeat: -1,
+        yoyo: true,
+        paused: false
+      });
+
+      // 方块动画 - 添加物理弹跳效果
+      this.blockAnimation = gsap.to(this.animationTargets.blocks, {
+        scale: 1.06,
+        rotation: 3,
+        bounce: 0.2,
+        duration: 3.5,
+        ease: "power1.inOut",
+        repeat: -1,
+        yoyo: true,
+        paused: false
+      });
+
+      // 门发光动画 - 使用闪烁效果
+      this.gateAnimation = gsap.to(this.animationTargets.gates, {
+        scale: 1.1,
+        glow: 1,
+        pulse: 1,
+        rotation: 2,
+        duration: 1.8,
+        ease: "power2.inOut",
+        repeat: -1,
+        yoyo: true,
+        paused: false
+      });
+
+      // 创建时间轴动画 - 组合多个动画
+      this.masterTimeline = gsap.timeline({ repeat: -1 });
+      this.masterTimeline
+        .add(this.gridAnimation, 0)
+        .add(this.pulseAnimation, 0.5)
+        .add(this.blockAnimation, 1)
+        .add(this.gateAnimation, 1.5);
+
+      console.log('GSAP高级动画系统初始化成功');
+    } catch (error) {
+      console.warn('GSAP动画初始化失败:', error);
+      this.initFallbackAnimations();
+    }
+  }
+
+  /**
+   * 降级动画系统
+   */
+  initFallbackAnimations() {
+    this.animationTargets = {
+      grid: { scale: 1, alpha: 1, glow: 0 },
+      pulse: { scale: 1, alpha: 1, rotation: 0 },
+      blocks: { scale: 1, alpha: 1, bounce: 0 },
+      gates: { scale: 1, alpha: 1, glow: 0 }
+    };
+
+    this.gridAnimation = {
+      progress: () => Math.sin(Date.now() * 0.001) * 0.5 + 0.5,
+      targets: () => [this.animationTargets.grid]
+    };
+    this.pulseAnimation = {
+      progress: () => Math.sin(Date.now() * 0.002) * 0.5 + 0.5,
+      targets: () => [this.animationTargets.pulse]
+    };
+    this.blockAnimation = {
+      progress: () => Math.sin(Date.now() * 0.0015) * 0.5 + 0.5,
+      targets: () => [this.animationTargets.blocks]
+    };
+    this.gateAnimation = {
+      progress: () => Math.sin(Date.now() * 0.003) * 0.5 + 0.5,
+      targets: () => [this.animationTargets.gates]
+    };
+  }
+  
+  /**
+   * 开始方块进入动画
+   * @param {Object} block - 方块对象
+   */
+  animateBlockEnter(block) {
+    const animationId = `block_enter_${block.id}`;
+    
+    try {
+      // 使用简单的数值对象作为动画目标
+      const animationTarget = { scale: 0, alpha: 0 };
+      const enterAnimation = gsap.fromTo(animationTarget, {
+        scale: 0,
+        alpha: 0
+      }, {
+        duration: 0.8,
+        scale: 1,
+        alpha: 1,
+        ease: "back.out(1.7)",
+        onComplete: () => {
+          this.animations.delete(animationId);
+        }
+      });
+      
+      this.animations.set(animationId, enterAnimation);
+    } catch (error) {
+      console.warn(`方块 ${block.id} 进入动画创建失败:`, error);
+    }
+  }
+  
+  /**
+   * 开始方块移动动画
+   * @param {Object} block - 方块对象
+   * @param {Object} fromPos - 起始位置
+   * @param {Object} toPos - 目标位置
+   */
+  animateBlockMove(block, fromPos, toPos) {
+    const animationId = `block_move_${block.id}`;
+    
+    try {
+      // 创建移动动画
+      const moveAnimation = gsap.to({}, {
+        duration: 0.3,
+        ease: "power2.out",
+        onUpdate: () => {
+          // 移动动画更新
+        },
+        onComplete: () => {
+          this.animations.delete(animationId);
+        }
+      });
+      
+      this.animations.set(animationId, moveAnimation);
+    } catch (error) {
+      console.warn(`方块 ${block.id} 移动动画创建失败:`, error);
+    }
+  }
+
+  /**
+   * 使用Physics2D插件创建方块移动动画
+   * @param {Object} block - 方块对象
+   * @param {Object} fromPos - 起始位置
+   * @param {Object} toPos - 目标位置
+   */
+  animateBlockMoveWithPhysics(block, fromPos, toPos) {
+    try {
+      if (typeof gsap === 'undefined' || !gsap || !Physics2DPlugin) {
+        console.warn('Physics2D插件不可用，使用简单移动');
+        this.animateBlockMove(block, fromPos, toPos);
+        return;
+      }
+
+      const animationId = `block_move_physics_${block.id}`;
+      
+      // 创建物理动画目标
+      const physicsTarget = {
+        x: fromPos.x,
+        y: fromPos.y,
+        rotation: 0,
+        scale: 1
+      };
+
+      // 使用Physics2D插件创建弹跳移动效果
+      const physicsAnimation = gsap.to(physicsTarget, {
+        duration: 0.8,
+        x: toPos.x,
+        y: toPos.y,
+        rotation: 360, // 旋转一圈
+        scale: 1.1,
+        ease: "power2.out",
+        physics2D: {
+          velocity: 200,
+          angle: 45,
+          gravity: 300,
+          friction: 0.8,
+          bounce: 0.6
+        },
+        onUpdate: () => {
+          // 更新方块位置
+          block.position.x = Math.round(physicsTarget.x);
+          block.position.y = Math.round(physicsTarget.y);
+          block.occupiedCells = this.calculateOccupiedCells(block.position, block.shapeData);
+        },
+        onComplete: () => {
+          // 动画完成后的清理
+          block.position.x = toPos.x;
+          block.position.y = toPos.y;
+          block.occupiedCells = this.calculateOccupiedCells(block.position, block.shapeData);
+          this.animations.delete(animationId);
+          console.log(`方块 ${block.id} 物理移动动画完成`);
+        }
+      });
+
+      this.animations.set(animationId, physicsAnimation);
+      console.log(`方块 ${block.id} 开始物理移动动画`);
+      
+    } catch (error) {
+      console.warn('Physics2D动画创建失败:', error);
+      // 降级到简单动画
+      this.animateBlockMove(block, fromPos, toPos);
+    }
+  }
+  
+  /**
+   * 开始方块选中动画
+   * @param {Object} block - 方块对象
+   */
+  animateBlockSelect(block) {
+    const animationId = `block_select_${block.id}`;
+    
+    try {
+      // 创建选中动画 - 使用简单的数值对象
+      const animationObj = {scale: 1};
+      const selectAnimation = gsap.to(animationObj, {
+        duration: 0.5,
+        scale: 1.05,
+        ease: "power2.out",
+        repeat: -1,
+        yoyo: true,
+        onComplete: () => {
+          this.animations.delete(animationId);
+        }
+      });
+      
+      this.animations.set(animationId, selectAnimation);
+    } catch (error) {
+      console.warn(`方块 ${block.id} 选中动画创建失败:`, error);
+    }
+  }
+  
+  /**
+   * 开始方块退出动画
+   * @param {Object} block - 方块对象
+   */
+  animateBlockExit(block) {
+    const animationId = `block_exit_${block.id}`;
+    
+    try {
+      // 创建退出动画 - 使用简单的数值对象
+      const animationObj = {scale: 1, alpha: 1};
+      const exitAnimation = gsap.to(animationObj, {
+        duration: 0.6,
+        scale: 0,
+        alpha: 0,
+        ease: "back.in(1.7)",
+        onComplete: () => {
+          this.animations.delete(animationId);
+        }
+      });
+      
+      this.animations.set(animationId, exitAnimation);
+    } catch (error) {
+      console.warn(`方块 ${block.id} 退出动画创建失败:`, error);
+    }
+  }
+  
+  /**
+   * 开始冰层融化动画
+   * @param {Object} iceLayer - 冰层对象
+   */
+  animateIceMelt(iceLayer) {
+    const animationId = `ice_melt_${iceLayer.id}`;
+    
+    try {
+      // 创建融化动画
+      const meltAnimation = gsap.to({}, {
+        duration: 2,
+        ease: "power2.out",
+        onUpdate: () => {
+          // 融化动画更新
+        },
+        onComplete: () => {
+          this.animations.delete(animationId);
+        }
+      });
+      
+      this.animations.set(animationId, meltAnimation);
+    } catch (error) {
+      console.warn(`冰层 ${iceLayer.id} 融化动画创建失败:`, error);
+    }
+  }
+  
+  /**
+   * 开始门闪烁动画
+   * @param {Object} gate - 门对象
+   */
+  animateGatePulse(gate) {
+    const animationId = `gate_pulse_${gate.id}`;
+    
+    try {
+      // 创建门脉冲动画 - 使用简单的数值对象
+      const animationObj = {scale: 1};
+      const pulseAnimation = gsap.to(animationObj, {
+        duration: 1,
+        scale: 1.1,
+        ease: "power2.inOut",
+        repeat: -1,
+        yoyo: true,
+        onComplete: () => {
+          this.animations.delete(animationId);
+        }
+      });
+      
+      this.animations.set(animationId, pulseAnimation);
+    } catch (error) {
+      console.warn(`门 ${gate.id} 脉冲动画创建失败:`, error);
+    }
+  }
+  
+  /**
+   * 停止所有动画
+   */
+  stopAllAnimations() {
+    try {
+      this.animations.forEach(animation => {
+        if (animation && animation.kill) {
+          animation.kill();
+        }
+      });
+      this.animations.clear();
+      this.blockAnimations.clear();
+    } catch (error) {
+      console.warn('停止动画时出错:', error);
+    }
+  }
+  
+  /**
    * 设置渲染上下文
    * @param {CanvasRenderingContext2D} ctx - 画布上下文
    * @param {Object} systemInfo - 系统信息
@@ -740,17 +1179,28 @@ class MapEngine {
     this.ctx = ctx;
     this.systemInfo = systemInfo;
     
+    // 安全获取系统信息，防止 NaN 或 Infinity
+    const windowWidth = Number(systemInfo.windowWidth) || 375;
+    const windowHeight = Number(systemInfo.windowHeight) || 667;
+    
+    // 确保值是有限的
+    if (!isFinite(windowWidth) || !isFinite(windowHeight)) {
+      console.warn('系统信息包含非有限值，使用默认值');
+      systemInfo.windowWidth = 375;
+      systemInfo.windowHeight = 667;
+    }
+    
     // 优化网格尺寸 - 针对抖音小游戏环境
-    // 确保每个格子至少30px，最大50px，以获得更好的视觉效果
-    const minCellSize = 30;
-    const maxCellSize = 50;
+    // 确保每个格子至少40px，最大60px，以获得更好的视觉效果
+    const minCellSize = 40;
+    const maxCellSize = 60;
     
     // 计算理想的网格尺寸
     const idealGridSize = this.GRID_SIZE * maxCellSize;
     
     // 根据屏幕尺寸调整
-    const maxWidth = systemInfo.windowWidth * 0.85; // 使用更多宽度
-    const maxHeight = systemInfo.windowHeight * 0.7; // 使用更多高度
+    const maxWidth = windowWidth * 0.9; // 使用更多宽度
+    const maxHeight = windowHeight * 0.8; // 使用更多高度
     
     // 选择较小的限制，确保网格完全可见
     this.gridSize = Math.min(idealGridSize, maxWidth, maxHeight);
@@ -764,9 +1214,17 @@ class MapEngine {
       this.gridSize = this.cellSize * this.GRID_SIZE;
     }
     
+    // 确保所有值都是有限的
+    this.gridSize = isFinite(this.gridSize) ? this.gridSize : 320;
+    this.cellSize = isFinite(this.cellSize) ? this.cellSize : 40;
+    
     // 居中定位
-    this.gridOffsetX = (systemInfo.windowWidth - this.gridSize) / 2;
-    this.gridOffsetY = (systemInfo.windowHeight - this.gridSize) / 2 + 30; // 减少顶部偏移
+    this.gridOffsetX = (windowWidth - this.gridSize) / 2;
+    this.gridOffsetY = (windowHeight - this.gridSize) / 2 + 20; // 减少顶部偏移
+    
+    // 确保偏移值也是有限的
+    this.gridOffsetX = isFinite(this.gridOffsetX) ? this.gridOffsetX : 0;
+    this.gridOffsetY = isFinite(this.gridOffsetY) ? this.gridOffsetY : 0;
     
     console.log('渲染上下文已设置:', {
       windowWidth: systemInfo.windowWidth,
@@ -778,6 +1236,9 @@ class MapEngine {
       minCellSize: minCellSize,
       maxCellSize: maxCellSize
     });
+    
+    // 初始化动画系统
+    this.initAnimations();
   }
   
   /**
@@ -788,17 +1249,94 @@ class MapEngine {
     
     const ctx = this.ctx;
     
-    // 绘制网格背景 - 更明显的背景
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
-    ctx.fillRect(this.gridOffsetX, this.gridOffsetY, this.gridSize, this.gridSize);
+      // 安全获取GSAP动画属性
+      let gridScale = 1, gridAlpha = 1, gridGlow = 0;
+      let pulseScale = 1, pulseAlpha = 1, pulseRotation = 0;
+
+      try {
+        if (this.animationTargets && this.animationTargets.grid) {
+          gridScale = this.animationTargets.grid.scale || 1;
+          gridAlpha = this.animationTargets.grid.alpha || 1;
+          gridGlow = this.animationTargets.grid.glow || 0;
+        }
+      } catch (error) {
+        console.warn('获取网格动画属性失败:', error);
+      }
+
+      try {
+        if (this.animationTargets && this.animationTargets.pulse) {
+          pulseScale = this.animationTargets.pulse.scale || 1;
+          pulseAlpha = this.animationTargets.pulse.alpha || 1;
+          pulseRotation = this.animationTargets.pulse.rotation || 0;
+        }
+      } catch (error) {
+        console.warn('获取脉冲动画属性失败:', error);
+      }
     
-    // 绘制网格边框 - 更粗的边框
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
-    ctx.lineWidth = 2;
-    ctx.strokeRect(this.gridOffsetX, this.gridOffsetY, this.gridSize, this.gridSize);
+    // 绘制网格背景 - 使用GSAP动画属性
+    const bgAlpha = 0.15 + (gridAlpha - 1) * 0.1 + gridGlow * 0.2;
+    ctx.fillStyle = `rgba(255, 255, 255, ${bgAlpha})`;
     
-    // 绘制内部网格线 - 更清晰的线条
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+    // 应用缩放变换
+    ctx.save();
+    ctx.translate(this.gridOffsetX + this.gridSize/2, this.gridOffsetY + this.gridSize/2);
+    ctx.scale(gridScale, gridScale);
+    ctx.translate(-this.gridSize/2, -this.gridSize/2);
+    ctx.fillRect(0, 0, this.gridSize, this.gridSize);
+    ctx.restore();
+    
+          // 绘制加粗的外边框 - 非门部分用黑色，门部分用对应颜色
+          const borderWidth = Math.max(6, this.cellSize * 0.15); // 边框宽度与格子大小成比例
+    const borderAlpha = 0.9 + (pulseAlpha - 1) * 0.2 + pulseRotation * 0.1;
+    
+    // 获取门的位置信息
+    const gates = this.getAllElementsByType('gate');
+    const gatePositions = {
+      up: gates.filter(gate => gate.direction === 'up').map(gate => ({
+        start: gate.position.x,
+        end: gate.position.x + gate.size.width
+      })),
+      right: gates.filter(gate => gate.direction === 'right').map(gate => ({
+        start: gate.position.y,
+        end: gate.position.y + gate.size.height
+      })),
+      down: gates.filter(gate => gate.direction === 'down').map(gate => ({
+        start: gate.position.x,
+        end: gate.position.x + gate.size.width
+      })),
+      left: gates.filter(gate => gate.direction === 'left').map(gate => ({
+        start: gate.position.y,
+        end: gate.position.y + gate.size.height
+      }))
+    };
+    
+    // 绘制上边框 - 非门部分黑色，门部分红色
+    this.drawBorderWithGates(ctx, 
+      this.gridOffsetX, this.gridOffsetY - borderWidth/2, 
+      this.gridOffsetX + this.gridSize, this.gridOffsetY - borderWidth/2,
+      gatePositions.up, 'up', borderWidth, borderAlpha);
+    
+    // 绘制右边框 - 非门部分黑色，门部分蓝色
+    this.drawBorderWithGates(ctx,
+      this.gridOffsetX + this.gridSize + borderWidth/2, this.gridOffsetY,
+      this.gridOffsetX + this.gridSize + borderWidth/2, this.gridOffsetY + this.gridSize,
+      gatePositions.right, 'right', borderWidth, borderAlpha);
+    
+    // 绘制下边框 - 非门部分黑色，门部分绿色
+    this.drawBorderWithGates(ctx,
+      this.gridOffsetX + this.gridSize, this.gridOffsetY + this.gridSize + borderWidth/2,
+      this.gridOffsetX, this.gridOffsetY + this.gridSize + borderWidth/2,
+      gatePositions.down, 'down', borderWidth, borderAlpha);
+    
+    // 绘制左边框 - 非门部分黑色，门部分黄色
+    this.drawBorderWithGates(ctx,
+      this.gridOffsetX - borderWidth/2, this.gridOffsetY,
+      this.gridOffsetX - borderWidth/2, this.gridOffsetY + this.gridSize,
+      gatePositions.left, 'left', borderWidth, borderAlpha);
+    
+    // 绘制内部网格线 - 使用GSAP动画属性
+    const lineAlpha = 0.4 + (gridAlpha - 1) * 0.1;
+    ctx.strokeStyle = `rgba(255, 255, 255, ${lineAlpha})`;
     ctx.lineWidth = 1;
     
     // 垂直线
@@ -823,6 +1361,72 @@ class MapEngine {
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
     ctx.lineWidth = 2;
     ctx.strokeRect(this.gridOffsetX, this.gridOffsetY, this.gridSize, this.gridSize);
+  }
+  
+  /**
+   * 绘制带门的边框
+   * @param {CanvasRenderingContext2D} ctx - 画布上下文
+   * @param {number} startX - 起始X坐标
+   * @param {number} startY - 起始Y坐标
+   * @param {number} endX - 结束X坐标
+   * @param {number} endY - 结束Y坐标
+   * @param {Array} gatePositions - 门的位置数组
+   * @param {string} direction - 边框方向
+   * @param {number} borderWidth - 边框宽度
+   * @param {number} borderAlpha - 边框透明度
+   */
+  drawBorderWithGates(ctx, startX, startY, endX, endY, gatePositions, direction, borderWidth, borderAlpha) {
+    ctx.lineWidth = borderWidth;
+    
+    // 获取门颜色
+    const gateColors = {
+      up: `rgba(255, 100, 100, ${borderAlpha})`,
+      right: `rgba(100, 100, 255, ${borderAlpha})`,
+      down: `rgba(100, 255, 100, ${borderAlpha})`,
+      left: `rgba(255, 255, 100, ${borderAlpha})`
+    };
+    
+    const gateColor = gateColors[direction];
+    const blackColor = `rgba(0, 0, 0, ${borderAlpha})`;
+    
+    // 先绘制整条边框为黑色
+    ctx.strokeStyle = blackColor;
+    ctx.beginPath();
+    ctx.moveTo(startX, startY);
+    ctx.lineTo(endX, endY);
+    ctx.stroke();
+    
+    // 然后在门的位置用门颜色覆盖
+    if (gatePositions.length > 0) {
+      ctx.strokeStyle = gateColor;
+      
+      gatePositions.forEach(gate => {
+        const cellSize = this.cellSize;
+        const gateStart = gate.start * cellSize;
+        const gateEnd = gate.end * cellSize;
+        
+        // 计算门段的实际坐标 - 确保在边框范围内
+        let gateStartX, gateStartY, gateEndX, gateEndY;
+        
+        if (startX === endX) { // 垂直边框
+          gateStartX = startX;
+          gateEndX = endX;
+          gateStartY = startY + gateStart;
+          gateEndY = startY + gateEnd;
+        } else { // 水平边框
+          gateStartX = startX + gateStart;
+          gateEndX = startX + gateEnd;
+          gateStartY = startY;
+          gateEndY = endY;
+        }
+        
+        // 绘制门段
+        ctx.beginPath();
+        ctx.moveTo(gateStartX, gateStartY);
+        ctx.lineTo(gateEndX, gateEndY);
+        ctx.stroke();
+      });
+    }
   }
   
   /**
@@ -859,43 +1463,56 @@ class MapEngine {
    * 绘制单个门
    * @param {Object} gate - 门对象
    */
-  drawGate(gate) {
-    const color = this.getGateColor(gate.color);
-    const gateSize = Math.min(this.cellSize * 0.8, 20); // 门的大小，不超过格子大小
+        drawGate(gate) {
+          const color = this.getGateColor(gate.color);
+          const borderWidth = Math.max(6, this.cellSize * 0.15); // 与主边框相同的宽度
+          
+          // 获取GSAP门动画属性
+          let gateScale = 1, gateGlow = 0, gatePulse = 0, gateRotation = 0;
+          try {
+            if (this.animationTargets && this.animationTargets.gates) {
+              gateScale = this.animationTargets.gates.scale || 1;
+              gateGlow = this.animationTargets.gates.glow || 0;
+              gatePulse = this.animationTargets.gates.pulse || 0;
+              gateRotation = this.animationTargets.gates.rotation || 0;
+            }
+          } catch (error) {
+            console.warn('获取门动画属性失败:', error);
+          }
     
     let x, y, width, height;
     
-    // 根据门的方向和位置计算坐标
+    // 根据门的方向和位置计算坐标 - 门正好在边框上
     switch (gate.direction) {
       case 'up':
-        // 上方的门
+        // 上方的门 - 绘制在上边框上
         x = this.gridOffsetX + gate.position.x * this.cellSize;
-        y = this.gridOffsetY - gateSize - 5; // 在网格上方
+        y = this.gridOffsetY - borderWidth / 2; // 在边框中心
         width = gate.size.width * this.cellSize;
-        height = gateSize;
+        height = borderWidth;
         break;
         
       case 'down':
-        // 下方的门
+        // 下方的门 - 绘制在下边框上
         x = this.gridOffsetX + gate.position.x * this.cellSize;
-        y = this.gridOffsetY + this.gridSize + 5; // 在网格下方
+        y = this.gridOffsetY + this.gridSize - borderWidth / 2; // 在边框中心
         width = gate.size.width * this.cellSize;
-        height = gateSize;
+        height = borderWidth;
         break;
         
       case 'left':
-        // 左侧的门
-        x = this.gridOffsetX - gateSize - 5; // 在网格左侧
+        // 左侧的门 - 绘制在左边框上
+        x = this.gridOffsetX - borderWidth / 2; // 在边框中心
         y = this.gridOffsetY + gate.position.y * this.cellSize;
-        width = gateSize;
+        width = borderWidth;
         height = gate.size.height * this.cellSize;
         break;
         
       case 'right':
-        // 右侧的门
-        x = this.gridOffsetX + this.gridSize + 5; // 在网格右侧
+        // 右侧的门 - 绘制在右边框上
+        x = this.gridOffsetX + this.gridSize - borderWidth / 2; // 在边框中心
         y = this.gridOffsetY + gate.position.y * this.cellSize;
-        width = gateSize;
+        width = borderWidth;
         height = gate.size.height * this.cellSize;
         break;
         
@@ -903,24 +1520,69 @@ class MapEngine {
         return; // 无效方向
     }
     
-    // 门背景
-    this.ctx.fillStyle = color;
-    this.ctx.fillRect(x, y, width, height);
+    // 安全获取门的动画状态 - 使用GSAP动画对象
+    const animationId = `gate_pulse_${gate.id}`;
+    const pulseAnimation = this.animations.get(animationId);
+    let pulseScale = 1;
     
-    // 门边框
-    this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.9)';
-    this.ctx.lineWidth = 2;
-    this.ctx.strokeRect(x, y, width, height);
+    try {
+      if (pulseAnimation && pulseAnimation.targets && pulseAnimation.targets()[0]) {
+        pulseScale = pulseAnimation.targets()[0].scale || 1;
+      }
+    } catch (error) {
+      console.warn(`获取门 ${gate.id} 动画状态失败:`, error);
+      pulseScale = 1;
+    }
     
-    // 门标签
-    this.ctx.fillStyle = 'white';
+    // 应用GSAP动画变换
+    this.ctx.save();
+    this.ctx.translate(x + width / 2, y + height / 2);
+    
+    // 组合所有动画效果
+    const finalScale = pulseScale * gateScale;
+    const finalRotation = gateRotation * Math.PI / 180; // 转换为弧度
+    
+    this.ctx.scale(finalScale, finalScale);
+    this.ctx.rotate(finalRotation);
+    this.ctx.translate(-width / 2, -height / 2);
+    
+    // 门背景 - 使用GSAP发光和脉冲效果
+    const brightColor = this.brightenColor(color, 0.3 + gateGlow * 0.2);
+    this.ctx.fillStyle = brightColor;
+    
+    // 应用发光效果
+    if (gateGlow > 0) {
+      this.ctx.shadowColor = color;
+      this.ctx.shadowBlur = gateGlow * 15;
+    }
+    
+    this.ctx.fillRect(0, 0, width, height);
+    
+    // 脉冲高光效果
+    if (gatePulse > 0) {
+      const pulseAlpha = 0.3 + gatePulse * 0.4;
+      this.ctx.fillStyle = `rgba(255, 255, 255, ${pulseAlpha})`;
+      this.ctx.fillRect(0, 0, width, height / 2);
+    }
+    
+    // 门边框 - 使用GSAP脉冲效果
+    const borderAlpha = 0.9 + gatePulse * 0.2;
+    this.ctx.strokeStyle = `rgba(255, 255, 255, ${borderAlpha})`;
+    this.ctx.lineWidth = 1 + gateGlow * 2; // 发光时边框更粗
+    this.ctx.strokeRect(0, 0, width, height);
+    
+    // 门标签 - 使用GSAP脉冲效果
+    const textAlpha = 1 + gatePulse * 0.3;
+    this.ctx.fillStyle = `rgba(255, 255, 255, ${textAlpha})`;
     this.ctx.font = 'bold 10px Arial';
     this.ctx.textAlign = 'center';
     this.ctx.fillText(
       gate.color.toUpperCase(),
-      x + width / 2,
-      y + height / 2 + 3
+      width / 2,
+      height / 2 + 3
     );
+    
+    this.ctx.restore();
     
     // 门的方向箭头
     this.drawGateArrow(x, y, width, height, gate.direction);
@@ -1059,9 +1721,49 @@ class MapEngine {
   drawTetrisBlocks() {
     const blocks = this.getAllElementsByType('tetris');
     
+    console.log('绘制方块数量:', blocks.length);
     blocks.forEach(block => {
+      console.log('绘制方块:', block.id, '位置:', block.position, 'occupiedCells:', block.occupiedCells);
+      // 直接使用原来的绘制方式，因为 block.js 现在是纯数据驱动
       this.drawTetrisBlock(block);
     });
+  }
+  
+  /**
+   * 绘制使用 block.js 创建的方块元素
+   * @param {Object} block - 方块对象
+   */
+  drawBlockElement(block) {
+    const blockElement = block.blockElement;
+    const element = blockElement.element;
+    
+    // 更新方块位置
+    const screenX = this.gridOffsetX + block.position.x * this.cellSize;
+    const screenY = this.gridOffsetY + block.position.y * this.cellSize;
+    
+    element.style.left = `${screenX}px`;
+    element.style.top = `${screenY}px`;
+    
+    // 更新方块大小
+    const maxWidth = Math.max(...blockElement.shapeData.blocks.map(b => b[0])) + 1;
+    const maxHeight = Math.max(...blockElement.shapeData.blocks.map(b => b[1])) + 1;
+    
+    element.style.width = `${maxWidth * this.cellSize}px`;
+    element.style.height = `${maxHeight * this.cellSize}px`;
+    
+    // 更新层级
+    element.style.zIndex = block.layer + 10;
+    
+    // 如果方块被选中，添加选中效果
+    if (this.selectedElement === block) {
+      if (!blockElement.isSelected) {
+        selectBlock(blockElement);
+      }
+    } else {
+      if (blockElement.isSelected) {
+        deselectBlock(blockElement);
+      }
+    }
   }
   
   /**
@@ -1072,60 +1774,143 @@ class MapEngine {
     const color = this.getBlockColor(block.color);
     const isSelected = this.selectedElement === block;
     
+    // 获取GSAP方块动画属性
+    let blockScale = 1, blockRotation = 0, blockBounce = 0, blockGlow = 0;
+    try {
+      if (this.animationTargets && this.animationTargets.blocks) {
+        blockScale = this.animationTargets.blocks.scale || 1;
+        blockRotation = this.animationTargets.blocks.rotation || 0;
+        blockBounce = this.animationTargets.blocks.bounce || 0;
+        blockGlow = this.animationTargets.blocks.glow || 0;
+      }
+    } catch (error) {
+      console.warn('获取方块动画属性失败:', error);
+    }
+    
     // 计算方块的边界框
+    console.log('方块', block.id, 'occupiedCells:', block.occupiedCells);
     const cells = block.occupiedCells.map(cellKey => cellKey.split(',').map(Number));
-    const minX = Math.min(...cells.map(cell => cell[0]));
-    const minY = Math.min(...cells.map(cell => cell[1]));
-    const maxX = Math.max(...cells.map(cell => cell[0]));
-    const maxY = Math.max(...cells.map(cell => cell[1]));
+    console.log('解析后的cells:', cells);
+    
+    if (cells.length === 0) {
+      console.warn(`方块 ${block.id} 没有占用格子，跳过绘制`);
+      return;
+    }
+    
+    // 安全计算边界框，避免空数组导致的 Infinity
+    const xs = cells.map(cell => cell[0]);
+    const ys = cells.map(cell => cell[1]);
+    const minX = Math.min(...xs);
+    const minY = Math.min(...ys);
+    const maxX = Math.max(...xs);
+    const maxY = Math.max(...ys);
+    
+    // 再次检查计算结果
+    if (!isFinite(minX) || !isFinite(minY) || !isFinite(maxX) || !isFinite(maxY)) {
+      console.warn(`方块 ${block.id} 边界框计算异常:`, { minX, minY, maxX, maxY, cells });
+      return;
+    }
+    
+    console.log('边界框:', { minX, minY, maxX, maxY });
     
     const blockWidth = (maxX - minX + 1) * this.cellSize;
     const blockHeight = (maxY - minY + 1) * this.cellSize;
+    
+    // 确保尺寸值是有限的
+    if (!isFinite(blockWidth) || !isFinite(blockHeight) || blockWidth <= 0 || blockHeight <= 0) {
+      console.warn(`方块 ${block.id} 尺寸异常:`, { blockWidth, blockHeight, cellSize: this.cellSize });
+      return; // 跳过绘制
+    }
     const blockScreenX = this.gridOffsetX + minX * this.cellSize;
     const blockScreenY = this.gridOffsetY + minY * this.cellSize;
     
-    // 绘制整个方块的阴影
-    this.ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
-    this.ctx.fillRect(blockScreenX + 2, blockScreenY + 2, blockWidth, blockHeight);
+    // 安全获取动画状态 - 使用GSAP动画对象
+    const animationId = `block_select_${block.id}`;
+    const selectAnimation = this.animations.get(animationId);
+    let scale = 1;
     
-    // 绘制整个方块的背景
-    this.ctx.fillStyle = color;
-    this.ctx.fillRect(blockScreenX, blockScreenY, blockWidth, blockHeight);
-    
-    // 选中效果
-    if (isSelected) {
-      this.ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
-      this.ctx.fillRect(blockScreenX, blockScreenY, blockWidth, blockHeight);
-      
-      // 选中边框 - 整个方块的外边框
-      this.ctx.strokeStyle = 'rgba(255, 255, 0, 0.9)';
-      this.ctx.lineWidth = 3;
-      this.ctx.strokeRect(blockScreenX, blockScreenY, blockWidth, blockHeight);
+    try {
+      if (selectAnimation && selectAnimation.targets && selectAnimation.targets()[0]) {
+        scale = selectAnimation.targets()[0].scale || 1;
+      }
+    } catch (error) {
+      console.warn(`获取方块 ${block.id} 动画状态失败:`, error);
+      scale = 1;
     }
     
-    // 绘制整个方块的外边框
-    this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.9)';
+    // 应用GSAP动画变换
+    this.ctx.save();
+    this.ctx.translate(blockScreenX + blockWidth / 2, blockScreenY + blockHeight / 2);
+    
+    // 组合所有动画效果
+    const finalScale = scale * blockScale;
+    const finalRotation = blockRotation * Math.PI / 180; // 转换为弧度
+    const bounceOffset = blockBounce * 5; // 弹跳偏移
+    
+    this.ctx.scale(finalScale, finalScale);
+    this.ctx.rotate(finalRotation);
+    this.ctx.translate(-blockWidth / 2, -blockHeight / 2 + bounceOffset);
+    
+    // 绘制整个方块的阴影 - 使用GSAP发光效果
+    const shadowAlpha = 0.2 + blockGlow * 0.3;
+    this.ctx.fillStyle = `rgba(0, 0, 0, ${shadowAlpha})`;
+    this.ctx.fillRect(2, 2, blockWidth, blockHeight);
+    
+    // 绘制发光效果（如果启用）
+    if (blockGlow > 0) {
+      this.ctx.shadowColor = color;
+      this.ctx.shadowBlur = blockGlow * 10;
+    }
+    
+    // 绘制整个方块的背景 - 带渐变效果
+    try {
+      const gradient = this.ctx.createLinearGradient(0, 0, blockWidth, blockHeight);
+      gradient.addColorStop(0, color);
+      gradient.addColorStop(1, this.darkenColor(color, 0.2));
+      this.ctx.fillStyle = gradient;
+      this.ctx.fillRect(0, 0, blockWidth, blockHeight);
+    } catch (error) {
+      console.warn(`方块 ${block.id} 渐变创建失败:`, error);
+      // 使用纯色作为备用
+      this.ctx.fillStyle = color;
+      this.ctx.fillRect(0, 0, blockWidth, blockHeight);
+    }
+    
+    // 选中效果 - 带脉冲动画
+    if (isSelected) {
+      const pulseAlpha = 0.4 + Math.sin(Date.now() * 0.01) * 0.2;
+      this.ctx.fillStyle = `rgba(255, 255, 255, ${pulseAlpha})`;
+      this.ctx.fillRect(0, 0, blockWidth, blockHeight);
+      
+      // 选中边框 - 带闪烁效果
+      const borderAlpha = 0.9 + Math.sin(Date.now() * 0.02) * 0.1;
+      this.ctx.strokeStyle = `rgba(255, 255, 0, ${borderAlpha})`;
+      this.ctx.lineWidth = 3 + Math.sin(Date.now() * 0.015) * 0.5;
+      this.ctx.strokeRect(0, 0, blockWidth, blockHeight);
+    }
+    
+    // 绘制整个方块的外边框 - 带呼吸效果
+    const borderAlpha = 0.9 + Math.sin(Date.now() * 0.005) * 0.1;
+    this.ctx.strokeStyle = `rgba(255, 255, 255, ${borderAlpha})`;
     this.ctx.lineWidth = 2;
-    this.ctx.strokeRect(blockScreenX, blockScreenY, blockWidth, blockHeight);
+    this.ctx.strokeRect(0, 0, blockWidth, blockHeight);
     
-    // 绘制整个方块的高光
-    this.ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
-    this.ctx.fillRect(blockScreenX + 2, blockScreenY + 2, blockWidth - 4, 3);
+    // 绘制整个方块的高光 - 带流动效果
+    const highlightAlpha = 0.3 + Math.sin(Date.now() * 0.008) * 0.1;
+    this.ctx.fillStyle = `rgba(255, 255, 255, ${highlightAlpha})`;
+    this.ctx.fillRect(2, 2, blockWidth - 4, 3);
     
-    // 绘制整个方块的内阴影
-    this.ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
-    this.ctx.fillRect(blockScreenX + 2, blockScreenY + blockHeight - 2, blockWidth - 4, 2);
+    // 绘制整个方块的内阴影 - 带呼吸效果
+    const shadowAlpha2 = 0.1 + Math.sin(Date.now() * 0.006) * 0.05;
+    this.ctx.fillStyle = `rgba(0, 0, 0, ${shadowAlpha2})`;
+    this.ctx.fillRect(2, blockHeight - 2, blockWidth - 4, 2);
+    
+    this.ctx.restore();
     
     // 绘制方块ID（调试用）
     if (block.occupiedCells.length > 0) {
       const firstCell = block.occupiedCells[0].split(',').map(Number);
-      const screenX = this.gridOffsetX + firstCell[0] * this.cellSize;
-      const screenY = this.gridOffsetY + firstCell[1] * this.cellSize;
-      
-      this.ctx.fillStyle = 'white';
-      this.ctx.font = '8px Arial';
-      this.ctx.textAlign = 'left';
-      this.ctx.fillText(block.id, screenX + 2, screenY + 10);
+      // 移除方块上的文字显示
     }
   }
   
@@ -1161,6 +1946,45 @@ class MapEngine {
       orange: '#FFA500'
     };
     return colors[colorName] || '#CCCCCC';
+  }
+  
+  /**
+   * 颜色变暗
+   * @param {string} color - 原始颜色
+   * @param {number} factor - 变暗因子 (0-1)
+   * @returns {string} 变暗后的颜色
+   */
+  darkenColor(color, factor) {
+    // 简单的颜色变暗实现
+    const hex = color.replace('#', '');
+    const r = parseInt(hex.substr(0, 2), 16);
+    const g = parseInt(hex.substr(2, 2), 16);
+    const b = parseInt(hex.substr(4, 2), 16);
+    
+    const newR = Math.floor(r * (1 - factor));
+    const newG = Math.floor(g * (1 - factor));
+    const newB = Math.floor(b * (1 - factor));
+    
+    return `rgb(${newR}, ${newG}, ${newB})`;
+  }
+  
+  /**
+   * 颜色变亮
+   * @param {string} color - 原始颜色
+   * @param {number} factor - 变亮因子 (0-1)
+   * @returns {string} 变亮后的颜色
+   */
+  brightenColor(color, factor) {
+    const hex = color.replace('#', '');
+    const r = parseInt(hex.substr(0, 2), 16);
+    const g = parseInt(hex.substr(2, 2), 16);
+    const b = parseInt(hex.substr(4, 2), 16);
+    
+    const newR = Math.min(255, Math.floor(r + (255 - r) * factor));
+    const newG = Math.min(255, Math.floor(g + (255 - g) * factor));
+    const newB = Math.min(255, Math.floor(b + (255 - b) * factor));
+    
+    return `rgb(${newR}, ${newG}, ${newB})`;
   }
   
   /**

@@ -59,55 +59,91 @@ const BLOCK_COLORS = {
   }
 };
 
-// 形状配置
+// 形状配置 - 基于原代码的俄罗斯方块形状
 const BLOCK_SHAPES = {
   '1x1': {
     name: '1x1',
     blocks: [[0, 0]],
     movementType: 'feet',
-    eyePosition: 'center'
+    eyePosition: 'center',
+    description: '单个方块'
   },
   '1x2': {
     name: '1x2',
     blocks: [[0, 0], [0, 1]],
     movementType: 'feet',
-    eyePosition: 'top'
+    eyePosition: 'top',
+    description: '2个方块直线'
   },
   '1x3': {
     name: '1x3',
     blocks: [[0, 0], [0, 1], [0, 2]],
     movementType: 'crawl',
-    eyePosition: 'top'
+    eyePosition: 'top',
+    description: '3个方块直线'
   },
   '2x1': {
     name: '2x1',
     blocks: [[0, 0], [1, 0]],
     movementType: 'feet',
-    eyePosition: 'left'
+    eyePosition: 'left',
+    description: '2个方块横线'
   },
   '2x2': {
     name: '2x2',
     blocks: [[0, 0], [1, 0], [0, 1], [1, 1]],
     movementType: 'feet',
-    eyePosition: 'top-left'
+    eyePosition: 'top-left',
+    description: '2x2方块'
   },
   '3x1': {
     name: '3x1',
     blocks: [[0, 0], [1, 0], [2, 0]],
     movementType: 'feet',
-    eyePosition: 'left'
+    eyePosition: 'left',
+    description: '3个方块横线'
   },
   'L-shape': {
     name: 'L-shape',
     blocks: [[0, 0], [0, 1], [0, 2], [1, 2]],
     movementType: 'wings',
-    eyePosition: 'top-left'
+    eyePosition: 'top-left',
+    description: 'L形状'
   },
   'T-shape': {
     name: 'T-shape',
     blocks: [[0, 0], [1, 0], [2, 0], [1, 1]],
     movementType: 'wings',
-    eyePosition: 'top-center'
+    eyePosition: 'top-center',
+    description: 'T形状'
+  },
+  'Z-shape': {
+    name: 'Z-shape',
+    blocks: [[0, 0], [1, 0], [1, 1], [2, 1]],
+    movementType: 'crawl',
+    eyePosition: 'top-left',
+    description: 'Z形状'
+  },
+  'line4': {
+    name: 'line4',
+    blocks: [[0, 0], [1, 0], [2, 0], [3, 0]],
+    movementType: 'feet',
+    eyePosition: 'left',
+    description: '4个方块直线'
+  },
+  'bigL': {
+    name: 'bigL',
+    blocks: [[0, 0], [0, 1], [0, 2], [1, 2], [2, 2]],
+    movementType: 'wings',
+    eyePosition: 'top-left',
+    description: '大L形状'
+  },
+  'cross': {
+    name: 'cross',
+    blocks: [[1, 0], [0, 1], [1, 1], [2, 1], [1, 2]],
+    movementType: 'wings',
+    eyePosition: 'top-center',
+    description: '十字形状'
   }
 };
 
@@ -117,6 +153,7 @@ const BLOCK_SHAPES = {
  * @returns {Object} 方块对象
  */
 function createBlock(blockData) {
+  // 抖音小游戏环境，使用 Canvas 渲染
   const colorData = BLOCK_COLORS[blockData.color] || BLOCK_COLORS.red;
   const shapeData = BLOCK_SHAPES[blockData.shape] || BLOCK_SHAPES['1x1'];
   
@@ -130,98 +167,16 @@ function createBlock(blockData) {
     position: blockData.position,
     layer: blockData.layer || 0,
     state: BlockStates.idle,
-    element: null,
-    $shape: null,
-    $eyes: [],
-    $blocks: [],
     animations: {},
     isSelected: false,
     isMoving: false,
-    occupiedCells: calculateOccupiedCells(blockData.position, shapeData.blocks)
+    occupiedCells: calculateOccupiedCells(blockData.position, shapeData.blocks),
+    // 抖音小游戏环境不需要 DOM 元素
+    element: null,
+    $shape: null,
+    $eyes: [],
+    $blocks: []
   };
-  
-  // 创建DOM元素
-  const $block = document.createElement('div');
-  $block.className = 'block-element';
-  $block.dataset.blockId = block.id;
-  
-  // 设置容器尺寸
-  const maxWidth = Math.max(...shapeData.blocks.map(b => b[0])) + 1;
-  const maxHeight = Math.max(...shapeData.blocks.map(b => b[1])) + 1;
-  
-  $block.style.width = `${maxWidth * BLOCK_CONFIG.CELL_SIZE}px`;
-  $block.style.height = `${maxHeight * BLOCK_CONFIG.CELL_SIZE}px`;
-  $block.style.position = 'absolute';
-  $block.style.left = `${blockData.position.x * BLOCK_CONFIG.CELL_SIZE}px`;
-  $block.style.top = `${blockData.position.y * BLOCK_CONFIG.CELL_SIZE}px`;
-  $block.style.cursor = 'pointer';
-  $block.style.transition = 'all 0.3s ease';
-  $block.style.overflow = 'visible';
-  $block.style.zIndex = blockData.layer + 10; // 层级越高，z-index越大
-  
-  // 添加呼吸动画
-  gsap.set($block, {
-    scale: 1,
-    transformOrigin: 'center center'
-  });
-  
-  // 创建呼吸动画
-  block.animations.breathing = gsap.to($block, {
-    scale: 1.05,
-    duration: BLOCK_CONFIG.BREATHING_DURATION,
-    ease: "power2.inOut",
-    yoyo: true,
-    repeat: -1
-  });
-  
-  // 创建形状容器
-  const $shape = document.createElement('div');
-  $shape.className = 'block-shape';
-  $shape.style.position = 'absolute';
-  $shape.style.left = '0px';
-  $shape.style.top = '0px';
-  $shape.style.width = `${maxWidth * BLOCK_CONFIG.CELL_SIZE}px`;
-  $shape.style.height = `${maxHeight * BLOCK_CONFIG.CELL_SIZE}px`;
-  $shape.style.zIndex = 3;
-  
-  // 为每个方块创建独立的div元素
-  shapeData.blocks.forEach((blockPos, index) => {
-    const $blockCell = document.createElement('div');
-    $blockCell.className = 'block-cell';
-    $blockCell.style.position = 'absolute';
-    $blockCell.style.left = `${blockPos[0] * BLOCK_CONFIG.CELL_SIZE}px`;
-    $blockCell.style.top = `${blockPos[1] * BLOCK_CONFIG.CELL_SIZE}px`;
-    $blockCell.style.width = `${BLOCK_CONFIG.CELL_SIZE}px`;
-    $blockCell.style.height = `${BLOCK_CONFIG.CELL_SIZE}px`;
-    $blockCell.style.background = colorData.gradient;
-    $blockCell.style.borderRadius = '4px';
-    $blockCell.style.boxShadow = '0 2px 4px rgba(0,0,0,0.2), inset 0 1px 2px rgba(255,255,255,0.3)';
-    $blockCell.style.border = '1px solid rgba(0,0,0,0.1)';
-    $blockCell.dataset.cellIndex = index;
-    
-    $shape.appendChild($blockCell);
-    block.$blocks.push($blockCell);
-  });
-  
-  $block.appendChild($shape);
-  block.$shape = $shape;
-  
-  // 创建眼睛
-  createBlockEyes(block, shapeData);
-  
-  block.element = $block;
-  
-  // 添加眨眼动画
-  if (block.$eyes.length > 0) {
-    block.animations.blinking = gsap.to(block.$eyes, {
-      scaleY: 0.1,
-      duration: 0.1,
-      ease: "power2.inOut",
-      yoyo: true,
-      repeat: 1,
-      delay: Math.random() * 3 + 2
-    });
-  }
   
   return block;
 }
@@ -336,29 +291,41 @@ function selectBlock(block) {
   }
   
   // 选中动画
-  gsap.to(block.element, {
-    scale: BLOCK_CONFIG.SELECT_SCALE,
-    duration: BLOCK_CONFIG.ANIMATION_DURATION,
-    ease: "back.out(1.7)"
-  });
+  try {
+    gsap.to(block.element, {
+      scale: BLOCK_CONFIG.SELECT_SCALE,
+      duration: BLOCK_CONFIG.ANIMATION_DURATION,
+      ease: "back.out(1.7)"
+    });
+  } catch (error) {
+    console.warn('选中动画创建失败:', error);
+  }
   
   // 方块发光效果
-  gsap.to(block.$blocks, {
-    boxShadow: `0 6px 12px rgba(0,0,0,0.4), inset 0 2px 4px rgba(255,255,255,0.6), 0 0 15px ${block.colorData.glowColor}`,
-    duration: 0.4,
-    ease: "back.out(1.7)",
-    stagger: 0.1
-  });
+  try {
+    gsap.to(block.$blocks, {
+      boxShadow: `0 6px 12px rgba(0,0,0,0.4), inset 0 2px 4px rgba(255,255,255,0.6), 0 0 15px ${block.colorData.glowColor}`,
+      duration: 0.4,
+      ease: "back.out(1.7)",
+      stagger: 0.1
+    });
+  } catch (error) {
+    console.warn('发光效果创建失败:', error);
+  }
   
   // 触发眨眼动画
   if (block.$eyes && block.$eyes.length > 0) {
-    gsap.to(block.$eyes, {
-      scaleY: 0.1,
-      duration: 0.1,
-      ease: "power2.inOut",
-      yoyo: true,
-      repeat: 1
-    });
+    try {
+      gsap.to(block.$eyes, {
+        scaleY: 0.1,
+        duration: 0.1,
+        ease: "power2.inOut",
+        yoyo: true,
+        repeat: 1
+      });
+    } catch (error) {
+      console.warn('眨眼动画触发失败:', error);
+    }
   }
   
   console.log(`选中方块: ${block.id}`);
@@ -375,28 +342,42 @@ function deselectBlock(block) {
   block.state = BlockStates.idle;
   
   // 恢复大小
-  gsap.to(block.element, {
-    scale: 1,
-    duration: BLOCK_CONFIG.ANIMATION_DURATION,
-    ease: "power2.out"
-  });
+  try {
+    gsap.to(block.element, {
+      scale: 1,
+      duration: BLOCK_CONFIG.ANIMATION_DURATION,
+      ease: "power2.out"
+    });
+  } catch (error) {
+    console.warn('恢复大小动画失败:', error);
+  }
   
   // 恢复方块样式
-  gsap.to(block.$blocks, {
-    boxShadow: '0 2px 4px rgba(0,0,0,0.2), inset 0 1px 2px rgba(255,255,255,0.3)',
-    duration: 0.3,
-    ease: "power2.in",
-    stagger: 0.05
-  });
+  try {
+    gsap.to(block.$blocks, {
+      boxShadow: '0 2px 4px rgba(0,0,0,0.2), inset 0 1px 2px rgba(255,255,255,0.3)',
+      duration: 0.3,
+      ease: "power2.in",
+      stagger: 0.05
+    });
+  } catch (error) {
+    console.warn('恢复样式动画失败:', error);
+  }
   
   // 恢复呼吸动画
-  block.animations.breathing = gsap.to(block.element, {
-    scale: 1.05,
-    duration: BLOCK_CONFIG.BREATHING_DURATION,
-    ease: "power2.inOut",
-    yoyo: true,
-    repeat: -1
-  });
+  setTimeout(() => {
+    try {
+      block.animations.breathing = gsap.to(block.element, {
+        scale: 1.05,
+        duration: BLOCK_CONFIG.BREATHING_DURATION,
+        ease: "power2.inOut",
+        yoyo: true,
+        repeat: -1
+      });
+    } catch (error) {
+      console.warn('恢复呼吸动画失败:', error);
+    }
+  }, 50);
 }
 
 /**
@@ -445,39 +426,58 @@ function moveWithFeet(block, newPosition, onComplete) {
   createBlockFeet(block);
   
   // 移动动画
-  gsap.to(block.element, {
-    left: newPosition.x * BLOCK_CONFIG.CELL_SIZE,
-    top: newPosition.y * BLOCK_CONFIG.CELL_SIZE,
-    duration: BLOCK_CONFIG.MOVE_DURATION,
-    ease: "circ.inOut",
-    onComplete: () => {
-      block.isMoving = false;
-      block.state = BlockStates.idle;
-      
-      // 移除脚部
-      removeBlockFeet(block);
-      
-      // 恢复呼吸动画
-      block.animations.breathing = gsap.to(block.element, {
-        scale: 1.05,
-        duration: BLOCK_CONFIG.BREATHING_DURATION,
-        ease: "power2.inOut",
-        yoyo: true,
-        repeat: -1
-      });
-      
-      if (onComplete) onComplete();
-    }
-  });
+  try {
+    gsap.to(block.element, {
+      left: newPosition.x * BLOCK_CONFIG.CELL_SIZE,
+      top: newPosition.y * BLOCK_CONFIG.CELL_SIZE,
+      duration: BLOCK_CONFIG.MOVE_DURATION,
+      ease: "circ.inOut",
+      onComplete: () => {
+        block.isMoving = false;
+        block.state = BlockStates.idle;
+        
+        // 移除脚部
+        removeBlockFeet(block);
+        
+        // 恢复呼吸动画
+        setTimeout(() => {
+          try {
+            block.animations.breathing = gsap.to(block.element, {
+              scale: 1.05,
+              duration: BLOCK_CONFIG.BREATHING_DURATION,
+              ease: "power2.inOut",
+              yoyo: true,
+              repeat: -1
+            });
+          } catch (error) {
+            console.warn('恢复呼吸动画失败:', error);
+          }
+        }, 50);
+        
+        if (onComplete) onComplete();
+      }
+    });
+  } catch (error) {
+    console.warn('移动动画创建失败:', error);
+    // 直接完成移动
+    block.isMoving = false;
+    block.state = BlockStates.idle;
+    removeBlockFeet(block);
+    if (onComplete) onComplete();
+  }
   
   // 身体摆动
-  gsap.to(block.element, {
-    rotation: "+=3deg",
-    duration: BLOCK_CONFIG.MOVE_DURATION * 0.3,
-    ease: "circ.inOut",
-    yoyo: true,
-    repeat: 1
-  });
+  try {
+    gsap.to(block.element, {
+      rotation: "+=3deg",
+      duration: BLOCK_CONFIG.MOVE_DURATION * 0.3,
+      ease: "circ.inOut",
+      yoyo: true,
+      repeat: 1
+    });
+  } catch (error) {
+    console.warn('身体摆动动画失败:', error);
+  }
 }
 
 /**
@@ -491,40 +491,59 @@ function moveWithWings(block, newPosition, onComplete) {
   createBlockWings(block);
   
   // 飞行动画
-  gsap.to(block.element, {
-    left: newPosition.x * BLOCK_CONFIG.CELL_SIZE,
-    top: newPosition.y * BLOCK_CONFIG.CELL_SIZE,
-    duration: BLOCK_CONFIG.MOVE_DURATION,
-    ease: "power2.inOut",
-    onComplete: () => {
-      block.isMoving = false;
-      block.state = BlockStates.idle;
-      
-      // 移除翅膀
-      removeBlockWings(block);
-      
-      // 恢复呼吸动画
-      block.animations.breathing = gsap.to(block.element, {
-        scale: 1.05,
-        duration: BLOCK_CONFIG.BREATHING_DURATION,
-        ease: "power2.inOut",
-        yoyo: true,
-        repeat: -1
-      });
-      
-      if (onComplete) onComplete();
-    }
-  });
+  try {
+    gsap.to(block.element, {
+      left: newPosition.x * BLOCK_CONFIG.CELL_SIZE,
+      top: newPosition.y * BLOCK_CONFIG.CELL_SIZE,
+      duration: BLOCK_CONFIG.MOVE_DURATION,
+      ease: "power2.inOut",
+      onComplete: () => {
+        block.isMoving = false;
+        block.state = BlockStates.idle;
+        
+        // 移除翅膀
+        removeBlockWings(block);
+        
+        // 恢复呼吸动画
+        setTimeout(() => {
+          try {
+            block.animations.breathing = gsap.to(block.element, {
+              scale: 1.05,
+              duration: BLOCK_CONFIG.BREATHING_DURATION,
+              ease: "power2.inOut",
+              yoyo: true,
+              repeat: -1
+            });
+          } catch (error) {
+            console.warn('恢复呼吸动画失败:', error);
+          }
+        }, 50);
+        
+        if (onComplete) onComplete();
+      }
+    });
+  } catch (error) {
+    console.warn('飞行动画创建失败:', error);
+    // 直接完成移动
+    block.isMoving = false;
+    block.state = BlockStates.idle;
+    removeBlockWings(block);
+    if (onComplete) onComplete();
+  }
   
   // 飞行起伏
-  gsap.to(block.$blocks, {
-    y: "+=4px",
-    duration: 0.4,
-    ease: "power2.inOut",
-    yoyo: true,
-    repeat: -1,
-    stagger: 0.1
-  });
+  try {
+    gsap.to(block.$blocks, {
+      y: "+=4px",
+      duration: 0.4,
+      ease: "power2.inOut",
+      yoyo: true,
+      repeat: -1,
+      stagger: 0.1
+    });
+  } catch (error) {
+    console.warn('飞行起伏动画失败:', error);
+  }
 }
 
 /**
@@ -535,46 +554,68 @@ function moveWithWings(block, newPosition, onComplete) {
  */
 function moveWithCrawl(block, newPosition, onComplete) {
   // 蠕动动画
-  gsap.to(block.element, {
-    left: newPosition.x * BLOCK_CONFIG.CELL_SIZE,
-    top: newPosition.y * BLOCK_CONFIG.CELL_SIZE,
-    duration: BLOCK_CONFIG.MOVE_DURATION,
-    ease: "power2.inOut",
-    onComplete: () => {
-      block.isMoving = false;
-      block.state = BlockStates.idle;
-      
-      // 恢复呼吸动画
-      block.animations.breathing = gsap.to(block.element, {
-        scale: 1.05,
-        duration: BLOCK_CONFIG.BREATHING_DURATION,
-        ease: "power2.inOut",
-        yoyo: true,
-        repeat: -1
-      });
-      
-      if (onComplete) onComplete();
-    }
-  });
+  try {
+    gsap.to(block.element, {
+      left: newPosition.x * BLOCK_CONFIG.CELL_SIZE,
+      top: newPosition.y * BLOCK_CONFIG.CELL_SIZE,
+      duration: BLOCK_CONFIG.MOVE_DURATION,
+      ease: "power2.inOut",
+      onComplete: () => {
+        block.isMoving = false;
+        block.state = BlockStates.idle;
+        
+        // 恢复呼吸动画
+        setTimeout(() => {
+          try {
+            block.animations.breathing = gsap.to(block.element, {
+              scale: 1.05,
+              duration: BLOCK_CONFIG.BREATHING_DURATION,
+              ease: "power2.inOut",
+              yoyo: true,
+              repeat: -1
+            });
+          } catch (error) {
+            console.warn('恢复呼吸动画失败:', error);
+          }
+        }, 50);
+        
+        if (onComplete) onComplete();
+      }
+    });
+  } catch (error) {
+    console.warn('蠕动动画创建失败:', error);
+    // 直接完成移动
+    block.isMoving = false;
+    block.state = BlockStates.idle;
+    if (onComplete) onComplete();
+  }
   
   // 上下跳跃
-  gsap.to(block.element, {
-    y: "+=4px",
-    duration: 0.3,
-    ease: "power2.inOut",
-    yoyo: true,
-    repeat: -1
-  });
+  try {
+    gsap.to(block.element, {
+      y: "+=4px",
+      duration: 0.3,
+      ease: "power2.inOut",
+      yoyo: true,
+      repeat: -1
+    });
+  } catch (error) {
+    console.warn('跳跃动画失败:', error);
+  }
   
   // 方块收缩
-  gsap.to(block.$blocks, {
-    scale: 0.95,
-    duration: 0.2,
-    ease: "power2.inOut",
-    yoyo: true,
-    repeat: -1,
-    stagger: 0.05
-  });
+  try {
+    gsap.to(block.$blocks, {
+      scale: 0.95,
+      duration: 0.2,
+      ease: "power2.inOut",
+      yoyo: true,
+      repeat: -1,
+      stagger: 0.05
+    });
+  } catch (error) {
+    console.warn('收缩动画失败:', error);
+  }
 }
 
 /**
@@ -636,16 +677,20 @@ function createBlockFeet(block) {
   
   // 脚部出现动画
   if (block.$feet.length > 0) {
-    gsap.fromTo(block.$feet, 
-      { scaleY: 0, opacity: 0 },
-      { 
-        scaleY: 1, 
-        opacity: 1, 
-        duration: 0.3, 
-        ease: "back.out(1.7)",
-        stagger: 0.1
-      }
-    );
+    try {
+      gsap.fromTo(block.$feet, 
+        { scaleY: 0, opacity: 0 },
+        { 
+          scaleY: 1, 
+          opacity: 1, 
+          duration: 0.3, 
+          ease: "back.out(1.7)",
+          stagger: 0.1
+        }
+      );
+    } catch (error) {
+      console.warn('脚部出现动画失败:', error);
+    }
   }
 }
 
@@ -702,16 +747,20 @@ function createBlockWings(block) {
   
   // 翅膀出现动画
   if (block.$wings.length > 0) {
-    gsap.fromTo(block.$wings, 
-      { scaleY: 0, opacity: 0 },
-      { 
-        scaleY: 1, 
-        opacity: 1, 
-        duration: 0.3, 
-        ease: "back.out(1.7)",
-        stagger: 0.1
-      }
-    );
+    try {
+      gsap.fromTo(block.$wings, 
+        { scaleY: 0, opacity: 0 },
+        { 
+          scaleY: 1, 
+          opacity: 1, 
+          duration: 0.3, 
+          ease: "back.out(1.7)",
+          stagger: 0.1
+        }
+      );
+    } catch (error) {
+      console.warn('翅膀出现动画失败:', error);
+    }
   }
 }
 
@@ -739,16 +788,23 @@ function exitBlock(block, onComplete) {
   block.state = BlockStates.exiting;
   
   // 出门动画
-  gsap.to(block.element, {
-    duration: 0.5,
-    scale: 0,
-    rotation: 360,
-    ease: "back.in(1.7)",
-    onComplete: () => {
-      block.state = BlockStates.eliminated;
-      if (onComplete) onComplete();
-    }
-  });
+  try {
+    gsap.to(block.element, {
+      duration: 0.5,
+      scale: 0,
+      rotation: 360,
+      ease: "back.in(1.7)",
+      onComplete: () => {
+        block.state = BlockStates.eliminated;
+        if (onComplete) onComplete();
+      }
+    });
+  } catch (error) {
+    console.warn('出门动画创建失败:', error);
+    // 直接完成退出
+    block.state = BlockStates.eliminated;
+    if (onComplete) onComplete();
+  }
 }
 
 /**

@@ -326,9 +326,19 @@ class GameEngine {
   handleClick(event) {
     if (this.gameState.isGameOver || this.gameState.isPaused) return;
     
-    const rect = this.canvas.getBoundingClientRect();
-    const x = event.clientX - rect.left;
-    const y = event.clientY - rect.top;
+    let x, y;
+    
+    // 抖音小游戏环境兼容处理
+    if (typeof this.canvas.getBoundingClientRect === 'function') {
+      // 浏览器环境
+      const rect = this.canvas.getBoundingClientRect();
+      x = event.clientX - rect.left;
+      y = event.clientY - rect.top;
+    } else {
+      // 抖音小游戏环境 - 直接使用坐标
+      x = event.clientX || event.x || 0;
+      y = event.clientY || event.y || 0;
+    }
     
     // 转换屏幕坐标到游戏坐标
     const gameX = x;
@@ -353,9 +363,19 @@ class GameEngine {
     event.preventDefault();
     if (event.touches.length > 0) {
       const touch = event.touches[0];
-      const rect = this.canvas.getBoundingClientRect();
-      const x = touch.clientX - rect.left;
-      const y = touch.clientY - rect.top;
+      let x, y;
+      
+      // 抖音小游戏环境兼容处理
+      if (typeof this.canvas.getBoundingClientRect === 'function') {
+        // 浏览器环境
+        const rect = this.canvas.getBoundingClientRect();
+        x = touch.clientX - rect.left;
+        y = touch.clientY - rect.top;
+      } else {
+        // 抖音小游戏环境 - 直接使用坐标
+        x = touch.clientX || touch.x || 0;
+        y = touch.clientY || touch.y || 0;
+      }
       
       // 模拟点击事件
       this.handleClick({ clientX: touch.clientX, clientY: touch.clientY });

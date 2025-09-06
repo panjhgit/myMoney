@@ -23,6 +23,12 @@ let mapEngine = null;
 
 // 初始化主菜单
 function initMainMenu() {
+  // 强制清理所有游戏状态，确保从干净的状态开始
+  console.log('初始化主菜单，清理所有游戏状态');
+  gameState = 'menu';
+  mapEngine = null;
+  mainMenu = null;
+  
   // 检查 MainMenu 类是否已加载
   if (typeof MainMenu === 'undefined') {
     console.error('MainMenu 类未找到，请检查 menu.js 是否正确加载');
@@ -42,6 +48,13 @@ function initMainMenu() {
 
 // 开始游戏
 function startGame(levelId) {
+  console.log(`开始游戏，关卡 ${levelId}`);
+  
+  // 强制清理所有状态，确保从干净的状态开始
+  console.log('清理所有游戏状态');
+  gameState = 'menu'; // 先设置为菜单状态
+  mapEngine = null;
+  
   // 检查 MapEngine 类是否已加载
   if (typeof MapEngine === 'undefined') {
     console.error('MapEngine 类未找到，请检查 map-engine.js 是否正确加载');
@@ -69,15 +82,37 @@ function startGame(levelId) {
   // 加载地图数据
   mapEngine.loadMap(map1);
   
-  // 切换到游戏状态
-  gameState = 'game';
+  // 将方块元素添加到画布中
+  setTimeout(() => {
+    const tetrisBlocks = mapEngine.getAllElementsByType('tetris');
+    tetrisBlocks.forEach(block => {
+      if (block.blockElement && block.blockElement.element) {
+        canvas.appendChild(block.blockElement.element);
+      }
+    });
+  }, 100);
   
-  console.log(`关卡 ${levelId} 开始，地图：${map1.name}`);
-  console.log('Block 系统已加载，支持方块动画和行为');
+  // 延迟切换到游戏状态，确保清理完成
+  setTimeout(() => {
+    gameState = 'game';
+    console.log(`关卡 ${levelId} 开始，地图：${map1.name}`);
+    console.log('Block 系统已加载，支持方块动画和行为');
+    console.log('游戏状态已切换到:', gameState);
+  }, 150);
 }
 
-// 主绘制函数
+// 主绘制函数 - 适配抖音小游戏环境
 function draw() {
+  // 调试信息
+  if (Math.random() < 0.01) { // 每100帧打印一次，避免刷屏
+    console.log('当前状态:', { 
+      gameState, 
+      hasMainMenu: !!mainMenu, 
+      hasMapEngine: !!mapEngine,
+      mapEngineType: mapEngine ? mapEngine.constructor.name : 'null'
+    });
+  }
+  
   if (gameState === 'menu' && mainMenu) {
     mainMenu.draw();
   } else if (gameState === 'game' && mapEngine) {
@@ -86,12 +121,31 @@ function draw() {
     // 更新地图引擎
     mapEngine.update();
   } else {
-    // 默认绘制
+    // 默认绘制 - 确保在菜单状态下不会调用游戏绘制
+    if (gameState === 'menu') {
+      // 强制清理 mapEngine，防止残留
+      if (mapEngine) {
+        console.warn('菜单状态下发现残留的 mapEngine，强制清理');
+        mapEngine = null;
+      }
+    }
     drawDefault();
   }
   
-  // 请求下一帧
-  requestAnimationFrame(draw);
+  // 抖音小游戏环境下的循环处理
+  if (typeof requestAnimationFrame !== 'undefined') {
+    // 浏览器环境
+    requestAnimationFrame(draw);
+  } else if (typeof wx !== 'undefined' && wx.requestAnimationFrame) {
+    // 微信小游戏环境
+    wx.requestAnimationFrame(draw);
+  } else if (typeof tt !== 'undefined' && tt.requestAnimationFrame) {
+    // 抖音小游戏环境
+    tt.requestAnimationFrame(draw);
+  } else {
+    // 使用定时器作为备选方案
+    setTimeout(draw, 16); // 约60fps
+  }
 }
 
 // 游戏绘制函数
@@ -150,7 +204,6 @@ function drawDefault() {
   ctx.font = `${parseInt(systemInfo.windowWidth / 20)}px Arial`;
   ctx.fillText('抖音小游戏空白模板', 110, 200);
   const image = tt.createImage();
-  image.src = 'icon.png';
   image.onload = () => {
     ctx.drawImage(
       image,
@@ -171,9 +224,20 @@ function setupGameEvents() {
   // 鼠标点击事件
   canvas.addEventListener('click', (e) => {
     if (gameState === 'game' && mapEngine) {
-      const rect = canvas.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
+      let x, y;
+      
+      // 抖音小游戏环境兼容处理
+      if (typeof canvas.getBoundingClientRect === 'function') {
+        // 浏览器环境
+        const rect = canvas.getBoundingClientRect();
+        x = e.clientX - rect.left;
+        y = e.clientY - rect.top;
+      } else {
+        // 抖音小游戏环境 - 直接使用触摸坐标
+        x = e.clientX || e.x || 0;
+        y = e.clientY || e.y || 0;
+      }
+      
       mapEngine.handleClick(x, y);
     }
   });
@@ -186,9 +250,16 @@ function setupGameEvents() {
     
     // ESC键返回主菜单
     if (e.key === 'Escape' && gameState === 'game') {
+      console.log('ESC键被按下，准备返回主菜单');
+      
+      // 彻底清理游戏状态
       gameState = 'menu';
       mapEngine = null;
-      console.log('返回主菜单');
+      
+      // 延迟确认清理完成
+      setTimeout(() => {
+        console.log('返回主菜单完成，当前状态:', { gameState, hasMapEngine: !!mapEngine });
+      }, 50);
     }
   });
 }
