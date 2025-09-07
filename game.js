@@ -4,6 +4,7 @@ console.log(
 );
 
 // 加载必要的库和模块
+require('./src/js/config.js'); // 加载统一配置
 require('./src/js/gsap.min.js');
 require('./src/js/creature.js');
 require('./src/js/menu.js');

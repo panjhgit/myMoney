@@ -6,16 +6,8 @@ var CreatureStates = {
   eliminated: 'eliminated'
 };
 
-// 生物配置常量
-var CREATURE_CONFIG = {
-  CELL_SIZE: 30, // 每个方块30px
-  EYE_SIZE: 6, // 眼睛大小
-  EYE_SPACING: 12, // 眼睛间距
-  EYE_OFFSET: 6, // 眼睛偏移
-  ANIMATION_DURATION: 0.3, // 动画持续时间
-  BREATHING_DURATION: 2, // 呼吸动画持续时间
-  WALK_DURATION: 0.5 // 走路动画持续时间
-};
+// 生物配置常量 - 使用统一配置
+var CREATURE_CONFIG = GAME_CONFIG.CREATURE_CONFIG;
 
 // 创建俄罗斯方块风格的小人 - 适配抖音小游戏Canvas环境
 var createCreature = function(row, col, colorData) {
@@ -111,28 +103,63 @@ var drawCreature = function(ctx, creature, startX, startY) {
 // 绘制眼睛
 var drawEyes = function(ctx, blockX, blockY) {
   var eyeSize = CREATURE_CONFIG.EYE_SIZE;
-  var eyeOffset = CREATURE_CONFIG.EYE_OFFSET;
+  var cellSize = CREATURE_CONFIG.CELL_SIZE;
+  
+  // 计算眼睛的精确位置，让它们居中
+  var centerX = blockX + cellSize / 2;
+  var centerY = blockY + cellSize / 3; // 稍微偏上一点
   var eyeSpacing = CREATURE_CONFIG.EYE_SPACING;
+  
+  console.log('绘制眼睛:', { 
+    blockX, blockY, 
+    centerX, centerY, 
+    eyeSize, eyeSpacing,
+    cellSize 
+  });
+  
+  // 绘制眉毛（在眼睛上方）
+  ctx.strokeStyle = 'black';
+  ctx.lineWidth = 1.5; // 稍微细一点
+  ctx.lineCap = 'round';
+  
+  // 左眉毛（向上弯曲，更精神）
+  ctx.beginPath();
+  ctx.moveTo(centerX - eyeSpacing / 2 - eyeSize/2, centerY - eyeSize - 3);
+  ctx.quadraticCurveTo(
+    centerX - eyeSpacing / 2, centerY - eyeSize - 5, // 控制点向上，让眉毛向上弯曲
+    centerX - eyeSpacing / 2 + eyeSize/2, centerY - eyeSize - 3
+  );
+  ctx.stroke();
+  
+  // 右眉毛（向上弯曲，更精神）
+  ctx.beginPath();
+  ctx.moveTo(centerX + eyeSpacing / 2 - eyeSize/2, centerY - eyeSize - 3);
+  ctx.quadraticCurveTo(
+    centerX + eyeSpacing / 2, centerY - eyeSize - 5, // 控制点向上，让眉毛向上弯曲
+    centerX + eyeSpacing / 2 + eyeSize/2, centerY - eyeSize - 3
+  );
+  ctx.stroke();
   
   // 左眼
   ctx.fillStyle = 'white';
   ctx.beginPath();
-  ctx.arc(blockX + eyeOffset, blockY + eyeOffset, eyeSize, 0, 2 * Math.PI);
+  ctx.arc(centerX - eyeSpacing / 2, centerY, eyeSize, 0, 2 * Math.PI);
   ctx.fill();
   
   // 右眼
   ctx.beginPath();
-  ctx.arc(blockX + eyeOffset + eyeSpacing, blockY + eyeOffset, eyeSize, 0, 2 * Math.PI);
+  ctx.arc(centerX + eyeSpacing / 2, centerY, eyeSize, 0, 2 * Math.PI);
   ctx.fill();
   
-  // 眼珠
+  // 左眼瞳孔
   ctx.fillStyle = 'black';
   ctx.beginPath();
-  ctx.arc(blockX + eyeOffset, blockY + eyeOffset, eyeSize / 2, 0, 2 * Math.PI);
+  ctx.arc(centerX - eyeSpacing / 2, centerY, eyeSize / 2, 0, 2 * Math.PI);
   ctx.fill();
   
+  // 右眼瞳孔
   ctx.beginPath();
-  ctx.arc(blockX + eyeOffset + eyeSpacing, blockY + eyeOffset, eyeSize / 2, 0, 2 * Math.PI);
+  ctx.arc(centerX + eyeSpacing / 2, centerY, eyeSize / 2, 0, 2 * Math.PI);
   ctx.fill();
 };
 
@@ -871,3 +898,64 @@ var drawWing = function(ctx, wing) {
 var startWormAnimation = startCrawlingAnimation;
 var startWingAnimation = startFlyingAnimation;
 var startLegWalkingAnimation = startWalkingAnimation;
+
+// 导出到全局作用域
+if (typeof window !== 'undefined') {
+  window.createCreature = createCreature;
+  window.drawCreature = drawCreature;
+  window.drawEyes = drawEyes;
+  window.drawFoot = drawFoot;
+  window.drawWing = drawWing;
+  window.standUpAndExtendLimbs = standUpAndExtendLimbs;
+  window.sitDownAndHideLimbs = sitDownAndHideLimbs;
+  window.startWalkingAnimation = startWalkingAnimation;
+  window.stopWalkingAnimation = stopWalkingAnimation;
+  window.startFlyingAnimation = startFlyingAnimation;
+  window.stopFlyingAnimation = stopFlyingAnimation;
+  window.startCrawlingAnimation = startCrawlingAnimation;
+  window.stopCrawlingAnimation = stopCrawlingAnimation;
+  window.startWormAnimation = startWormAnimation;
+  window.startWingAnimation = startWingAnimation;
+  window.startLegWalkingAnimation = startLegWalkingAnimation;
+  window.CREATURE_CONFIG = CREATURE_CONFIG;
+}
+
+if (typeof global !== 'undefined') {
+  global.createCreature = createCreature;
+  global.drawCreature = drawCreature;
+  global.drawEyes = drawEyes;
+  global.drawFoot = drawFoot;
+  global.drawWing = drawWing;
+  global.standUpAndExtendLimbs = standUpAndExtendLimbs;
+  global.sitDownAndHideLimbs = sitDownAndHideLimbs;
+  global.startWalkingAnimation = startWalkingAnimation;
+  global.stopWalkingAnimation = stopWalkingAnimation;
+  global.startFlyingAnimation = startFlyingAnimation;
+  global.stopFlyingAnimation = stopFlyingAnimation;
+  global.startCrawlingAnimation = startCrawlingAnimation;
+  global.stopCrawlingAnimation = stopCrawlingAnimation;
+  global.startWormAnimation = startWormAnimation;
+  global.startWingAnimation = startWingAnimation;
+  global.startLegWalkingAnimation = startLegWalkingAnimation;
+  global.CREATURE_CONFIG = CREATURE_CONFIG;
+}
+
+if (typeof this !== 'undefined') {
+  this.createCreature = createCreature;
+  this.drawCreature = drawCreature;
+  this.drawEyes = drawEyes;
+  this.drawFoot = drawFoot;
+  this.drawWing = drawWing;
+  this.standUpAndExtendLimbs = standUpAndExtendLimbs;
+  this.sitDownAndHideLimbs = sitDownAndHideLimbs;
+  this.startWalkingAnimation = startWalkingAnimation;
+  this.stopWalkingAnimation = stopWalkingAnimation;
+  this.startFlyingAnimation = startFlyingAnimation;
+  this.stopFlyingAnimation = stopFlyingAnimation;
+  this.startCrawlingAnimation = startCrawlingAnimation;
+  this.stopCrawlingAnimation = stopCrawlingAnimation;
+  this.startWormAnimation = startWormAnimation;
+  this.startWingAnimation = startWingAnimation;
+  this.startLegWalkingAnimation = startLegWalkingAnimation;
+  this.CREATURE_CONFIG = CREATURE_CONFIG;
+}

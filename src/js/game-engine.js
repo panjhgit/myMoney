@@ -28,15 +28,15 @@ class GameEngine {
       isPaused: false
     };
     
-    // 游戏配置
+    // 游戏配置 - 使用统一配置
     this.config = {
-      BOARD_SIZE: 9, // 改为9x9棋盘
-      CELL_SIZE: 30,
+      BOARD_SIZE: GAME_CONFIG.GRID_SIZE, // 使用统一网格大小
+      CELL_SIZE: GAME_CONFIG.CELL_SIZE, // 使用统一格子大小
       CREATURE_COUNT: 8,
       HIDDEN_CREATURE_COUNT: 5,
       ICE_MELT_DELAY: 2000, // 冰块融化延迟
-      STEP_DURATION: 0.4,
-      ANIMATION_DURATION: 0.3
+      STEP_DURATION: GAME_CONFIG.STEP_DURATION,
+      ANIMATION_DURATION: GAME_CONFIG.ANIMATION_DURATION
     };
     
     // 颜色配置
@@ -114,11 +114,11 @@ class GameEngine {
       return;
     }
     
-    // 更新配置
-    this.config.BOARD_SIZE = mapData.boardSize;
-    this.config.CELL_SIZE = mapData.cellSize;
-    this.gameState.target = mapData.target;
-    this.gameState.timeLeft = mapData.timeLimit;
+    // 更新配置 - 使用统一配置
+    this.config.BOARD_SIZE = GAME_CONFIG.GRID_SIZE;
+    this.config.CELL_SIZE = GAME_CONFIG.CELL_SIZE;
+    this.gameState.target = mapData.target || 5;
+    this.gameState.timeLeft = mapData.timeLimit || 300;
     
     // 初始化游戏
     this.initBoard();
@@ -281,7 +281,7 @@ class GameEngine {
       color: exit.colorData.gradient,
       x: 0,
       y: 0,
-      width: 40,
+      width: GAME_CONFIG.CELL_SIZE,
       height: 15
     };
     

@@ -94,7 +94,7 @@ const map1 = {
     {
       id: "S_shape",
       color: "cyan",
-      position: { x: 6, y: 2 },
+      position: { x: 5, y: 2 },
       shape: "S-shape",
       layer: 0
     },

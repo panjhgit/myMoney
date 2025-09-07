@@ -12,15 +12,15 @@ var BlockStates = {
   eliminated: 'eliminated'
 };
 
-// 方块配置常量
+// 方块配置常量 - 使用统一配置
 var BLOCK_CONFIG = {
-  CELL_SIZE: 30, // 每个方块30px
-  EYE_SIZE: 6, // 眼睛大小
+  CELL_SIZE: GAME_CONFIG.CELL_SIZE, // 使用统一格子大小
+  EYE_SIZE: GAME_CONFIG.CREATURE_CONFIG.EYE_SIZE, // 使用统一眼睛大小
   EYE_SPACING: 12, // 眼睛间距
   EYE_OFFSET: 6, // 眼睛偏移
-  ANIMATION_DURATION: 0.3, // 动画持续时间
+  ANIMATION_DURATION: GAME_CONFIG.ANIMATION_DURATION, // 使用统一动画持续时间
   BREATHING_DURATION: 2, // 呼吸动画持续时间
-  MOVE_DURATION: 0.5, // 移动动画持续时间
+  MOVE_DURATION: GAME_CONFIG.STEP_DURATION, // 使用统一移动持续时间
   SELECT_SCALE: 1.2, // 选中时的缩放
   GLOW_INTENSITY: 0.8 // 发光强度
 };

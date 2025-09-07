@@ -6,7 +6,9 @@
 
 class MapEngine {
   constructor() {
-    this.GRID_SIZE = 8; // 8x8网格
+    // 使用统一配置
+    this.GRID_SIZE = GAME_CONFIG.GRID_SIZE;
+    this.CELL_SIZE = GAME_CONFIG.CELL_SIZE;
     this.MAX_LAYERS = 10; // 最大层数
     
     // 核心数据结构
@@ -1364,9 +1366,8 @@ class MapEngine {
     }
     
     // 优化网格尺寸 - 针对抖音小游戏环境
-    // 确保每个格子至少40px，最大60px，以获得更好的视觉效果
-    const minCellSize = 40;
-    const maxCellSize = 60;
+    // 使用统一配置的格子大小范围
+    const maxCellSize = GAME_CONFIG.MAX_CELL_SIZE;
     
     // 计算理想的网格尺寸
     const idealGridSize = this.GRID_SIZE * maxCellSize;
@@ -1378,18 +1379,9 @@ class MapEngine {
     // 选择较小的限制，确保网格完全可见
     this.gridSize = Math.min(idealGridSize, maxWidth, maxHeight);
     
-    // 计算实际格子大小
-    this.cellSize = this.gridSize / this.GRID_SIZE;
-    
-    // 确保格子大小在合理范围内
-    if (this.cellSize < minCellSize) {
-      this.cellSize = minCellSize;
-      this.gridSize = this.cellSize * this.GRID_SIZE;
-    }
-    
-    // 确保所有值都是有限的
-    this.gridSize = isFinite(this.gridSize) ? this.gridSize : 320;
-    this.cellSize = isFinite(this.cellSize) ? this.cellSize : 40;
+    // 使用固定格子大小，确保与方块大小一致
+    this.cellSize = GAME_CONFIG.CELL_SIZE;
+    this.gridSize = this.cellSize * this.GRID_SIZE;
     
     // 居中定位
     this.gridOffsetX = (windowWidth - this.gridSize) / 2;
@@ -1406,8 +1398,8 @@ class MapEngine {
       cellSize: this.cellSize,
       gridOffsetX: this.gridOffsetX,
       gridOffsetY: this.gridOffsetY,
-      minCellSize: minCellSize,
-      maxCellSize: maxCellSize
+      minCellSize: GAME_CONFIG.MIN_CELL_SIZE,
+      maxCellSize: GAME_CONFIG.MAX_CELL_SIZE
     });
     
     // 初始化动画系统
@@ -2433,8 +2425,7 @@ class MapEngine {
    * @param {Object} targetPosition - 目标位置 {x, y}
    */
   moveElementToPosition(elementId, targetPosition) {
-    // 在方块列表中查找元素
-    const element = this.getAllElementsByType('tetris').find(block => block.id === elementId);
+    const element = this.getElementById(elementId);
     if (!element) {
       console.warn(`元素 ${elementId} 不存在`);
       return;
@@ -2456,7 +2447,7 @@ class MapEngine {
     
     // 播放移动动画
     if (element.blockElement && typeof animateBlockMove !== 'undefined') {
-      this.animateBlockMove(element, oldPosition, targetPosition);
+      this.animateBlockMove(element.blockElement, oldPosition, targetPosition);
     }
     
     console.log(`移动方块 ${elementId} 从 (${oldPosition.x},${oldPosition.y}) 到 (${targetPosition.x},${targetPosition.y})`);
