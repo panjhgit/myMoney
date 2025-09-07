@@ -2436,7 +2436,7 @@ class MapEngine {
    * @param {Object} targetPosition - 目标位置 {x, y}
    */
   moveElementToPosition(elementId, targetPosition) {
-    const element = this.getElementById(elementId);
+    const element = this.elementRegistry.get(elementId);
     if (!element) {
       console.warn(`元素 ${elementId} 不存在`);
       return;
@@ -2511,12 +2511,9 @@ class MapEngine {
     oldCells.forEach(cell => {
       const elementsAtCell = this.spatialIndex.get(cell);
       if (elementsAtCell) {
-        const index = elementsAtCell.findIndex(el => el.id === element.id);
-        if (index !== -1) {
-          elementsAtCell.splice(index, 1);
-          if (elementsAtCell.length === 0) {
-            this.spatialIndex.delete(cell);
-          }
+        elementsAtCell.delete(element.id);
+        if (elementsAtCell.size === 0) {
+          this.spatialIndex.delete(cell);
         }
       }
     });
@@ -2525,9 +2522,9 @@ class MapEngine {
     const newCells = this.calculateOccupiedCells(newPosition, element.shapeData);
     newCells.forEach(cell => {
       if (!this.spatialIndex.has(cell)) {
-        this.spatialIndex.set(cell, []);
+        this.spatialIndex.set(cell, new Set());
       }
-      this.spatialIndex.get(cell).push(element);
+      this.spatialIndex.get(cell).add(element.id);
     });
   }
   

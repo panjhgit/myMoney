@@ -191,7 +191,91 @@ function drawGame() {
 function drawGameInfo() {
   if (!mapEngine) return;
   
-  // 不绘制任何文字，只保留空白背景
+  // 绘制顶部信息栏背景
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+  ctx.fillRect(15, 100, systemInfo.windowWidth - 30, 50);
+  
+  // 绘制金币
+  drawCoinIcon(25, 110);
+  drawCurrencyText(55, 110);
+  
+  // 绘制爱心
+  drawHeartIcon(systemInfo.windowWidth - 100, 110);
+  drawLivesText(systemInfo.windowWidth - 60, 110);
+  
+  // 绘制当前关卡
+  drawCurrentLevelText(systemInfo.windowWidth / 2, 110);
+}
+
+// 绘制金币图标
+function drawCoinIcon(x, y) {
+  ctx.fillStyle = '#FFD700';
+  ctx.beginPath();
+  ctx.arc(x + 15, y + 15, 15, 0, 2 * Math.PI);
+  ctx.fill();
+  
+  ctx.fillStyle = '#FFFFFF';
+  ctx.font = 'bold 12px Arial';
+  ctx.textAlign = 'center';
+  ctx.fillText('$', x + 15, y + 20);
+}
+
+// 绘制金币数量
+function drawCurrencyText(x, y) {
+  ctx.fillStyle = '#FFFFFF';
+  ctx.font = 'bold 14px Arial';
+  ctx.textAlign = 'left';
+  ctx.fillText('1905', x, y + 15);
+  
+  // 加号按钮
+  ctx.fillStyle = '#4CAF50';
+  ctx.beginPath();
+  ctx.arc(x + 40, y + 15, 8, 0, 2 * Math.PI);
+  ctx.fill();
+  
+  ctx.fillStyle = '#FFFFFF';
+  ctx.font = 'bold 12px Arial';
+  ctx.textAlign = 'center';
+  ctx.fillText('+', x + 40, y + 19);
+}
+
+// 绘制爱心图标
+function drawHeartIcon(x, y) {
+  ctx.fillStyle = '#FF6B6B';
+  ctx.beginPath();
+  ctx.moveTo(x + 15, y + 5);
+  ctx.bezierCurveTo(x + 5, y - 5, x - 5, y - 5, x - 5, y + 10);
+  ctx.bezierCurveTo(x - 5, y + 20, x + 15, y + 30, x + 15, y + 30);
+  ctx.bezierCurveTo(x + 15, y + 30, x + 35, y + 20, x + 35, y + 10);
+  ctx.bezierCurveTo(x + 35, y - 5, x + 25, y - 5, x + 15, y + 5);
+  ctx.fill();
+}
+
+// 绘制生命值
+function drawLivesText(x, y) {
+  ctx.fillStyle = '#FFFFFF';
+  ctx.font = 'bold 14px Arial';
+  ctx.textAlign = 'left';
+  ctx.fillText('5', x, y + 15);
+  
+  // 加号按钮
+  ctx.fillStyle = '#4CAF50';
+  ctx.beginPath();
+  ctx.arc(x + 20, y + 15, 8, 0, 2 * Math.PI);
+  ctx.fill();
+  
+  ctx.fillStyle = '#FFFFFF';
+  ctx.font = 'bold 12px Arial';
+  ctx.textAlign = 'center';
+  ctx.fillText('+', x + 20, y + 19);
+}
+
+// 绘制当前关卡
+function drawCurrentLevelText(x, y) {
+  ctx.fillStyle = '#FFFFFF';
+  ctx.font = 'bold 14px Arial';
+  ctx.textAlign = 'center';
+  ctx.fillText('关卡 1', x, y + 15);
 }
 
 // 默认绘制函数
