@@ -10,7 +10,7 @@ class MainMenu {
     this.lives = 5;
     this.maxLives = 5;
     this.currentLevel = 1;
-    this.maxUnlockedLevel = 1;
+    this.maxUnlockedLevel = 2; // 解锁前两关用于测试
     this.totalLevels = 500;
     
     // 滚动相关
@@ -370,8 +370,11 @@ class MainMenu {
   }
   
   isPointInLevel(x, y, level) {
-    return x >= level.x && x <= level.x + 60 && 
-           y >= level.y && y <= level.y + 60;
+    // 考虑绘制时的偏移（-30, -30）
+    const drawX = level.x - 30;
+    const drawY = level.y - 30;
+    return x >= drawX && x <= drawX + 60 && 
+           y >= drawY && y <= drawY + 60;
   }
   
   isPointInPlayButton(x, y) {
@@ -674,7 +677,7 @@ class MainMenu {
     // 只绘制可见的关卡
     const visibleLevels = this.levels.filter(level => {
       const screenY = level.y - this.scrollY;
-      return screenY >= 300 && screenY < 600; // 在关卡区域内显示
+      return screenY >= 280 && screenY < 620; // 扩大显示范围，确保第二关可见
     });
     
     console.log('可见关卡数量:', visibleLevels.length);
@@ -721,68 +724,6 @@ class MainMenu {
     this.ctx.restore();
   }
   
-  drawLevelBlock(level) {
-    const isCurrentLevel = level.id === this.currentLevel;
-    let color;
-    
-    if (!level.unlocked) {
-      color = this.colors.level.locked;
-    } else if (level.completed) {
-      color = this.colors.level.completed;
-    } else if (isCurrentLevel) {
-      color = this.colors.level.current;
-    } else {
-      color = this.colors.level.unlocked;
-    }
-    
-    // 计算屏幕坐标
-    const screenX = level.x;
-    const screenY = level.y - this.scrollY;
-    
-    // 确保只显示在关卡区域内
-    if (screenY < 300 || screenY > 600) {
-      return;
-    }
-    
-    this.ctx.save();
-    this.ctx.globalAlpha = level.alpha;
-    
-    // 应用变换
-    this.ctx.translate(screenX + 30, screenY + 30);
-    this.ctx.scale(level.scale, level.scale);
-    this.ctx.rotate(level.rotation * Math.PI / 180);
-    this.ctx.translate(-30, -30);
-    
-    // 关卡方块 - 圆角矩形更适合手机
-    this.ctx.fillStyle = color;
-    this.drawRoundedRect(0, 0, 60, 60, 8);
-    
-    // 方块内部装饰
-    this.drawLevelDecorations({ x: 0, y: 0 });
-    
-    // 关卡数字 - 调整字体大小
-    this.ctx.fillStyle = this.colors.text;
-    this.ctx.font = 'bold 14px Arial';
-    this.ctx.textAlign = 'center';
-    this.ctx.fillText(level.id.toString(), 30, 38);
-    
-    // 特殊关卡标记
-    if (level.id % 50 === 0) {
-      this.drawBossLevelMark(30, 8);
-    }
-    
-    // 锁定图标
-    if (!level.unlocked) {
-      this.drawLockIcon(50, 8);
-    }
-    
-    // 完成标记
-    if (level.completed) {
-      this.drawCompletedMark(8, 8);
-    }
-    
-    this.ctx.restore();
-  }
   
   // 绘制圆角矩形
   drawRoundedRect(x, y, width, height, radius) {

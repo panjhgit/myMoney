@@ -12,6 +12,7 @@ require('./src/js/menu.js');
 require('./src/js/map-engine.js');
 require('./src/js/block.js');
 require('./src/map/map1.js');
+require('./src/map/map2.js');
 
 let systemInfo = tt.getSystemInfoSync();
 let canvas = tt.createCanvas(),
@@ -83,8 +84,13 @@ function startGame(levelId) {
   }
   
   // 检查地图数据是否已加载
-  if (typeof map1 === 'undefined') {
-    console.error('地图数据未找到，请检查 map1.js 是否正确加载');
+  let mapData;
+  if (levelId === 1 && typeof map1 !== 'undefined') {
+    mapData = map1;
+  } else if (levelId === 2 && typeof map2 !== 'undefined') {
+    mapData = map2;
+  } else {
+    console.error(`地图数据未找到，关卡 ${levelId} 不存在`);
     return;
   }
   
@@ -96,7 +102,7 @@ function startGame(levelId) {
   
   // 立即切换到游戏状态
   gameState = 'game';
-  console.log(`关卡 ${levelId} 开始，地图：${map1.name}`);
+  console.log(`关卡 ${levelId} 开始，地图：${mapData.name}`);
   
   // 创建地图引擎实例
   mapEngine = new MapEngine();
@@ -105,7 +111,7 @@ function startGame(levelId) {
   mapEngine.setRenderContext(ctx, systemInfo);
   
   // 加载地图数据
-  mapEngine.loadMap(map1);
+  mapEngine.loadMap(mapData);
   
   console.log('Block 系统已加载，支持方块动画和行为');
   console.log('游戏状态已切换到:', gameState);

@@ -78,8 +78,8 @@ var drawCreature = function(ctx, creature, startX, startY) {
     ctx.lineWidth = 1;
     ctx.strokeRect(blockX, blockY, CREATURE_CONFIG.CELL_SIZE, CREATURE_CONFIG.CELL_SIZE);
     
-    // 绘制眼睛（在第一个方块上）
-    if (block === element.blocks[0]) {
+    // 绘制眼睛（智能选择位置）
+    if (shouldDrawEyesOnBlock(block, element.blocks)) {
       drawEyes(ctx, blockX, blockY, creature.element);
     }
   });
@@ -110,6 +110,29 @@ var drawCreature = function(ctx, creature, startX, startY) {
   }
   
   ctx.restore();
+};
+
+// 智能选择眼睛绘制位置
+var shouldDrawEyesOnBlock = function(currentBlock, allBlocks) {
+  // 对于1x1方块，在唯一方块上绘制眼睛
+  if (allBlocks.length === 1) {
+    return currentBlock === allBlocks[0];
+  }
+  
+  // 对于2x2方块，在左上角方块上绘制眼睛
+  if (allBlocks.length === 4) {
+    // 找到最左上角的方块
+    var topLeftBlock = allBlocks.reduce(function(min, block) {
+      if (block[1] < min[1] || (block[1] === min[1] && block[0] < min[0])) {
+        return block;
+      }
+      return min;
+    });
+    return currentBlock === topLeftBlock;
+  }
+  
+  // 对于其他形状，在第一个方块上绘制眼睛
+  return currentBlock === allBlocks[0];
 };
 
 // 绘制眼睛 - 支持多种眼睛类型
@@ -900,39 +923,30 @@ var startFlyingAnimation = function(creature) {
     repeat: -1
   });
   
-  // 翅膀扇动动画
+  // 翅膀扇动动画 - 以根部为轴，翅膀尖向下扇动
   if (creature.wings && creature.wings.length > 0) {
-    // 将翅膀分为两组：左翅膀和右翅膀
-    var leftWings = creature.wings.filter(function(wing, index) { return index % 2 === 0; });
-    var rightWings = creature.wings.filter(function(wing, index) { return index % 2 === 1; });
-    
     // 创建翅膀扇动时间线
     var wingTimeline = gsap.timeline({ repeat: -1 });
     
-    // 翅膀扇动周期
-    wingTimeline
-      // 羽毛向下摆动 - 左右翅膀垂直对称摆动
-      .to(leftWings, {
-        rotation: -45, // 左翅膀向下摆动到-45°
-        duration: 0.4,
-        ease: "power2.inOut"
+    // 翅膀扇动周期：翅膀尖向下扇动，然后恢复
+    creature.wings.forEach(function(wing, index) {
+      var isLeftWing = index === 0; // 左翅膀
+      var originalRotation = wing.originalRotation;
+      
+      // 翅膀向下扇动（翅膀尖向下）
+      wingTimeline.to(wing, {
+        rotation: originalRotation + (isLeftWing ? -30 : 30), // 左翅膀向左下，右翅膀向右下
+        duration: 0.3,
+        ease: "power2.out"
       }, 0)
-      .to(rightWings, {
-        rotation: 45, // 右翅膀向下摆动到+45°（垂直对称）
-        duration: 0.4,
-        ease: "power2.inOut"
-      }, 0)
-      // 恢复到原位
-      .to(leftWings, {
-        rotation: -30, // 左翅膀恢复到-30°
-        duration: 0.4,
-        ease: "power2.inOut"
-      }, 0.4)
-      .to(rightWings, {
-        rotation: 30, // 右翅膀恢复到+30°
-        duration: 0.4,
-        ease: "power2.inOut"
-      }, 0.4);
+      
+      // 翅膀恢复原位
+      .to(wing, {
+        rotation: originalRotation, // 恢复到原始角度
+        duration: 0.3,
+        ease: "power2.in"
+      }, 0.3);
+    });
     
     creature.animations.wingTimeline = wingTimeline;
   }
@@ -1150,27 +1164,39 @@ var createSimpleWings = function(creature) {
   
   creature.wings = [];
   
-  // 找到眼睛所在的那一列作为翅膀对称中心
+  // 找到躯干的中心线（对称轴）
   var blocks = creature.colorData.blocks;
   var minY = Math.min.apply(Math, blocks.map(function(b) { return b[1]; }));
+  var maxY = Math.max.apply(Math, blocks.map(function(b) { return b[1]; }));
   
-  // 找到最顶部的方块（头部，有眼睛）
-  var topBlocks = blocks.filter(function(block) { return block[1] === minY; });
-  var headBlock = topBlocks[0];
+  // 找到躯干的中心X坐标（对称轴）
+  var centerX = 0;
+  var centerY = 0;
   
-  // 眼睛所在的那一列的X坐标（翅膀对称中心）
-  var eyeColumnX = headBlock[0];
+  // 计算躯干的中心点
+  var totalX = 0, totalY = 0;
+  blocks.forEach(function(block) {
+    totalX += block[0];
+    totalY += block[1];
+  });
+  centerX = totalX / blocks.length;
+  centerY = totalY / blocks.length;
   
-  // 创建翅膀
+  // 创建左右翅膀，位置在躯干格子外
+  var cellSize = CREATURE_CONFIG.CELL_SIZE;
+  var wingOffset = cellSize * 0.8; // 翅膀在躯干外80%格子大小的距离
+  
   for (var i = 0; i < 2; i++) {
     var wing = {
-      x: eyeColumnX * CREATURE_CONFIG.CELL_SIZE + (i === 0 ? -15 : 15),
-      y: headBlock[1] * CREATURE_CONFIG.CELL_SIZE + 5,
-      width: 20,
-      height: 12,
-      rotation: i === 0 ? -30 : 30, // 左翅膀向左下倾斜，右翅膀向右下倾斜
-      color: '#000',
-      originalRotation: i === 0 ? -30 : 30
+      x: centerX * cellSize + (i === 0 ? -wingOffset : wingOffset), // 左翅膀在左，右翅膀在右
+      y: centerY * cellSize, // 翅膀在躯干中心高度
+      width: cellSize * 0.6, // 翅膀宽度：格子大小的60%
+      height: cellSize * 0.4, // 翅膀高度：格子大小的40%
+      rotation: i === 0 ? -20 : 20, // 左翅膀向左倾斜，右翅膀向右倾斜
+      color: '#2C3E50', // 深蓝色，与腿颜色一致
+      originalRotation: i === 0 ? -20 : 20,
+      originalX: centerX * cellSize + (i === 0 ? -wingOffset : wingOffset),
+      originalY: centerY * cellSize
     };
     
     creature.wings.push(wing);
@@ -1229,19 +1255,62 @@ var drawWing = function(ctx, wing) {
   ctx.translate(wing.x, wing.y);
   ctx.rotate(wing.rotation * Math.PI / 180);
   
-  // 绘制简单的翅膀形状（椭圆形）
-  ctx.fillStyle = wing.color;
-  ctx.beginPath();
-  ctx.ellipse(wing.width / 2, wing.height / 2, wing.width / 2, wing.height / 2, 0, 0, 2 * Math.PI);
-  ctx.fill();
+  // 设置翅膀颜色和描边
+  ctx.fillStyle = '#2C3E50';
+  ctx.strokeStyle = '#000000';
+  ctx.lineWidth = Math.max(3, wing.width * 0.15);
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
   
-  // 绘制翅膀纹理线条
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
-  ctx.lineWidth = 1;
-  for (var i = 1; i < 3; i++) {
+  var w = wing.width;
+  var h = wing.height;
+  
+  // 使用完整的原始SVG路径
+  if (typeof Path2D !== 'undefined') {
+    try {
+      var svgScale = 0.1;
+      var targetScale = Math.min(w / (1368 * svgScale), h / (1368 * svgScale)) * 0.4;
+      
+      // 根据翅膀方向设置变换
+      if (wing.side === 'right') {
+        ctx.scale(-targetScale, targetScale);
+        ctx.translate(-1368 * svgScale, 0);
+      } else {
+        ctx.scale(targetScale, targetScale);
+      }
+      
+      // 应用SVG的内置变换
+      ctx.translate(0, 1368);
+      ctx.scale(0.1, -0.1);
+      
+      // 使用完整的原始SVG路径数据
+      var originalPath = 'M5231 9564 c-242 -65 -518 -329 -625 -598 -55 -138 -95 -371 -82 -487 4 -35 10 -107 15 -159 21 -232 144 -573 289 -804 34 -54 62 -100 62 -102 0 -2 -62 -4 -137 -4 -166 0 -289 -27 -418 -91 -138 -68 -286 -214 -349 -344 -66 -137 -71 -164 -71 -430 0 -267 8 -312 80 -455 114 -226 383 -467 723 -646 50 -26 92 -52 92 -56 0 -4 -21 -16 -46 -27 -55 -25 -141 -110 -171 -171 -56 -111 -66 -190 -37 -310 72 -306 477 -674 953 -866 164 -67 601 -173 711 -174 19 0 63 -7 97 -15 161 -38 600 -38 758 0 226 54 278 70 378 119 l108 54 46 -92 c61 -121 107 -187 197 -283 120 -127 278 -227 420 -263 241 -61 662 -45 904 36 274 91 520 255 656 438 140 189 184 280 233 486 15 64 18 122 18 400 -1 301 -2 333 -24 435 -82 387 -267 833 -568 1370 -41 73 -223 350 -309 470 -117 163 -390 495 -573 695 -251 275 -659 666 -942 902 -69 58 -462 355 -561 425 -413 290 -878 500 -1225 552 -109 17 -535 13 -602 -5z m614 -241 c249 -61 563 -191 794 -330 354 -214 806 -562 1186 -912 138 -128 493 -489 606 -616 444 -502 717 -893 966 -1385 120 -236 167 -343 238 -538 124 -342 175 -589 175 -853 0 -210 -43 -389 -136 -570 -107 -208 -310 -373 -583 -476 -255 -96 -613 -110 -844 -32 -215 72 -388 280 -492 592 -140 421 -75 866 163 1119 122 130 270 205 447 228 82 11 255 11 338 1 31 -4 61 -5 65 -2 4 4 13 38 20 76 10 61 9 72 -4 82 -24 18 -154 26 -319 20 -236 -9 -396 -62 -565 -188 -144 -107 -241 -242 -311 -432 -83 -222 -96 -417 -52 -783 5 -40 4 -42 -49 -76 -123 -82 -259 -138 -423 -175 -151 -34 -452 -43 -642 -19 -578 73 -931 194 -1248 425 -97 71 -238 213 -292 295 -139 207 -120 322 64 407 131 60 254 71 728 69 435 -3 461 -3 453 5 -3 3 -171 48 -374 101 -203 52 -432 115 -509 141 -241 79 -520 212 -656 312 -30 22 -71 53 -93 68 -65 47 -201 198 -250 276 -76 123 -99 200 -104 352 -6 228 42 372 168 496 110 108 231 156 421 166 219 12 451 -59 630 -192 41 -30 79 -55 86 -55 7 0 17 10 24 23 6 12 28 39 48 61 l36 38 -49 42 c-388 326 -686 868 -725 1319 -14 158 1 312 40 427 79 229 266 426 474 499 55 20 76 21 265 17 157 -3 224 -9 285 -23z';
+      
+      var path = new Path2D(originalPath);
+      ctx.fill(path);
+      ctx.stroke(path);
+    } catch (e) {
+      // 如果SVG路径失败，回退到简化版本
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.quadraticCurveTo(w * 0.3, w * 0.2, w * 0.6, w * 0.1);
+      ctx.quadraticCurveTo(w * 0.8, w * 0.3, w * 0.9, w * 0.5);
+      ctx.quadraticCurveTo(w * 0.7, w * 0.8, w * 0.4, w * 0.9);
+      ctx.quadraticCurveTo(w * 0.1, w * 0.7, 0, w * 0.5);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+    }
+  } else {
+    // 不支持Path2D时的备用方案
     ctx.beginPath();
-    ctx.moveTo(wing.width * 0.2, wing.height * i / 3);
-    ctx.lineTo(wing.width * 0.8, wing.height * i / 3);
+    ctx.moveTo(0, 0);
+    ctx.quadraticCurveTo(w * 0.3, w * 0.2, w * 0.6, w * 0.1);
+    ctx.quadraticCurveTo(w * 0.8, w * 0.3, w * 0.9, w * 0.5);
+    ctx.quadraticCurveTo(w * 0.7, w * 0.8, w * 0.4, w * 0.9);
+    ctx.quadraticCurveTo(w * 0.1, w * 0.7, 0, w * 0.5);
+    ctx.closePath();
+    ctx.fill();
     ctx.stroke();
   }
   

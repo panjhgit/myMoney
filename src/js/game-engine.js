@@ -944,3 +944,46 @@ class GameEngine {
     console.log(`游戏引擎 ${this.levelId} 已销毁`);
   }
 }
+
+// 地图管理器类
+class MapManager {
+  constructor() {
+    this.maps = new Map();
+    this.loadMaps();
+  }
+  
+  // 加载所有地图
+  loadMaps() {
+    // 加载第一关地图
+    if (typeof map1 !== 'undefined') {
+      this.maps.set(1, map1);
+    }
+    
+    // 加载第二关地图
+    if (typeof map2 !== 'undefined') {
+      this.maps.set(2, map2);
+    }
+    
+    console.log(`地图管理器初始化完成，已加载 ${this.maps.size} 个地图`);
+  }
+  
+  // 获取指定关卡的地图
+  getMap(levelId) {
+    const map = this.maps.get(levelId);
+    if (!map) {
+      console.error(`地图 ${levelId} 不存在`);
+      return null;
+    }
+    return map;
+  }
+  
+  // 获取所有可用地图
+  getAllMaps() {
+    return Array.from(this.maps.keys());
+  }
+  
+  // 检查地图是否存在
+  hasMap(levelId) {
+    return this.maps.has(levelId);
+  }
+}

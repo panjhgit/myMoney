@@ -239,7 +239,9 @@ class MapEngine {
       layer: block.layer || 0,
       movable: true,
       occupiedCells: this.calculateOccupiedCells(block.position, blockElement.shapeData),
-      blockElement: blockElement // 保存 block.js 创建的元素
+      blockElement: blockElement, // 保存 block.js 创建的元素
+      movementType: block.movementType, // 运动类型（feet, wings, crawl）
+      wingConfig: block.wingConfig // 翅膀配置
     };
     
     this.addElement(element);
@@ -345,6 +347,52 @@ class MapEngine {
     }
     
     this.elementRegistry.set(element.id, element);
+    
+    // 处理运动类型（如果是俄罗斯方块）
+    if (element.type === 'tetris' && element.movementType && element.blockElement) {
+      this.applyMovementType(element);
+    }
+  }
+  
+  /**
+   * 应用运动类型到方块
+   * @param {Object} element - 方块元素
+   */
+  applyMovementType(element) {
+    if (!element.blockElement || !element.movementType) {
+      return;
+    }
+    
+    // 设置运动类型
+    element.blockElement.movementType = element.movementType;
+    
+    // 根据运动类型应用相应的动画
+    if (element.movementType === 'wings') {
+      // 创建翅膀
+      if (typeof createSimpleWings !== 'undefined') {
+        createSimpleWings(element.blockElement);
+      }
+      // 开始飞行动画
+      if (typeof startFlyingAnimation !== 'undefined') {
+        startFlyingAnimation(element.blockElement);
+      }
+    } else if (element.movementType === 'feet') {
+      // 创建腿
+      if (typeof createSimpleFeet !== 'undefined') {
+        createSimpleFeet(element.blockElement);
+      }
+      // 开始走路动画
+      if (typeof startWalkingAnimation !== 'undefined') {
+        startWalkingAnimation(element.blockElement);
+      }
+    } else if (element.movementType === 'crawl') {
+      // 开始爬行动画
+      if (typeof startCrawlingAnimation !== 'undefined') {
+        startCrawlingAnimation(element.blockElement);
+      }
+    }
+    
+    console.log(`方块 ${element.id} 应用运动类型: ${element.movementType}`);
   }
   
   /**
