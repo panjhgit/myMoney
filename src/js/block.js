@@ -69,6 +69,42 @@ var BLOCK_COLORS = {
   }
 };
 
+// 眼睛类型配置 - 几何形状眼睛
+var EYE_TYPES = {
+  circle: {
+    name: 'circle',
+    shape: 'circle',
+    size: 1.0,
+    pupilSize: 0.5,
+    eyebrowStyle: 'curved',
+    description: '圆形眼睛'
+  },
+  square: {
+    name: 'square',
+    shape: 'square',
+    size: 1.0,
+    pupilSize: 0.4,
+    eyebrowStyle: 'curved',
+    description: '正方形眼睛'
+  },
+  triangle: {
+    name: 'triangle',
+    shape: 'triangle',
+    size: 1.4, // 再大一点
+    pupilSize: 0.4,
+    eyebrowStyle: 'curved',
+    description: '三角形眼睛'
+  },
+  star: {
+    name: 'star',
+    shape: 'star',
+    size: 1.4, // 再大一点
+    pupilSize: 0.3,
+    eyebrowStyle: 'curved',
+    description: '五角星眼睛'
+  }
+};
+
 // 形状配置 - 基于原代码的俄罗斯方块形状
 var BLOCK_SHAPES = {
   '1x1': {
@@ -76,6 +112,7 @@ var BLOCK_SHAPES = {
     blocks: [[0, 0]],
     movementType: 'feet',
     eyePosition: 'center',
+    eyeType: 'circle',
     description: '单个方块'
   },
   '1x2': {
@@ -83,6 +120,7 @@ var BLOCK_SHAPES = {
     blocks: [[0, 0], [0, 1]],
     movementType: 'feet',
     eyePosition: 'top',
+    eyeType: 'square',
     description: '2个方块直线'
   },
   '1x3': {
@@ -90,6 +128,7 @@ var BLOCK_SHAPES = {
     blocks: [[0, 0], [0, 1], [0, 2]],
     movementType: 'crawl',
     eyePosition: 'top',
+    eyeType: 'triangle',
     description: '3个方块直线'
   },
   '2x1': {
@@ -97,6 +136,7 @@ var BLOCK_SHAPES = {
     blocks: [[0, 0], [1, 0]],
     movementType: 'feet',
     eyePosition: 'left',
+    eyeType: 'star',
     description: '2个方块横线'
   },
   '2x2': {
@@ -104,6 +144,7 @@ var BLOCK_SHAPES = {
     blocks: [[0, 0], [1, 0], [0, 1], [1, 1]],
     movementType: 'feet',
     eyePosition: 'top-left',
+    eyeType: 'circle',
     description: '2x2方块'
   },
   'I-shape': {
@@ -111,6 +152,7 @@ var BLOCK_SHAPES = {
     blocks: [[0, 0], [0, 1], [0, 2], [0, 3]],
     movementType: 'crawl',
     eyePosition: 'top',
+    eyeType: 'triangle',
     description: 'I形方块'
   },
   'L-shape': {
@@ -118,6 +160,7 @@ var BLOCK_SHAPES = {
     blocks: [[0, 0], [0, 1], [0, 2], [1, 2]],
     movementType: 'feet',
     eyePosition: 'top',
+    eyeType: 'square',
     description: 'L形方块'
   },
   'T-shape': {
@@ -125,6 +168,7 @@ var BLOCK_SHAPES = {
     blocks: [[0, 0], [1, 0], [2, 0], [1, 1]],
     movementType: 'feet',
     eyePosition: 'top',
+    eyeType: 'triangle',
     description: 'T形方块'
   },
   'S-shape': {
@@ -132,6 +176,7 @@ var BLOCK_SHAPES = {
     blocks: [[0, 0], [1, 0], [1, 1], [2, 1]],
     movementType: 'feet',
     eyePosition: 'top',
+    eyeType: 'star',
     description: 'S形方块'
   },
   'Z-shape': {
@@ -139,6 +184,7 @@ var BLOCK_SHAPES = {
     blocks: [[0, 1], [1, 1], [1, 0], [2, 0]],
     movementType: 'feet',
     eyePosition: 'top',
+    eyeType: 'star',
     description: 'Z形方块'
   },
   'bigL': {
@@ -146,6 +192,7 @@ var BLOCK_SHAPES = {
     blocks: [[0, 0], [0, 1], [0, 2], [1, 2], [2, 2]],
     movementType: 'feet',
     eyePosition: 'top',
+    eyeType: 'square',
     description: '大L形方块'
   },
   'cross': {
@@ -153,6 +200,7 @@ var BLOCK_SHAPES = {
     blocks: [[1, 0], [0, 1], [1, 1], [2, 1], [1, 2]],
     movementType: 'feet',
     eyePosition: 'center',
+    eyeType: 'circle',
     description: '十字形方块'
   }
 };
@@ -389,6 +437,7 @@ if (typeof window !== 'undefined') {
   window.BLOCK_CONFIG = BLOCK_CONFIG;
   window.BLOCK_COLORS = BLOCK_COLORS;
   window.BLOCK_SHAPES = BLOCK_SHAPES;
+  window.EYE_TYPES = EYE_TYPES;
   window.createBlock = createBlock;
   window.drawBlock = drawBlock;
   window.createIce = createIce;
@@ -404,6 +453,7 @@ if (typeof window !== 'undefined') {
   global.BLOCK_CONFIG = BLOCK_CONFIG;
   global.BLOCK_COLORS = BLOCK_COLORS;
   global.BLOCK_SHAPES = BLOCK_SHAPES;
+  global.EYE_TYPES = EYE_TYPES;
   global.createBlock = createBlock;
   global.drawBlock = drawBlock;
   global.createIce = createIce;
@@ -420,6 +470,7 @@ if (typeof window !== 'undefined') {
   this.BLOCK_CONFIG = BLOCK_CONFIG;
   this.BLOCK_COLORS = BLOCK_COLORS;
   this.BLOCK_SHAPES = BLOCK_SHAPES;
+  this.EYE_TYPES = EYE_TYPES;
   this.createBlock = createBlock;
   this.drawBlock = drawBlock;
   this.createIce = createIce;

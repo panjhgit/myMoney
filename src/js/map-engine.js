@@ -223,6 +223,7 @@ class MapEngine {
       blocks: shapeData.blocks,
       movementType: shapeData.movementType,
       eyePosition: shapeData.eyePosition,
+      eyeType: shapeData.eyeType,
       shape: block.shape
     };
     
