@@ -190,7 +190,6 @@ function drawGameInfo() {
   // 绘制操作提示
   ctx.font = '12px Arial';
   ctx.fillText('点击方块选择，拖拽移动', systemInfo.windowWidth / 2, systemInfo.windowHeight - 60);
-  ctx.fillText('双击返回主菜单', systemInfo.windowWidth / 2, systemInfo.windowHeight - 40);
 }
 
 // 默认绘制函数

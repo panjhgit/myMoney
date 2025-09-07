@@ -2433,7 +2433,8 @@ class MapEngine {
    * @param {Object} targetPosition - 目标位置 {x, y}
    */
   moveElementToPosition(elementId, targetPosition) {
-    const element = this.getElementById(elementId);
+    // 在方块列表中查找元素
+    const element = this.getAllElementsByType('tetris').find(block => block.id === elementId);
     if (!element) {
       console.warn(`元素 ${elementId} 不存在`);
       return;
@@ -2455,7 +2456,7 @@ class MapEngine {
     
     // 播放移动动画
     if (element.blockElement && typeof animateBlockMove !== 'undefined') {
-      this.animateBlockMove(element.blockElement, oldPosition, targetPosition);
+      this.animateBlockMove(element, oldPosition, targetPosition);
     }
     
     console.log(`移动方块 ${elementId} 从 (${oldPosition.x},${oldPosition.y}) 到 (${targetPosition.x},${targetPosition.y})`);

@@ -186,7 +186,6 @@ class MainMenu {
   
   setupEventListeners() {
     this.canvas.addEventListener('click', (e) => this.handleClick(e));
-    this.canvas.addEventListener('dblclick', (e) => this.handleDoubleClick(e));
     this.canvas.addEventListener('touchstart', (e) => this.handleTouchStart(e), { passive: false });
     this.canvas.addEventListener('touchmove', (e) => this.handleTouchMove(e), { passive: false });
     this.canvas.addEventListener('touchend', (e) => this.handleTouchEnd(e), { passive: false });
@@ -234,15 +233,6 @@ class MainMenu {
     }
   }
   
-  // 双击处理（用于返回主菜单功能）
-  handleDoubleClick(event) {
-    event.preventDefault();
-    console.log('双击检测到 - 返回主菜单');
-    // 触发返回主菜单事件
-    if (window.onReturnToMenu) {
-      window.onReturnToMenu();
-    }
-  }
   
   handleClick(event) {
     // 在抖音小游戏中，直接使用事件坐标
