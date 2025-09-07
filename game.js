@@ -251,6 +251,7 @@ function setupGameEvents() {
     // ESC键返回主菜单
     if (e.key === 'Escape' && gameState === 'game') {
       console.log('ESC键被按下，准备返回主菜单');
+      console.log('按键详情:', { key: e.key, code: e.code, keyCode: e.keyCode });
       
       // 彻底清理游戏状态
       gameState = 'menu';

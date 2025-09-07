@@ -945,17 +945,17 @@ class MapEngine {
         paused: true
       });
 
-      // 🧊 冰块动画 - 逼真的冰块效果
+      // 🧊 冰块动画 - 静态效果
       this.iceAnimation = gsap.to(this.animationTargets.ice, {
-        scale: 1.05,
-        rotation: 2,
-        glow: 0.5,
-        shimmer: 1.2,
-        crack: 0.8,
-        duration: 3.0,
-        ease: "power2.inOut",
-        yoyo: true,
-        repeat: -1
+        shimmer: 0,
+        glow: 0,
+        crack: 0,
+        scale: 1,
+        duration: 0,
+        ease: "none",
+        repeat: 0,
+        yoyo: false,
+        paused: true
       });
 
       // 创建时间轴动画 - 组合多个动画
@@ -1528,10 +1528,7 @@ class MapEngine {
     // 绘制石块
     this.drawRocks();
     
-    // 绘制冰层
-    this.drawIceLayers();
-    
-    // 绘制俄罗斯方块
+    // 绘制俄罗斯方块（包括被冰块包裹的方块）
     this.drawTetrisBlocks();
   }
   
@@ -1859,51 +1856,34 @@ class MapEngine {
       this.ctx.scale(iceScale, iceScale);
       this.ctx.translate(-this.cellSize / 2, -this.cellSize / 2);
       
-      // 🧊 逼真的冰块效果 - 多层渐变
-      // 外层冰块 - 透明蓝色
-      const outerGradient = this.ctx.createRadialGradient(
-        this.cellSize * 0.3, this.cellSize * 0.3, 0,
-        this.cellSize * 0.7, this.cellSize * 0.7, this.cellSize * 0.8
-      );
-      outerGradient.addColorStop(0, `rgba(173, 216, 230, ${iceAlpha * 0.8})`);
-      outerGradient.addColorStop(0.5, `rgba(135, 206, 235, ${iceAlpha * 0.6})`);
-      outerGradient.addColorStop(1, `rgba(100, 149, 237, ${iceAlpha * 0.4})`);
+      // 🧊 几乎完全透明的冰块效果 - 圆角立方体
+      const cornerRadius = this.cellSize * 0.15; // 圆角半径
       
-      this.ctx.fillStyle = outerGradient;
-      this.ctx.fillRect(0, 0, this.cellSize, this.cellSize);
+      // 冰块主体 - 几乎完全透明蓝色
+      this.ctx.fillStyle = `rgba(173, 216, 230, ${iceAlpha * 0.01})`;
+      this.ctx.beginPath();
+      this.ctx.roundRect(0, 0, this.cellSize, this.cellSize, cornerRadius);
+      this.ctx.fill();
       
-      // 内层冰块 - 更透明的中心
-      const innerGradient = this.ctx.createRadialGradient(
-        this.cellSize * 0.4, this.cellSize * 0.4, 0,
-        this.cellSize * 0.6, this.cellSize * 0.6, this.cellSize * 0.4
-      );
-      innerGradient.addColorStop(0, `rgba(255, 255, 255, ${iceAlpha * 0.9})`);
-      innerGradient.addColorStop(0.3, `rgba(173, 216, 230, ${iceAlpha * 0.7})`);
-      innerGradient.addColorStop(1, `rgba(135, 206, 235, ${iceAlpha * 0.5})`);
+      // 冰块顶部高光 - 更亮的区域
+      this.ctx.fillStyle = `rgba(255, 255, 255, ${iceAlpha * 0.02})`;
+      this.ctx.beginPath();
+      this.ctx.roundRect(0, 0, this.cellSize, this.cellSize * 0.3, cornerRadius);
+      this.ctx.fill();
       
-      this.ctx.fillStyle = innerGradient;
-      this.ctx.fillRect(this.cellSize * 0.1, this.cellSize * 0.1, this.cellSize * 0.8, this.cellSize * 0.8);
-      
-      // 🧊 冰块高光 - 模拟光线折射
-      const highlightGradient = this.ctx.createLinearGradient(0, 0, this.cellSize * 0.6, this.cellSize * 0.6);
-      highlightGradient.addColorStop(0, `rgba(255, 255, 255, ${iceAlpha * 0.8})`);
-      highlightGradient.addColorStop(0.3, `rgba(255, 255, 255, ${iceAlpha * 0.4})`);
-      highlightGradient.addColorStop(1, `rgba(255, 255, 255, 0)`);
-      
-      this.ctx.fillStyle = highlightGradient;
-      this.ctx.fillRect(0, 0, this.cellSize * 0.6, this.cellSize * 0.6);
-      
-      // 🧊 冰块边框 - 发光边框
-      this.ctx.strokeStyle = `rgba(135, 206, 235, ${iceAlpha + iceGlow})`;
-      this.ctx.lineWidth = 3;
-      this.ctx.strokeRect(1, 1, this.cellSize - 2, this.cellSize - 2);
-      
-      // 🧊 冰块内部纹理 - 模拟冰晶结构
-      this.ctx.strokeStyle = `rgba(255, 255, 255, ${iceAlpha * 0.6})`;
+      // 冰块边框 - 圆角边框
+      this.ctx.strokeStyle = `rgba(135, 206, 235, ${iceAlpha * 0.03})`;
       this.ctx.lineWidth = 1;
+      this.ctx.beginPath();
+      this.ctx.roundRect(0.5, 0.5, this.cellSize - 1, this.cellSize - 1, cornerRadius);
+      this.ctx.stroke();
       
-      // 绘制冰晶裂纹 - 更真实的裂纹
-      const crackCount = 4 + Math.floor(Math.random() * 3);
+      // 冰块内部裂纹 - 白色线条
+      this.ctx.strokeStyle = `rgba(255, 255, 255, ${iceAlpha * 0.1})`;
+      this.ctx.lineWidth = 0.8;
+      
+      // 绘制裂纹 - 网状结构
+      const crackCount = 3 + Math.floor(Math.random() * 2);
       for (let i = 0; i < crackCount; i++) {
         const startX = Math.random() * this.cellSize;
         const startY = Math.random() * this.cellSize;
@@ -1914,37 +1894,27 @@ class MapEngine {
         this.ctx.moveTo(startX, startY);
         this.ctx.lineTo(endX, endY);
         this.ctx.stroke();
-        
-        // 添加裂纹分支
-        if (Math.random() > 0.5) {
-          this.ctx.beginPath();
-          this.ctx.moveTo((startX + endX) / 2, (startY + endY) / 2);
-          this.ctx.lineTo(
-            (startX + endX) / 2 + (Math.random() - 0.5) * this.cellSize * 0.3,
-            (startY + endY) / 2 + (Math.random() - 0.5) * this.cellSize * 0.3
-          );
-          this.ctx.stroke();
-        }
       }
       
-      // 🧊 冰块闪烁效果 - 模拟光线反射
-      if (iceGlow > 0.4) {
-        const shimmerGradient = this.ctx.createRadialGradient(
-          this.cellSize * 0.2, this.cellSize * 0.2, 0,
-          this.cellSize * 0.2, this.cellSize * 0.2, this.cellSize * 0.4
+      // 冰块底部融化效果 - 小水珠
+      if (ice.meltProgress > 0) {
+        this.ctx.fillStyle = `rgba(255, 255, 255, ${iceAlpha * 0.4})`;
+        this.ctx.beginPath();
+        this.ctx.ellipse(
+          this.cellSize * 0.2, this.cellSize * 0.9, 
+          this.cellSize * 0.1, this.cellSize * 0.05, 
+          0, 0, 2 * Math.PI
         );
-        shimmerGradient.addColorStop(0, `rgba(255, 255, 255, ${iceGlow * 0.6})`);
-        shimmerGradient.addColorStop(0.5, `rgba(173, 216, 230, ${iceGlow * 0.3})`);
-        shimmerGradient.addColorStop(1, `rgba(255, 255, 255, 0)`);
+        this.ctx.fill();
         
-        this.ctx.fillStyle = shimmerGradient;
-        this.ctx.fillRect(0, 0, this.cellSize, this.cellSize);
+        this.ctx.beginPath();
+        this.ctx.ellipse(
+          this.cellSize * 0.7, this.cellSize * 0.85, 
+          this.cellSize * 0.08, this.cellSize * 0.04, 
+          0, 0, 2 * Math.PI
+        );
+        this.ctx.fill();
       }
-      
-      // 🧊 冰块边缘 - 模拟冰的厚度
-      this.ctx.strokeStyle = `rgba(100, 149, 237, ${iceAlpha * 0.8})`;
-      this.ctx.lineWidth = 1;
-      this.ctx.strokeRect(0, 0, this.cellSize, this.cellSize);
       
       // 恢复状态
       this.ctx.restore();
@@ -2025,12 +1995,65 @@ class MapEngine {
   }
   
   /**
+   * 绘制被冰块包裹的方块 - 静态冰块效果
+   * @param {Object} block - 方块对象
+   * @param {number} blockWidth - 方块宽度
+   * @param {number} blockHeight - 方块高度
+   */
+  drawIceWrappedBlock(block, blockWidth, blockHeight) {
+    // 🧊 冰块主体 - 静态渐变效果
+    const mainGradient = this.ctx.createLinearGradient(0, 0, blockWidth, blockHeight);
+    mainGradient.addColorStop(0, `rgba(173, 216, 230, 0.9)`);
+    mainGradient.addColorStop(0.5, `rgba(135, 206, 235, 0.8)`);
+    mainGradient.addColorStop(1, `rgba(100, 149, 237, 0.9)`);
+    this.ctx.fillStyle = mainGradient;
+    this.ctx.fillRect(0, 0, blockWidth, blockHeight);
+    
+    // 冰块高光层 - 静态高光
+    const highlightGradient = this.ctx.createLinearGradient(0, 0, blockWidth * 0.6, blockHeight * 0.4);
+    highlightGradient.addColorStop(0, `rgba(255, 255, 255, 0.3)`);
+    highlightGradient.addColorStop(1, `rgba(255, 255, 255, 0)`);
+    this.ctx.fillStyle = highlightGradient;
+    this.ctx.fillRect(0, 0, blockWidth * 0.6, blockHeight * 0.4);
+    
+    // 冰块边框 - 静态边框
+    this.ctx.strokeStyle = `rgba(135, 206, 235, 0.6)`;
+    this.ctx.lineWidth = 2;
+    this.ctx.strokeRect(1, 1, blockWidth - 2, blockHeight - 2);
+    
+    // 冰块内部裂纹 - 静态裂纹
+    this.ctx.strokeStyle = `rgba(255, 255, 255, 0.7)`;
+    this.ctx.lineWidth = 1;
+    
+    // 绘制静态裂纹
+    const crackCount = 3;
+    for (let i = 0; i < crackCount; i++) {
+      const startX = blockWidth * (0.2 + i * 0.3);
+      const startY = blockHeight * (0.2 + i * 0.2);
+      const endX = blockWidth * (0.8 - i * 0.2);
+      const endY = blockHeight * (0.8 - i * 0.3);
+      
+      this.ctx.beginPath();
+      this.ctx.moveTo(startX, startY);
+      this.ctx.lineTo(endX, endY);
+      this.ctx.stroke();
+    }
+    
+    // 冰块表面反射 - 静态光斑
+    this.ctx.fillStyle = `rgba(255, 255, 255, 0.2)`;
+    this.ctx.beginPath();
+    this.ctx.ellipse(blockWidth * 0.3, blockHeight * 0.3, blockWidth * 0.15, blockHeight * 0.1, 0, 0, 2 * Math.PI);
+    this.ctx.fill();
+  }
+
+  /**
    * 绘制单个俄罗斯方块
    * @param {Object} block - 方块对象
    */
   drawTetrisBlock(block) {
     const color = this.getBlockColor(block.color);
     const isSelected = this.selectedElement === block;
+    const isIceWrapped = block.layer === 1; // 第1层方块被冰块包裹
     
     // 获取GSAP方块动画属性
     let blockScale = 1, blockRotation = 0, blockBounce = 0, blockGlow = 0;
@@ -2045,7 +2068,7 @@ class MapEngine {
       console.warn('获取方块动画属性失败:', error);
     }
     
-    // 计算方块的边界框
+    // 根据形状的每个块分别绘制
     console.log('方块', block.id, 'occupiedCells:', block.occupiedCells);
     const cells = block.occupiedCells.map(cellKey => cellKey.split(',').map(Number));
     console.log('解析后的cells:', cells);
@@ -2055,24 +2078,67 @@ class MapEngine {
       return;
     }
     
-    // 安全计算边界框，避免空数组导致的 Infinity
-    const xs = cells.map(cell => cell[0]);
-    const ys = cells.map(cell => cell[1]);
-    const minX = Math.min(...xs);
-    const minY = Math.min(...ys);
-    const maxX = Math.max(...xs);
-    const maxY = Math.max(...ys);
+    // 为每个块分别绘制
+    cells.forEach(cell => {
+      const [cellX, cellY] = cell;
+      const x = this.gridOffsetX + cellX * this.cellSize;
+      const y = this.gridOffsetY + cellY * this.cellSize;
+      
+      this.ctx.save();
+      
+      // 应用变换
+      this.ctx.translate(x + this.cellSize / 2, y + this.cellSize / 2);
+      this.ctx.rotate(blockRotation * Math.PI / 180);
+      this.ctx.scale(blockScale, blockScale);
+      this.ctx.translate(-this.cellSize / 2, -this.cellSize / 2);
+      
+      // 设置阴影
+      if (blockGlow > 0) {
+        this.ctx.shadowColor = color;
+        this.ctx.shadowBlur = blockGlow * 10;
+      }
+      
+      // 绘制单个块
+      if (isIceWrapped) {
+        // 被冰块包裹的方块：使用冰块效果
+        this.drawIceWrappedBlock(block, this.cellSize, this.cellSize);
+      } else {
+        // 正常方块：原始颜色
+        try {
+          const gradient = this.ctx.createLinearGradient(0, 0, this.cellSize, this.cellSize);
+          gradient.addColorStop(0, color);
+          gradient.addColorStop(1, this.darkenColor(color, 0.2));
+          this.ctx.fillStyle = gradient;
+          this.ctx.fillRect(0, 0, this.cellSize, this.cellSize);
+        } catch (error) {
+          console.warn(`方块 ${block.id} 渐变创建失败:`, error);
+          this.ctx.fillStyle = color;
+          this.ctx.fillRect(0, 0, this.cellSize, this.cellSize);
+        }
+      }
+      
+      // 选中效果
+      if (isSelected) {
+        const pulseAlpha = 0.4 + Math.sin(Date.now() * 0.01) * 0.2;
+        this.ctx.fillStyle = `rgba(255, 255, 255, ${pulseAlpha})`;
+        this.ctx.fillRect(0, 0, this.cellSize, this.cellSize);
+        
+        const borderAlpha = 0.9 + Math.sin(Date.now() * 0.02) * 0.1;
+        this.ctx.strokeStyle = `rgba(255, 255, 0, ${borderAlpha})`;
+        this.ctx.lineWidth = 3 + Math.sin(Date.now() * 0.015) * 0.5;
+        this.ctx.strokeRect(0, 0, this.cellSize, this.cellSize);
+      }
+      
+      // 绘制边框
+      const borderAlpha = 0.9 + Math.sin(Date.now() * 0.005) * 0.1;
+      this.ctx.strokeStyle = `rgba(255, 255, 255, ${borderAlpha})`;
+      this.ctx.lineWidth = 2;
+      this.ctx.strokeRect(0, 0, this.cellSize, this.cellSize);
+      
+      this.ctx.restore();
+    });
     
-    // 再次检查计算结果
-    if (!isFinite(minX) || !isFinite(minY) || !isFinite(maxX) || !isFinite(maxY)) {
-      console.warn(`方块 ${block.id} 边界框计算异常:`, { minX, minY, maxX, maxY, cells });
-      return;
-    }
-    
-    console.log('边界框:', { minX, minY, maxX, maxY });
-    
-    const blockWidth = (maxX - minX + 1) * this.cellSize;
-    const blockHeight = (maxY - minY + 1) * this.cellSize;
+    return; // 提前返回，不再执行下面的边界框绘制
     
     // 确保尺寸值是有限的
     if (!isFinite(blockWidth) || !isFinite(blockHeight) || blockWidth <= 0 || blockHeight <= 0) {
@@ -2121,17 +2187,23 @@ class MapEngine {
     }
     
     // 绘制整个方块的背景 - 带渐变效果
-    try {
-      const gradient = this.ctx.createLinearGradient(0, 0, blockWidth, blockHeight);
-      gradient.addColorStop(0, color);
-      gradient.addColorStop(1, this.darkenColor(color, 0.2));
-      this.ctx.fillStyle = gradient;
-      this.ctx.fillRect(0, 0, blockWidth, blockHeight);
-    } catch (error) {
-      console.warn(`方块 ${block.id} 渐变创建失败:`, error);
-      // 使用纯色作为备用
-      this.ctx.fillStyle = color;
-      this.ctx.fillRect(0, 0, blockWidth, blockHeight);
+    if (isIceWrapped) {
+      // 🧊 被冰块包裹的方块：使用GSAP动画的冰块效果
+      this.drawIceWrappedBlock(block, blockWidth, blockHeight);
+    } else {
+      // 正常方块：原始颜色
+      try {
+        const gradient = this.ctx.createLinearGradient(0, 0, blockWidth, blockHeight);
+        gradient.addColorStop(0, color);
+        gradient.addColorStop(1, this.darkenColor(color, 0.2));
+        this.ctx.fillStyle = gradient;
+        this.ctx.fillRect(0, 0, blockWidth, blockHeight);
+      } catch (error) {
+        console.warn(`方块 ${block.id} 渐变创建失败:`, error);
+        // 使用纯色作为备用
+        this.ctx.fillStyle = color;
+        this.ctx.fillRect(0, 0, blockWidth, blockHeight);
+      }
     }
     
     // 选中效果 - 带脉冲动画
@@ -2201,7 +2273,9 @@ class MapEngine {
       green: '#96CEB4',
       yellow: '#FFEAA7',
       purple: '#DDA0DD',
-      orange: '#FFA500'
+      orange: '#FFA500',
+      cyan: '#00CED1',
+      magenta: '#FF69B4'
     };
     return colors[colorName] || '#CCCCCC';
   }
