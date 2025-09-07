@@ -56,6 +56,16 @@ const BLOCK_COLORS = {
     name: 'orange',
     gradient: 'linear-gradient(135deg, #FFA500, #FFB347)',
     glowColor: 'rgba(255, 165, 0, 0.6)'
+  },
+  cyan: {
+    name: 'cyan',
+    gradient: 'linear-gradient(135deg, #00CED1, #40E0D0)',
+    glowColor: 'rgba(0, 206, 209, 0.6)'
+  },
+  magenta: {
+    name: 'magenta',
+    gradient: 'linear-gradient(135deg, #FF69B4, #FFB6C1)',
+    glowColor: 'rgba(255, 105, 180, 0.6)'
   }
 };
 
@@ -144,6 +154,34 @@ const BLOCK_SHAPES = {
     movementType: 'wings',
     eyePosition: 'top-center',
     description: '十字形状'
+  },
+  'I-shape': {
+    name: 'I-shape',
+    blocks: [[0, 0], [0, 1], [0, 2], [0, 3]],
+    movementType: 'feet',
+    eyePosition: 'top',
+    description: 'I形 - 4个方块竖直线'
+  },
+  'S-shape': {
+    name: 'S-shape',
+    blocks: [[1, 0], [2, 0], [0, 1], [1, 1]],
+    movementType: 'crawl',
+    eyePosition: 'top-left',
+    description: 'S形 - S字形'
+  },
+  'J-shape': {
+    name: 'J-shape',
+    blocks: [[1, 0], [1, 1], [1, 2], [0, 2]],
+    movementType: 'wings',
+    eyePosition: 'top-left',
+    description: 'J形 - 反L形'
+  },
+  'ice': {
+    name: 'ice',
+    blocks: [[0, 0]],
+    movementType: 'static',
+    eyePosition: 'center',
+    description: '冰块 - 单个冰块'
   }
 };
 
@@ -179,6 +217,39 @@ function createBlock(blockData) {
   };
   
   return block;
+}
+
+/**
+ * 创建冰块元素
+ * @param {Object} iceData - 冰块数据 {id, position, layer, meltProgress}
+ * @returns {Object} 冰块对象
+ */
+function createIce(iceData) {
+  const shapeData = BLOCK_SHAPES['ice'];
+  
+  const ice = {
+    id: iceData.id,
+    type: 'ice',
+    position: iceData.position,
+    shape: 'ice',
+    shapeData: shapeData,
+    layer: iceData.layer || 1,
+    meltProgress: iceData.meltProgress || 0,
+    movable: false,
+    state: BlockStates.idle,
+    animations: {},
+    isSelected: false,
+    isMoving: false,
+    occupiedCells: calculateOccupiedCells(iceData.position, shapeData.blocks),
+    covered: true, // 初始被覆盖
+    // 抖音小游戏环境不需要 DOM 元素
+    element: null,
+    $shape: null,
+    $eyes: [],
+    $blocks: []
+  };
+  
+  return ice;
 }
 
 /**
@@ -855,6 +926,7 @@ if (typeof window !== 'undefined') {
   window.BLOCK_COLORS = BLOCK_COLORS;
   window.BLOCK_SHAPES = BLOCK_SHAPES;
   window.createBlock = createBlock;
+  window.createIce = createIce;
   window.selectBlock = selectBlock;
   window.deselectBlock = deselectBlock;
   window.moveBlock = moveBlock;
@@ -867,22 +939,11 @@ if (typeof window !== 'undefined') {
   global.BLOCK_COLORS = BLOCK_COLORS;
   global.BLOCK_SHAPES = BLOCK_SHAPES;
   global.createBlock = createBlock;
+  global.createIce = createIce;
   global.selectBlock = selectBlock;
   global.deselectBlock = deselectBlock;
   global.moveBlock = moveBlock;
   global.exitBlock = exitBlock;
   global.updateBlockPosition = updateBlockPosition;
   global.destroyBlock = destroyBlock;
-} else {
-  this.BlockStates = BlockStates;
-  this.BLOCK_CONFIG = BLOCK_CONFIG;
-  this.BLOCK_COLORS = BLOCK_COLORS;
-  this.BLOCK_SHAPES = BLOCK_SHAPES;
-  this.createBlock = createBlock;
-  this.selectBlock = selectBlock;
-  this.deselectBlock = deselectBlock;
-  this.moveBlock = moveBlock;
-  this.exitBlock = exitBlock;
-  this.updateBlockPosition = updateBlockPosition;
-  this.destroyBlock = destroyBlock;
 }

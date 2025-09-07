@@ -109,12 +109,19 @@ class MapEngine {
       layer.rockCells.clear();
     });
     
-    this.spatialIndex.forEach(cellSet => cellSet.clear());
+    this.spatialIndex.clear();
     this.elementRegistry.clear();
     this.collisionCache.clear();
     this.pathCache.clear();
     this.selectedElement = null;
     this.moveHistory = [];
+    
+    // 重新初始化空间索引
+    for (let x = 0; x < this.GRID_SIZE; x++) {
+      for (let y = 0; y < this.GRID_SIZE; y++) {
+        this.spatialIndex.set(`${x},${y}`, new Set());
+      }
+    }
   }
   
   /**
@@ -146,8 +153,14 @@ class MapEngine {
       return;
     }
     
+    console.log('开始创建方块:', block);
     const blockElement = createBlock(block);
-    console.log('创建方块元素:', block.id, 'shapeData:', blockElement.shapeData);
+    console.log('创建方块元素完成:', block.id, 'shapeData:', blockElement.shapeData);
+    
+    if (!blockElement.shapeData || !blockElement.shapeData.blocks) {
+      console.error('方块 shapeData 无效:', blockElement);
+      return;
+    }
     
     const element = {
       id: block.id,
@@ -191,17 +204,17 @@ class MapEngine {
    * @param {Object} ice - 冰层配置 {id, position, layer, meltProgress}
    */
   addIceLayer(ice) {
-    const element = {
-      id: ice.id,
-      type: 'ice',
-      position: ice.position,
-      layer: ice.layer || 1,
-      meltProgress: ice.meltProgress || 0,
-      covered: true // 初始被覆盖
-    };
+    console.log('开始创建冰块:', ice);
+    const iceElement = createIce(ice);
+    console.log('创建冰块元素完成:', ice.id, 'shapeData:', iceElement.shapeData);
+
+    if (!iceElement.shapeData || !iceElement.shapeData.blocks) {
+      console.error('冰块 shapeData 无效:', iceElement);
+      return;
+    }
     
-    this.addElement(element);
-    this.layers.get(element.layer).iceCells.add(`${ice.position.x},${ice.position.y}`);
+    this.addElement(iceElement);
+    this.layers.get(iceElement.layer).iceCells.add(`${ice.position.x},${ice.position.y}`);
   }
   
   /**
@@ -226,17 +239,43 @@ class MapEngine {
    * @param {Object} element - 元素对象
    */
   addElement(element) {
+    // 检查边界
+    if (element.type === 'tetris') {
+      const maxX = Math.max(...element.shapeData.blocks.map(block => block[0]));
+      const maxY = Math.max(...element.shapeData.blocks.map(block => block[1]));
+      
+      if (element.position.x < 0 || element.position.y < 0 || 
+          element.position.x + maxX >= this.GRID_SIZE ||
+          element.position.y + maxY >= this.GRID_SIZE) {
+        console.warn(`方块 ${element.id} 超出边界，跳过添加 (位置: ${element.position.x},${element.position.y}, 最大: ${maxX},${maxY})`);
+        return;
+      }
+    } else {
+      if (element.position.x < 0 || element.position.y < 0 || 
+          element.position.x >= this.GRID_SIZE ||
+          element.position.y >= this.GRID_SIZE) {
+        console.warn(`元素 ${element.id} 超出边界，跳过添加 (位置: ${element.position.x},${element.position.y})`);
+        return;
+      }
+    }
+    
     const layer = this.layers.get(element.layer);
     layer.elements.set(element.id, element);
     
     // 更新空间索引
     if (element.type === 'tetris') {
       element.occupiedCells.forEach(cell => {
+        if (!this.spatialIndex.has(cell)) {
+          this.spatialIndex.set(cell, new Set());
+        }
         this.spatialIndex.get(cell).add(element.id);
       });
       layer.occupiedCells.add(...element.occupiedCells);
     } else {
       const cellKey = `${element.position.x},${element.position.y}`;
+      if (!this.spatialIndex.has(cellKey)) {
+        this.spatialIndex.set(cellKey, new Set());
+      }
       this.spatialIndex.get(cellKey).add(element.id);
       layer.occupiedCells.add(cellKey);
     }
@@ -384,6 +423,7 @@ class MapEngine {
     
     for (const cell of cells) {
       const elementsAtCell = this.spatialIndex.get(cell);
+      if (!elementsAtCell) continue;
       
       for (const elementId of elementsAtCell) {
         if (elementId === excludeId) continue;
@@ -422,10 +462,16 @@ class MapEngine {
     
     // 更新空间索引
     oldCells.forEach(cell => {
-      this.spatialIndex.get(cell).delete(element.id);
+      const cellSet = this.spatialIndex.get(cell);
+      if (cellSet) {
+        cellSet.delete(element.id);
+      }
     });
     
     newCells.forEach(cell => {
+      if (!this.spatialIndex.has(cell)) {
+        this.spatialIndex.set(cell, new Set());
+      }
       this.spatialIndex.get(cell).add(element.id);
     });
     
@@ -489,6 +535,7 @@ class MapEngine {
   isIceCovered(iceElement) {
     const cellKey = `${iceElement.position.x},${iceElement.position.y}`;
     const elementsAtCell = this.spatialIndex.get(cellKey);
+    if (!elementsAtCell) return false;
     
     for (const elementId of elementsAtCell) {
       const element = this.elementRegistry.get(elementId);
@@ -653,11 +700,17 @@ class MapEngine {
     // 更新空间索引
     if (element.type === 'tetris') {
       element.occupiedCells.forEach(cell => {
-        this.spatialIndex.get(cell).delete(elementId);
+        const cellSet = this.spatialIndex.get(cell);
+        if (cellSet) {
+          cellSet.delete(elementId);
+        }
       });
     } else {
       const cellKey = `${element.position.x},${element.position.y}`;
-      this.spatialIndex.get(cellKey).delete(elementId);
+      const cellSet = this.spatialIndex.get(cellKey);
+      if (cellSet) {
+        cellSet.delete(elementId);
+      }
     }
     
     this.elementRegistry.delete(elementId);
@@ -707,13 +760,16 @@ class MapEngine {
     
     const cellKey = `${position.x},${position.y}`;
     const elementsAtCell = this.spatialIndex.get(cellKey);
+    if (!elementsAtCell) return;
     
     // 检查是否有新的方块可以移动
     for (const elementId of elementsAtCell) {
       const element = this.elementRegistry.get(elementId);
       if (element.type === 'tetris' && element.layer === layer) {
+        // 将第2层方块移动到第0层，使其可移动
+        element.layer = 0;
         element.movable = true;
-        console.log(`方块 ${element.id} 现在可以移动`);
+        console.log(`方块 ${element.id} 从第${layer}层移动到第0层，现在可以移动`);
       }
     }
   }
@@ -829,6 +885,14 @@ class MapEngine {
           glow: 0,
           pulse: 0,
           rotation: 0
+        },
+        ice: { 
+          scale: 1, 
+          rotation: 0, 
+          alpha: 1,
+          glow: 0,
+          shimmer: 0,
+          crack: 0
         }
       };
 
@@ -856,11 +920,11 @@ class MapEngine {
         paused: false
       });
 
-      // 方块动画 - 添加物理弹跳效果
+      // 方块动画 - 移除旋转摆动，只保留轻微的缩放效果
       this.blockAnimation = gsap.to(this.animationTargets.blocks, {
-        scale: 1.06,
-        rotation: 3,
-        bounce: 0.2,
+        scale: 1.02,
+        rotation: 0, // 移除旋转
+        bounce: 0, // 移除弹跳
         duration: 3.5,
         ease: "power1.inOut",
         repeat: -1,
@@ -868,17 +932,30 @@ class MapEngine {
         paused: false
       });
 
-      // 门发光动画 - 使用闪烁效果
+      // 门动画 - 移除所有特效，保持静态
       this.gateAnimation = gsap.to(this.animationTargets.gates, {
-        scale: 1.1,
-        glow: 1,
-        pulse: 1,
+        scale: 1,
+        glow: 0,
+        pulse: 0,
+        rotation: 0,
+        duration: 0,
+        ease: "none",
+        repeat: 0,
+        yoyo: false,
+        paused: true
+      });
+
+      // 🧊 冰块动画 - 逼真的冰块效果
+      this.iceAnimation = gsap.to(this.animationTargets.ice, {
+        scale: 1.05,
         rotation: 2,
-        duration: 1.8,
+        glow: 0.5,
+        shimmer: 1.2,
+        crack: 0.8,
+        duration: 3.0,
         ease: "power2.inOut",
-        repeat: -1,
         yoyo: true,
-        paused: false
+        repeat: -1
       });
 
       // 创建时间轴动画 - 组合多个动画
@@ -887,7 +964,8 @@ class MapEngine {
         .add(this.gridAnimation, 0)
         .add(this.pulseAnimation, 0.5)
         .add(this.blockAnimation, 1)
-        .add(this.gateAnimation, 1.5);
+        .add(this.gateAnimation, 1.5)
+        .add(this.iceAnimation, 2);
 
       console.log('GSAP高级动画系统初始化成功');
     } catch (error) {
@@ -904,7 +982,8 @@ class MapEngine {
       grid: { scale: 1, alpha: 1, glow: 0 },
       pulse: { scale: 1, alpha: 1, rotation: 0 },
       blocks: { scale: 1, alpha: 1, bounce: 0 },
-      gates: { scale: 1, alpha: 1, glow: 0 }
+      gates: { scale: 1, alpha: 1, glow: 0 },
+      ice: { scale: 1, alpha: 1, glow: 0, shimmer: 0, crack: 0 }
     };
 
     this.gridAnimation = {
@@ -922,6 +1001,10 @@ class MapEngine {
     this.gateAnimation = {
       progress: () => Math.sin(Date.now() * 0.003) * 0.5 + 0.5,
       targets: () => [this.animationTargets.gates]
+    };
+    this.iceAnimation = {
+      progress: () => Math.sin(Date.now() * 0.002) * 0.5 + 0.5,
+      targets: () => [this.animationTargets.ice]
     };
   }
   
@@ -1310,29 +1393,19 @@ class MapEngine {
       }))
     };
     
-    // 绘制上边框 - 非门部分黑色，门部分红色
-    this.drawBorderWithGates(ctx, 
-      this.gridOffsetX, this.gridOffsetY - borderWidth/2, 
-      this.gridOffsetX + this.gridSize, this.gridOffsetY - borderWidth/2,
-      gatePositions.up, 'up', borderWidth, borderAlpha);
+    // 绘制完整的正方形边框，包含四个角
+    // 先绘制整个边框为黑色
+    ctx.strokeStyle = `rgba(0, 0, 0, ${borderAlpha})`;
+    ctx.lineWidth = borderWidth;
+    ctx.strokeRect(
+      this.gridOffsetX - borderWidth/2, 
+      this.gridOffsetY - borderWidth/2, 
+      this.gridSize + borderWidth, 
+      this.gridSize + borderWidth
+    );
     
-    // 绘制右边框 - 非门部分黑色，门部分蓝色
-    this.drawBorderWithGates(ctx,
-      this.gridOffsetX + this.gridSize + borderWidth/2, this.gridOffsetY,
-      this.gridOffsetX + this.gridSize + borderWidth/2, this.gridOffsetY + this.gridSize,
-      gatePositions.right, 'right', borderWidth, borderAlpha);
-    
-    // 绘制下边框 - 非门部分黑色，门部分绿色
-    this.drawBorderWithGates(ctx,
-      this.gridOffsetX + this.gridSize, this.gridOffsetY + this.gridSize + borderWidth/2,
-      this.gridOffsetX, this.gridOffsetY + this.gridSize + borderWidth/2,
-      gatePositions.down, 'down', borderWidth, borderAlpha);
-    
-    // 绘制左边框 - 非门部分黑色，门部分黄色
-    this.drawBorderWithGates(ctx,
-      this.gridOffsetX - borderWidth/2, this.gridOffsetY,
-      this.gridOffsetX - borderWidth/2, this.gridOffsetY + this.gridSize,
-      gatePositions.left, 'left', borderWidth, borderAlpha);
+    // 然后在门的位置用门颜色覆盖
+    this.drawGatesOnBorder(ctx, borderWidth, borderAlpha);
     
     // 绘制内部网格线 - 使用GSAP动画属性
     const lineAlpha = 0.4 + (gridAlpha - 1) * 0.1;
@@ -1357,76 +1430,90 @@ class MapEngine {
       ctx.stroke();
     }
     
-    // 绘制网格边框
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
-    ctx.lineWidth = 2;
-    ctx.strokeRect(this.gridOffsetX, this.gridOffsetY, this.gridSize, this.gridSize);
+    // 网格边框已由 drawGatesOnBorder 函数统一绘制，这里不需要再画
   }
   
   /**
-   * 绘制带门的边框
+   * 在边框上绘制门 - 动态处理所有门
    * @param {CanvasRenderingContext2D} ctx - 画布上下文
-   * @param {number} startX - 起始X坐标
-   * @param {number} startY - 起始Y坐标
-   * @param {number} endX - 结束X坐标
-   * @param {number} endY - 结束Y坐标
-   * @param {Array} gatePositions - 门的位置数组
-   * @param {string} direction - 边框方向
    * @param {number} borderWidth - 边框宽度
    * @param {number} borderAlpha - 边框透明度
    */
-  drawBorderWithGates(ctx, startX, startY, endX, endY, gatePositions, direction, borderWidth, borderAlpha) {
-    ctx.lineWidth = borderWidth;
+  drawGatesOnBorder(ctx, borderWidth, borderAlpha) {
+    // 获取所有门
+    const gates = this.getAllElementsByType('gate');
     
-    // 获取门颜色
-    const gateColors = {
-      up: `rgba(255, 100, 100, ${borderAlpha})`,
-      right: `rgba(100, 100, 255, ${borderAlpha})`,
-      down: `rgba(100, 255, 100, ${borderAlpha})`,
-      left: `rgba(255, 255, 100, ${borderAlpha})`
-    };
-    
-    const gateColor = gateColors[direction];
-    const blackColor = `rgba(0, 0, 0, ${borderAlpha})`;
-    
-    // 先绘制整条边框为黑色
-    ctx.strokeStyle = blackColor;
-    ctx.beginPath();
-    ctx.moveTo(startX, startY);
-    ctx.lineTo(endX, endY);
-    ctx.stroke();
-    
-    // 然后在门的位置用门颜色覆盖
-    if (gatePositions.length > 0) {
-      ctx.strokeStyle = gateColor;
+    gates.forEach(gate => {
+      const color = this.getGateColor(gate.color);
+      const gateColor = `rgba(${this.hexToRgb(color)}, ${borderAlpha})`;
       
-      gatePositions.forEach(gate => {
-        const cellSize = this.cellSize;
-        const gateStart = gate.start * cellSize;
-        const gateEnd = gate.end * cellSize;
-        
-        // 计算门段的实际坐标 - 确保在边框范围内
-        let gateStartX, gateStartY, gateEndX, gateEndY;
-        
-        if (startX === endX) { // 垂直边框
-          gateStartX = startX;
-          gateEndX = endX;
-          gateStartY = startY + gateStart;
-          gateEndY = startY + gateEnd;
-        } else { // 水平边框
-          gateStartX = startX + gateStart;
-          gateEndX = startX + gateEnd;
-          gateStartY = startY;
-          gateEndY = endY;
-        }
-        
-        // 绘制门段
-        ctx.beginPath();
-        ctx.moveTo(gateStartX, gateStartY);
-        ctx.lineTo(gateEndX, gateEndY);
-        ctx.stroke();
-      });
-    }
+      ctx.strokeStyle = gateColor;
+      ctx.lineWidth = borderWidth;
+      
+      let startX, startY, endX, endY;
+      
+      // 根据门的方向计算坐标
+      switch (gate.direction) {
+        case 'up':
+          // 上方的门
+          startX = this.gridOffsetX + gate.position.x * this.cellSize;
+          startY = this.gridOffsetY - borderWidth / 2;
+          endX = this.gridOffsetX + (gate.position.x + gate.size.width) * this.cellSize;
+          endY = this.gridOffsetY - borderWidth / 2;
+          break;
+          
+        case 'down':
+          // 下方的门
+          startX = this.gridOffsetX + gate.position.x * this.cellSize;
+          startY = this.gridOffsetY + this.gridSize + borderWidth / 2;
+          endX = this.gridOffsetX + (gate.position.x + gate.size.width) * this.cellSize;
+          endY = this.gridOffsetY + this.gridSize + borderWidth / 2;
+          break;
+          
+        case 'left':
+          // 左侧的门
+          startX = this.gridOffsetX - borderWidth / 2;
+          startY = this.gridOffsetY + gate.position.y * this.cellSize;
+          endX = this.gridOffsetX - borderWidth / 2;
+          endY = this.gridOffsetY + (gate.position.y + gate.size.height) * this.cellSize;
+          break;
+          
+        case 'right':
+          // 右侧的门
+          startX = this.gridOffsetX + this.gridSize + borderWidth / 2;
+          startY = this.gridOffsetY + gate.position.y * this.cellSize;
+          endX = this.gridOffsetX + this.gridSize + borderWidth / 2;
+          endY = this.gridOffsetY + (gate.position.y + gate.size.height) * this.cellSize;
+          break;
+          
+        default:
+          console.warn(`未知的门方向: ${gate.direction}`);
+          return;
+      }
+      
+      // 绘制门段
+      ctx.beginPath();
+      ctx.moveTo(startX, startY);
+      ctx.lineTo(endX, endY);
+      ctx.stroke();
+    });
+  }
+  
+  /**
+   * 将十六进制颜色转换为RGB
+   * @param {string} hex - 十六进制颜色值
+   * @returns {string} RGB颜色值
+   */
+  hexToRgb(hex) {
+    // 移除 # 号
+    hex = hex.replace('#', '');
+    
+    // 解析RGB值
+    const r = parseInt(hex.substr(0, 2), 16);
+    const g = parseInt(hex.substr(2, 2), 16);
+    const b = parseInt(hex.substr(4, 2), 16);
+    
+    return `${r}, ${g}, ${b}`;
   }
   
   /**
@@ -1455,12 +1542,73 @@ class MapEngine {
     const gates = this.getAllElementsByType('gate');
     
     gates.forEach(gate => {
-      this.drawGate(gate);
+      this.drawGateLabel(gate);
     });
   }
   
   /**
-   * 绘制单个门
+   * 绘制门的标签 - 动态处理所有门
+   * @param {Object} gate - 门对象
+   */
+  drawGateLabel(gate) {
+    const borderWidth = Math.max(6, this.cellSize * 0.15);
+    
+    let x, y, width, height;
+    
+    // 根据门的方向和位置计算坐标
+    switch (gate.direction) {
+      case 'up':
+        x = this.gridOffsetX + gate.position.x * this.cellSize;
+        y = this.gridOffsetY - borderWidth / 2;
+        width = gate.size.width * this.cellSize;
+        height = borderWidth;
+        break;
+        
+      case 'down':
+        x = this.gridOffsetX + gate.position.x * this.cellSize;
+        y = this.gridOffsetY + this.gridSize - borderWidth / 2;
+        width = gate.size.width * this.cellSize;
+        height = borderWidth;
+        break;
+        
+      case 'left':
+        x = this.gridOffsetX - borderWidth / 2;
+        y = this.gridOffsetY + gate.position.y * this.cellSize;
+        width = borderWidth;
+        height = gate.size.height * this.cellSize;
+        break;
+        
+      case 'right':
+        x = this.gridOffsetX + this.gridSize - borderWidth / 2;
+        y = this.gridOffsetY + gate.position.y * this.cellSize;
+        width = borderWidth;
+        height = gate.size.height * this.cellSize;
+        break;
+        
+      default:
+        return;
+    }
+    
+    // 应用GSAP动画变换
+    this.ctx.save();
+    this.ctx.translate(x + width / 2, y + height / 2);
+    this.ctx.translate(-width / 2, -height / 2);
+    
+    // 门标签 - 移除脉冲特效，保持静态
+    this.ctx.fillStyle = `rgba(255, 255, 255, 1)`;
+    this.ctx.font = 'bold 10px Arial';
+    this.ctx.textAlign = 'center';
+    this.ctx.fillText(
+      gate.color.toUpperCase(),
+      width / 2,
+      height / 2 + 3
+    );
+    
+    this.ctx.restore();
+  }
+
+  /**
+   * 绘制单个门（已废弃，由 drawBorderWithGates 统一绘制）
    * @param {Object} gate - 门对象
    */
         drawGate(gate) {
@@ -1489,7 +1637,7 @@ class MapEngine {
         x = this.gridOffsetX + gate.position.x * this.cellSize;
         y = this.gridOffsetY - borderWidth / 2; // 在边框中心
         width = gate.size.width * this.cellSize;
-        height = borderWidth;
+        height = borderWidth; // 使用边框宽度
         break;
         
       case 'down':
@@ -1497,14 +1645,14 @@ class MapEngine {
         x = this.gridOffsetX + gate.position.x * this.cellSize;
         y = this.gridOffsetY + this.gridSize - borderWidth / 2; // 在边框中心
         width = gate.size.width * this.cellSize;
-        height = borderWidth;
+        height = borderWidth; // 使用边框宽度
         break;
         
       case 'left':
         // 左侧的门 - 绘制在左边框上
         x = this.gridOffsetX - borderWidth / 2; // 在边框中心
         y = this.gridOffsetY + gate.position.y * this.cellSize;
-        width = borderWidth;
+        width = borderWidth; // 使用边框宽度
         height = gate.size.height * this.cellSize;
         break;
         
@@ -1512,7 +1660,7 @@ class MapEngine {
         // 右侧的门 - 绘制在右边框上
         x = this.gridOffsetX + this.gridSize - borderWidth / 2; // 在边框中心
         y = this.gridOffsetY + gate.position.y * this.cellSize;
-        width = borderWidth;
+        width = borderWidth; // 使用边框宽度
         height = gate.size.height * this.cellSize;
         break;
         
@@ -1546,34 +1694,19 @@ class MapEngine {
     this.ctx.rotate(finalRotation);
     this.ctx.translate(-width / 2, -height / 2);
     
-    // 门背景 - 使用GSAP发光和脉冲效果
-    const brightColor = this.brightenColor(color, 0.3 + gateGlow * 0.2);
+    // 门背景 - 移除发光和脉冲效果，保持静态
+    const brightColor = this.brightenColor(color, 0.3);
     this.ctx.fillStyle = brightColor;
-    
-    // 应用发光效果
-    if (gateGlow > 0) {
-      this.ctx.shadowColor = color;
-      this.ctx.shadowBlur = gateGlow * 15;
-    }
-    
     this.ctx.fillRect(0, 0, width, height);
     
-    // 脉冲高光效果
-    if (gatePulse > 0) {
-      const pulseAlpha = 0.3 + gatePulse * 0.4;
-      this.ctx.fillStyle = `rgba(255, 255, 255, ${pulseAlpha})`;
-      this.ctx.fillRect(0, 0, width, height / 2);
-    }
+    // 门的高光效果 - 移除脉冲，保持静态
+    this.ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+    this.ctx.fillRect(0, 0, width, height / 2);
     
-    // 门边框 - 使用GSAP脉冲效果
-    const borderAlpha = 0.9 + gatePulse * 0.2;
-    this.ctx.strokeStyle = `rgba(255, 255, 255, ${borderAlpha})`;
-    this.ctx.lineWidth = 1 + gateGlow * 2; // 发光时边框更粗
-    this.ctx.strokeRect(0, 0, width, height);
+    // 门边框由 drawBorderWithGates 函数统一绘制，这里不需要再画边框
     
-    // 门标签 - 使用GSAP脉冲效果
-    const textAlpha = 1 + gatePulse * 0.3;
-    this.ctx.fillStyle = `rgba(255, 255, 255, ${textAlpha})`;
+    // 门标签 - 移除脉冲特效，保持静态
+    this.ctx.fillStyle = `rgba(255, 255, 255, 1)`;
     this.ctx.font = 'bold 10px Arial';
     this.ctx.textAlign = 'center';
     this.ctx.fillText(
@@ -1682,7 +1815,7 @@ class MapEngine {
   }
   
   /**
-   * 绘制冰层
+   * 绘制冰层 - 每个冰块独立渲染，确保是一个格子一个格子的
    */
   drawIceLayers() {
     const iceLayers = this.getAllElementsByType('ice');
@@ -1691,20 +1824,135 @@ class MapEngine {
       const x = this.gridOffsetX + ice.position.x * this.cellSize;
       const y = this.gridOffsetY + ice.position.y * this.cellSize;
       
-      // 冰层背景
-      const alpha = 0.3 + (ice.meltProgress / 100) * 0.4; // 融化时变透明
-      this.ctx.fillStyle = `rgba(173, 216, 230, ${alpha})`;
-      this.ctx.fillRect(x, y, this.cellSize, this.cellSize);
+      // 获取冰块动画属性
+      let iceGlow = 0.3;
+      let iceScale = 1;
+      let iceRotation = 0;
+      let iceAlpha = 0.8;
       
-      // 冰层边框
-      this.ctx.strokeStyle = `rgba(135, 206, 235, ${alpha})`;
+      // 尝试从GSAP动画获取属性
+      if (this.animationTargets && this.animationTargets.ice) {
+        try {
+          const iceAnimation = this.animationTargets.ice;
+          if (typeof iceAnimation.progress === 'function') {
+            const progress = iceAnimation.progress();
+            iceGlow = 0.3 + Math.sin(Date.now() * 0.003 + ice.position.x * 0.5 + ice.position.y * 0.3) * 0.2;
+            iceScale = 1 + Math.sin(Date.now() * 0.002 + ice.position.x * 0.4) * 0.05;
+            iceRotation = Math.sin(Date.now() * 0.001 + ice.position.y * 0.6) * 2;
+            iceAlpha = 0.8 - (ice.meltProgress / 100) * 0.5;
+          }
+        } catch (e) {
+          // 如果GSAP不可用，使用默认值
+          iceGlow = 0.3;
+          iceScale = 1;
+          iceRotation = 0;
+          iceAlpha = 0.8 - (ice.meltProgress / 100) * 0.5;
+        }
+      }
+      
+      // 保存当前状态
+      this.ctx.save();
+      
+      // 应用变换
+      this.ctx.translate(x + this.cellSize / 2, y + this.cellSize / 2);
+      this.ctx.rotate(iceRotation * Math.PI / 180);
+      this.ctx.scale(iceScale, iceScale);
+      this.ctx.translate(-this.cellSize / 2, -this.cellSize / 2);
+      
+      // 🧊 逼真的冰块效果 - 多层渐变
+      // 外层冰块 - 透明蓝色
+      const outerGradient = this.ctx.createRadialGradient(
+        this.cellSize * 0.3, this.cellSize * 0.3, 0,
+        this.cellSize * 0.7, this.cellSize * 0.7, this.cellSize * 0.8
+      );
+      outerGradient.addColorStop(0, `rgba(173, 216, 230, ${iceAlpha * 0.8})`);
+      outerGradient.addColorStop(0.5, `rgba(135, 206, 235, ${iceAlpha * 0.6})`);
+      outerGradient.addColorStop(1, `rgba(100, 149, 237, ${iceAlpha * 0.4})`);
+      
+      this.ctx.fillStyle = outerGradient;
+      this.ctx.fillRect(0, 0, this.cellSize, this.cellSize);
+      
+      // 内层冰块 - 更透明的中心
+      const innerGradient = this.ctx.createRadialGradient(
+        this.cellSize * 0.4, this.cellSize * 0.4, 0,
+        this.cellSize * 0.6, this.cellSize * 0.6, this.cellSize * 0.4
+      );
+      innerGradient.addColorStop(0, `rgba(255, 255, 255, ${iceAlpha * 0.9})`);
+      innerGradient.addColorStop(0.3, `rgba(173, 216, 230, ${iceAlpha * 0.7})`);
+      innerGradient.addColorStop(1, `rgba(135, 206, 235, ${iceAlpha * 0.5})`);
+      
+      this.ctx.fillStyle = innerGradient;
+      this.ctx.fillRect(this.cellSize * 0.1, this.cellSize * 0.1, this.cellSize * 0.8, this.cellSize * 0.8);
+      
+      // 🧊 冰块高光 - 模拟光线折射
+      const highlightGradient = this.ctx.createLinearGradient(0, 0, this.cellSize * 0.6, this.cellSize * 0.6);
+      highlightGradient.addColorStop(0, `rgba(255, 255, 255, ${iceAlpha * 0.8})`);
+      highlightGradient.addColorStop(0.3, `rgba(255, 255, 255, ${iceAlpha * 0.4})`);
+      highlightGradient.addColorStop(1, `rgba(255, 255, 255, 0)`);
+      
+      this.ctx.fillStyle = highlightGradient;
+      this.ctx.fillRect(0, 0, this.cellSize * 0.6, this.cellSize * 0.6);
+      
+      // 🧊 冰块边框 - 发光边框
+      this.ctx.strokeStyle = `rgba(135, 206, 235, ${iceAlpha + iceGlow})`;
+      this.ctx.lineWidth = 3;
+      this.ctx.strokeRect(1, 1, this.cellSize - 2, this.cellSize - 2);
+      
+      // 🧊 冰块内部纹理 - 模拟冰晶结构
+      this.ctx.strokeStyle = `rgba(255, 255, 255, ${iceAlpha * 0.6})`;
       this.ctx.lineWidth = 1;
-      this.ctx.strokeRect(x, y, this.cellSize, this.cellSize);
       
-      // 融化进度
+      // 绘制冰晶裂纹 - 更真实的裂纹
+      const crackCount = 4 + Math.floor(Math.random() * 3);
+      for (let i = 0; i < crackCount; i++) {
+        const startX = Math.random() * this.cellSize;
+        const startY = Math.random() * this.cellSize;
+        const endX = Math.random() * this.cellSize;
+        const endY = Math.random() * this.cellSize;
+        
+        this.ctx.beginPath();
+        this.ctx.moveTo(startX, startY);
+        this.ctx.lineTo(endX, endY);
+        this.ctx.stroke();
+        
+        // 添加裂纹分支
+        if (Math.random() > 0.5) {
+          this.ctx.beginPath();
+          this.ctx.moveTo((startX + endX) / 2, (startY + endY) / 2);
+          this.ctx.lineTo(
+            (startX + endX) / 2 + (Math.random() - 0.5) * this.cellSize * 0.3,
+            (startY + endY) / 2 + (Math.random() - 0.5) * this.cellSize * 0.3
+          );
+          this.ctx.stroke();
+        }
+      }
+      
+      // 🧊 冰块闪烁效果 - 模拟光线反射
+      if (iceGlow > 0.4) {
+        const shimmerGradient = this.ctx.createRadialGradient(
+          this.cellSize * 0.2, this.cellSize * 0.2, 0,
+          this.cellSize * 0.2, this.cellSize * 0.2, this.cellSize * 0.4
+        );
+        shimmerGradient.addColorStop(0, `rgba(255, 255, 255, ${iceGlow * 0.6})`);
+        shimmerGradient.addColorStop(0.5, `rgba(173, 216, 230, ${iceGlow * 0.3})`);
+        shimmerGradient.addColorStop(1, `rgba(255, 255, 255, 0)`);
+        
+        this.ctx.fillStyle = shimmerGradient;
+        this.ctx.fillRect(0, 0, this.cellSize, this.cellSize);
+      }
+      
+      // 🧊 冰块边缘 - 模拟冰的厚度
+      this.ctx.strokeStyle = `rgba(100, 149, 237, ${iceAlpha * 0.8})`;
+      this.ctx.lineWidth = 1;
+      this.ctx.strokeRect(0, 0, this.cellSize, this.cellSize);
+      
+      // 恢复状态
+      this.ctx.restore();
+      
+      // 融化进度显示
       if (ice.meltProgress > 0) {
-        this.ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
-        this.ctx.font = '10px Arial';
+        this.ctx.fillStyle = `rgba(255, 255, 255, ${iceAlpha})`;
+        this.ctx.font = 'bold 10px Arial';
         this.ctx.textAlign = 'center';
         this.ctx.fillText(
           `${ice.meltProgress}%`,
@@ -1712,6 +1960,16 @@ class MapEngine {
           y + this.cellSize / 2 + 3
         );
       }
+      
+      // 调试信息 - 显示冰块ID和位置
+      this.ctx.fillStyle = 'rgba(255, 0, 0, 0.5)';
+      this.ctx.font = '8px Arial';
+      this.ctx.textAlign = 'left';
+      this.ctx.fillText(
+        `${ice.id}`,
+        x + 2,
+        y + 10
+      );
     });
   }
   

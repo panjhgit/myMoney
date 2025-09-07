@@ -1,13 +1,14 @@
 /**
- * 地图1：基础多层方块 Puzzle (8x8网格)
- * 难度：简单
+ * 地图1：完整俄罗斯方块 Puzzle (8x8网格)
+ * 难度：中等
  * 目标：让所有方块通过对应颜色的门离开
+ * 包含：所有俄罗斯方块形状、水泥砖、冰块
  */
 
 const map1 = {
-  name: "基础多层方块",
-  description: "学习多层方块的基本玩法",
-  difficulty: "简单",
+  name: "完整俄罗斯方块",
+  description: "包含所有俄罗斯方块形状的挑战关卡",
+  difficulty: "中等",
   
   // 门配置 - 四边各有一个门
   gates: [
@@ -41,139 +42,205 @@ const map1 = {
     }
   ],
   
-  // 俄罗斯方块配置
+  // 俄罗斯方块配置 - 每种形状一个代表性方块，8x8布局
   tetrisBlocks: [
-    // 第0层 - 顶层方块
+    // 第0层 - 顶层方块（可见，可移动）
     {
-      id: "red_block_1",
+      id: "single_1x1",
       color: "red",
-      position: { x: 3, y: 1 },
-      shape: "2x2",
+      position: { x: 0, y: 0 },
+      shape: "1x1",
       layer: 0
     },
     {
-      id: "blue_block_1", 
+      id: "line_1x2",
       color: "blue",
-      position: { x: 1, y: 3 },
+      position: { x: 2, y: 0 },
+      shape: "1x2",
+      layer: 0
+    },
+    {
+      id: "line_1x3",
+      color: "green",
+      position: { x: 4, y: 0 },
       shape: "1x3",
       layer: 0
     },
     {
-      id: "green_block_1",
-      color: "green",
-      position: { x: 4, y: 4 },
+      id: "line_2x1",
+      color: "yellow",
+      position: { x: 6, y: 0 },
       shape: "2x1",
       layer: 0
     },
     {
-      id: "yellow_block_1",
-      color: "yellow", 
-      position: { x: 5, y: 1 },
-      shape: "1x2",
+      id: "line_3x1",
+      color: "purple",
+      position: { x: 0, y: 2 },
+      shape: "3x1",
+      layer: 0
+    },
+    {
+      id: "line_4x1",
+      color: "orange",
+      position: { x: 4, y: 2 },
+      shape: "line4",
       layer: 0
     },
     
-    // 第1层 - 被冰层覆盖的方块
+    // O形 - 2x2正方形
     {
-      id: "red_block_2",
+      id: "square_2x2",
+      color: "cyan",
+      position: { x: 0, y: 4 },
+      shape: "2x2",
+      layer: 0
+    },
+    
+    // I形 - 4个方块竖直线（调整位置确保不超出边界）
+    {
+      id: "I_shape",
+      color: "magenta",
+      position: { x: 3, y: 3 },
+      shape: "I-shape",
+      layer: 0
+    },
+    
+    // T形 - T字形（调整位置确保不超出边界）
+    {
+      id: "T_shape",
       color: "red",
-      position: { x: 0, y: 0 },
-      shape: "1x2",
-      layer: 1
+      position: { x: 5, y: 4 },
+      shape: "T-shape",
+      layer: 0
+    },
+    
+    // L形 - L字形（调整位置确保不超出边界）
+    {
+      id: "L_shape",
+      color: "blue",
+      position: { x: 0, y: 5 },
+      shape: "L-shape",
+      layer: 0
+    },
+    
+    // J形 - 反L形（调整位置确保不超出边界）
+    {
+      id: "J_shape",
+      color: "green",
+      position: { x: 3, y: 5 },
+      shape: "J-shape",
+      layer: 0
+    },
+    
+    // S形 - S字形（调整位置确保不超出边界）
+    {
+      id: "S_shape",
+      color: "yellow",
+      position: { x: 5, y: 6 },
+      shape: "S-shape",
+      layer: 0
+    },
+    
+    // Z形 - Z字形（调整位置确保不超出边界）
+    {
+      id: "Z_shape",
+      color: "purple",
+      position: { x: 0, y: 6 },
+      shape: "Z-shape",
+      layer: 0
+    },
+    
+    // 第2层 - 被冰层覆盖的方块（当冰层融化后才会露出来）
+    {
+      id: "big_L",
+      color: "orange",
+      position: { x: 1, y: 4 },
+      shape: "bigL",
+      layer: 2
     },
     {
-      id: "blue_block_2",
-      color: "blue", 
-      position: { x: 5, y: 5 },
-      shape: "2x1",
-      layer: 1
+      id: "cross_shape",
+      color: "cyan",
+      position: { x: 4, y: 4 },
+      shape: "cross",
+      layer: 2
     }
   ],
   
-  // 冰层配置
+  // 冰层配置 - 第1层冰层，覆盖第2层方块
   iceLayers: [
-    // 覆盖第1层方块的冰层
+    // 覆盖大L形的冰层
     {
-      id: "ice_1",
-      position: { x: 0, y: 0 },
-      layer: 0,
+      id: "ice_bigL_1",
+      position: { x: 1, y: 4 },
+      layer: 1,
       meltProgress: 0
     },
     {
-      id: "ice_2", 
-      position: { x: 0, y: 1 },
-      layer: 0,
+      id: "ice_bigL_2",
+      position: { x: 1, y: 5 },
+      layer: 1,
       meltProgress: 0
     },
     {
-      id: "ice_3",
-      position: { x: 5, y: 5 },
-      layer: 0,
+      id: "ice_bigL_3",
+      position: { x: 1, y: 6 },
+      layer: 1,
       meltProgress: 0
     },
     {
-      id: "ice_4",
-      position: { x: 6, y: 5 },
-      layer: 0,
+      id: "ice_bigL_4",
+      position: { x: 2, y: 6 },
+      layer: 1,
+      meltProgress: 0
+    },
+    {
+      id: "ice_bigL_5",
+      position: { x: 3, y: 6 },
+      layer: 1,
       meltProgress: 0
     },
     
-    // 第1层的冰层
+    // 覆盖十字形的冰层
     {
-      id: "ice_5",
-      position: { x: 2, y: 2 },
+      id: "ice_cross_1",
+      position: { x: 4, y: 4 },
       layer: 1,
       meltProgress: 0
     },
     {
-      id: "ice_6",
-      position: { x: 3, y: 2 },
+      id: "ice_cross_2",
+      position: { x: 5, y: 4 },
+      layer: 1,
+      meltProgress: 0
+    },
+    {
+      id: "ice_cross_3",
+      position: { x: 6, y: 4 },
+      layer: 1,
+      meltProgress: 0
+    },
+    {
+      id: "ice_cross_4",
+      position: { x: 5, y: 5 },
+      layer: 1,
+      meltProgress: 0
+    },
+    {
+      id: "ice_cross_5",
+      position: { x: 5, y: 6 },
       layer: 1,
       meltProgress: 0
     }
   ],
   
-  // 石块配置 - 作为障碍物
+  // 石块配置 - 只有一个岩石作为障碍物
   rocks: [
-    // 第0层石块 - 四个角落
     {
       id: "rock_1",
-      position: { x: 0, y: 0 },
-      layer: 0
-    },
-    {
-      id: "rock_2", 
-      position: { x: 7, y: 0 },
-      layer: 0
-    },
-    {
-      id: "rock_3",
-      position: { x: 0, y: 7 },
-      layer: 0
-    },
-    {
-      id: "rock_4",
-      position: { x: 7, y: 7 },
-      layer: 0
-    },
-    
-    // 第1层石块
-    {
-      id: "rock_5",
       position: { x: 1, y: 1 },
-      layer: 1
-    },
-    {
-      id: "rock_6",
-      position: { x: 6, y: 1 },
-      layer: 1
-    },
-    
-    // 第2层石块
-    {
-      id: "rock_7",
-      position: { x: 3, y: 3 },
-      layer: 2
+      layer: 0
     }
   ],
   
