@@ -187,9 +187,9 @@ class MainMenu {
   setupEventListeners() {
     this.canvas.addEventListener('click', (e) => this.handleClick(e));
     this.canvas.addEventListener('dblclick', (e) => this.handleDoubleClick(e));
-    this.canvas.addEventListener('touchstart', (e) => this.handleTouchStart(e));
-    this.canvas.addEventListener('touchmove', (e) => this.handleTouchMove(e));
-    this.canvas.addEventListener('touchend', (e) => this.handleTouchEnd(e));
+    this.canvas.addEventListener('touchstart', (e) => this.handleTouchStart(e), { passive: false });
+    this.canvas.addEventListener('touchmove', (e) => this.handleTouchMove(e), { passive: false });
+    this.canvas.addEventListener('touchend', (e) => this.handleTouchEnd(e), { passive: false });
   }
   
   handleTouchStart(event) {

@@ -319,7 +319,7 @@ class GameEngine {
   // 设置事件监听器 - 适配抖音小游戏环境
   setupEventListeners() {
     this.canvas.addEventListener('click', (e) => this.handleClick(e));
-    this.canvas.addEventListener('touchstart', (e) => this.handleTouch(e));
+    this.canvas.addEventListener('touchstart', (e) => this.handleTouch(e), { passive: false });
   }
   
   // 处理点击事件

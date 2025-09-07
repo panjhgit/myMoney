@@ -19,6 +19,12 @@ var CREATURE_CONFIG = {
 
 // 创建俄罗斯方块风格的小人 - 适配抖音小游戏Canvas环境
 var createCreature = function(row, col, colorData) {
+  // 安全检查：确保 colorData 有 blocks 属性
+  if (!colorData || !colorData.blocks) {
+    console.error('createCreature: colorData 无效或缺少 blocks 属性:', colorData);
+    return null;
+  }
+  
   var creature = {
     id: row + '-' + col + '-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9), // 唯一ID
     row: row,
@@ -27,7 +33,8 @@ var createCreature = function(row, col, colorData) {
     colorData: colorData,
     element: null,
     animations: {},
-    isWalking: false
+    isWalking: false,
+    shapeData: colorData // 添加 shapeData 属性，指向 colorData
   };
   
   // 在抖音小游戏环境中，创建Canvas元素而不是DOM元素
@@ -82,6 +89,20 @@ var drawCreature = function(ctx, creature, startX, startY) {
       drawEyes(ctx, blockX, blockY);
     }
   });
+  
+  // 绘制脚（如果存在）
+  if (creature.feet && creature.feet.length > 0) {
+    creature.feet.forEach(function(foot) {
+      drawFoot(ctx, foot);
+    });
+  }
+  
+  // 绘制翅膀（如果存在）
+  if (creature.wings && creature.wings.length > 0) {
+    creature.wings.forEach(function(wing) {
+      drawWing(ctx, wing);
+    });
+  }
   
   ctx.restore();
 };
@@ -166,6 +187,13 @@ if (typeof window !== 'undefined') {
   window.selectCreature = selectCreature;
   window.deselectCreature = deselectCreature;
   window.destroyCreature = destroyCreature;
+  
+  // 动画效果函数
+  window.standUpAndExtendLimbs = standUpAndExtendLimbs;
+  window.sitDownAndHideLimbs = sitDownAndHideLimbs;
+  window.startWormAnimation = startWormAnimation;
+  window.startWingAnimation = startWingAnimation;
+  window.startLegWalkingAnimation = startLegWalkingAnimation;
 } else if (typeof global !== 'undefined') {
   global.CreatureStates = CreatureStates;
   global.createCreature = createCreature;
@@ -174,6 +202,13 @@ if (typeof window !== 'undefined') {
   global.selectCreature = selectCreature;
   global.deselectCreature = deselectCreature;
   global.destroyCreature = destroyCreature;
+  
+  // 动画效果函数
+  global.standUpAndExtendLimbs = standUpAndExtendLimbs;
+  global.sitDownAndHideLimbs = sitDownAndHideLimbs;
+  global.startWormAnimation = startWormAnimation;
+  global.startWingAnimation = startWingAnimation;
+  global.startLegWalkingAnimation = startLegWalkingAnimation;
 } else {
   // 在抖音小游戏环境中，直接设置为全局变量
   this.CreatureStates = CreatureStates;
@@ -183,4 +218,655 @@ if (typeof window !== 'undefined') {
   this.selectCreature = selectCreature;
   this.deselectCreature = deselectCreature;
   this.destroyCreature = destroyCreature;
+  
+  // 动画效果函数
+  this.standUpAndExtendLimbs = standUpAndExtendLimbs;
+  this.sitDownAndHideLimbs = sitDownAndHideLimbs;
+  this.startWormAnimation = startWormAnimation;
+  this.startWingAnimation = startWingAnimation;
+  this.startLegWalkingAnimation = startLegWalkingAnimation;
 }
+
+// 图形配置对象 - 统一管理所有图形的属性
+var SHAPE_CONFIGS = {
+  // 单个方块
+  single: {
+    name: 'single',
+    movementType: 'feet', // 用脚走路
+    eyeType: 'round', // 圆形眼睛
+    eyePosition: 'center', // 眼睛位置：中心
+    footPosition: 'bottom', // 脚部位置：底部
+    footCount: 2, // 脚部数量
+    footAnimation: 'alternating', // 脚部动画：交替
+    footSize: 'dynamic', // 脚部大小：动态计算
+    wingPosition: null, // 无翅膀
+    wingAnimation: null, // 无翅膀动画
+    wingSize: null, // 无翅膀大小
+    crawlAnimation: null // 无蠕动动画
+  },
+  
+  // 直线2
+  line2: {
+    name: 'line2',
+    movementType: 'crawl', // 蠕动
+    eyeType: 'oval', // 椭圆形眼睛
+    eyePosition: 'left', // 眼睛位置：左侧
+    footPosition: null, // 无脚部
+    footCount: 0,
+    footAnimation: null,
+    footSize: null,
+    wingPosition: null, // 无翅膀
+    wingAnimation: null,
+    wingSize: null,
+    crawlAnimation: 'bounce' // 蠕动动画：上下跳跃
+  },
+  
+  // 直线3
+  line3: {
+    name: 'line3',
+    movementType: 'crawl', // 蠕动
+    eyeType: 'oval', // 椭圆形眼睛
+    eyePosition: 'left', // 眼睛位置：左侧
+    footPosition: null, // 无脚部
+    footCount: 0,
+    footAnimation: null,
+    footSize: null,
+    wingPosition: null, // 无翅膀
+    wingAnimation: null,
+    wingSize: null,
+    crawlAnimation: 'bounce' // 蠕动动画：上下跳跃
+  },
+  
+  // 直线4
+  line4: {
+    name: 'line4',
+    movementType: 'crawl', // 蠕动
+    eyeType: 'oval', // 椭圆形眼睛
+    eyePosition: 'left', // 眼睛位置：左侧
+    footPosition: null, // 无脚部
+    footCount: 0,
+    footAnimation: null,
+    footSize: null,
+    wingPosition: null, // 无翅膀
+    wingAnimation: null,
+    wingSize: null,
+    crawlAnimation: 'bounce' // 蠕动动画：上下跳跃
+  },
+  
+  // 正方形
+  square: {
+    name: 'square',
+    movementType: 'feet', // 用脚走路
+    eyeType: 'round', // 圆形眼睛
+    eyePosition: 'top-left', // 眼睛位置：左上角
+    footPosition: 'bottom', // 脚部位置：底部
+    footCount: 2, // 脚部数量
+    footAnimation: 'alternating', // 脚部动画：交替
+    footSize: 'dynamic', // 脚部大小：动态计算
+    wingPosition: null, // 无翅膀
+    wingAnimation: null,
+    wingSize: null,
+    crawlAnimation: null // 无蠕动动画
+  },
+  
+  // L形
+  lshape: {
+    name: 'lshape',
+    movementType: 'wings', // 用翅膀飞行
+    eyeType: 'round', // 圆形眼睛
+    eyePosition: 'top-left', // 眼睛位置：左上角
+    footPosition: null, // 无脚部
+    footCount: 0,
+    footAnimation: null,
+    footSize: null,
+    wingPosition: 'top-sides', // 翅膀位置：顶部两侧
+    wingAnimation: 'symmetric', // 翅膀动画：对称扇动
+    wingSize: 'dynamic', // 翅膀大小：动态计算
+    crawlAnimation: null // 无蠕动动画
+  },
+  
+  // T形
+  tshape: {
+    name: 'tshape',
+    movementType: 'wings', // 用翅膀飞行
+    eyeType: 'round', // 圆形眼睛
+    eyePosition: 'top-center', // 眼睛位置：顶部中心
+    footPosition: null, // 无脚部
+    footCount: 0,
+    footAnimation: null,
+    footSize: null,
+    wingPosition: 'top-sides', // 翅膀位置：顶部两侧
+    wingAnimation: 'symmetric', // 翅膀动画：对称扇动
+    wingSize: 'dynamic', // 翅膀大小：动态计算
+    crawlAnimation: null // 无蠕动动画
+  },
+  
+  // Z形
+  zshape: {
+    name: 'zshape',
+    movementType: 'crawl', // 蠕动
+    eyeType: 'round', // 圆形眼睛
+    eyePosition: 'top-left', // 眼睛位置：左上角
+    footPosition: null, // 无脚部
+    footCount: 0,
+    footAnimation: null,
+    footSize: null,
+    wingPosition: null, // 无翅膀
+    wingAnimation: null,
+    wingSize: null,
+    crawlAnimation: 'bounce' // 蠕动动画：上下跳跃
+  },
+  
+  // 十字形
+  cross: {
+    name: 'cross',
+    movementType: 'crawl', // 蠕动
+    eyeType: 'round', // 圆形眼睛
+    eyePosition: 'top-center', // 眼睛位置：顶部中心
+    footPosition: null, // 无脚部
+    footCount: 0,
+    footAnimation: null,
+    footSize: null,
+    wingPosition: null, // 无翅膀
+    wingAnimation: null,
+    wingSize: null,
+    crawlAnimation: 'bounce' // 蠕动动画：上下跳跃
+  },
+  
+  // 大L形
+  bigl: {
+    name: 'bigl',
+    movementType: 'wings', // 用翅膀飞行
+    eyeType: 'round', // 圆形眼睛
+    eyePosition: 'top-left', // 眼睛位置：左上角
+    footPosition: null, // 无脚部
+    footCount: 0,
+    footAnimation: null,
+    footSize: null,
+    wingPosition: 'top-sides', // 翅膀位置：顶部两侧
+    wingAnimation: 'symmetric', // 翅膀动画：对称扇动
+    wingSize: 'dynamic', // 翅膀大小：动态计算
+    crawlAnimation: null // 无蠕动动画
+  }
+};
+
+// 根据形状名称获取配置
+var getShapeConfig = function(shapeName) {
+  return SHAPE_CONFIGS[shapeName] || SHAPE_CONFIGS.single;
+};
+
+// 小人站起来并伸出手脚（Canvas版本）
+var standUpAndExtendLimbs = function(creature) {
+  if (creature.isWalking) return;
+  
+  creature.isWalking = true;
+  
+  // 停止呼吸动画
+  if (creature.animations && creature.animations.breathing) {
+    creature.animations.breathing.kill();
+  }
+  
+  // 站起来动画 - 放大
+  creature.element.scale = 1.1;
+  
+  // 根据形状配置选择运动方式
+  var config = getShapeConfig(creature.colorData.shape);
+  creature.movementType = config.movementType;
+  creature.shapeConfig = config;
+  
+  if (config.movementType === 'feet') {
+    // 用脚走路
+    createSimpleFeet(creature);
+    startWalkingAnimation(creature);
+  } else if (config.movementType === 'wings') {
+    // 用翅膀飞
+    createSimpleWings(creature);
+    startFlyingAnimation(creature);
+  } else if (config.movementType === 'crawl') {
+    // 像虫子一样蠕动
+    startCrawlingAnimation(creature);
+  }
+};
+
+// 小人坐下并收起手脚（Canvas版本）
+var sitDownAndHideLimbs = function(creature) {
+  creature.isWalking = false;
+  
+  // 坐下动画 - 恢复原始大小
+  creature.element.scale = 1;
+  
+  // 根据运动方式移除相应的肢体
+  if (creature.movementType === 'feet') {
+    removeSimpleFeet(creature);
+    stopWalkingAnimation(creature);
+  } else if (creature.movementType === 'wings') {
+    removeSimpleWings(creature);
+    stopFlyingAnimation(creature);
+  } else if (creature.movementType === 'crawl') {
+    stopCrawlingAnimation(creature);
+  }
+  
+  // 恢复呼吸动画
+  if (!creature.animations) {
+    creature.animations = {};
+  }
+  creature.animations.breathing = gsap.to(creature.element, {
+    breathingScale: 1.05,
+    duration: 2,
+    ease: "power2.inOut",
+    yoyo: true,
+    repeat: -1
+  });
+};
+
+// 开始走路动画（Canvas版本）
+var startWalkingAnimation = function(creature) {
+  // 停止呼吸动画
+  if (creature.animations && creature.animations.breathing) {
+    creature.animations.breathing.kill();
+  }
+  
+  // 自然走路动画（使用GSAP）
+  if (creature.feet && creature.feet.length > 0) {
+    // 创建时间线来协调所有动画
+    var walkTimeline = gsap.timeline({ repeat: -1 });
+    
+    // 将腿分为两组
+    var leftLegs = creature.feet.filter(function(leg, index) { return index % 2 === 0; });
+    var rightLegs = creature.feet.filter(function(leg, index) { return index % 2 === 1; });
+    
+    // 身体自然起伏（走路时的重心转移）
+    walkTimeline
+      .to(creature.element, { 
+        y: creature.element.y + 2, 
+        duration: 0.3, 
+        ease: "power1.inOut" 
+      }, 0)
+      .to(creature.element, { 
+        y: creature.element.y - 2, 
+        duration: 0.3, 
+        ease: "power1.inOut" 
+      }, 0.3)
+      .to(creature.element, { 
+        y: creature.element.y + 2, 
+        duration: 0.3, 
+        ease: "power1.inOut" 
+      }, 0.6)
+      .to(creature.element, { 
+        y: creature.element.y - 2, 
+        duration: 0.3, 
+        ease: "power1.inOut" 
+      }, 0.9);
+    
+    // 左腿前后摆动
+    leftLegs.forEach(function(leg) {
+      walkTimeline
+        .to(leg, { 
+          x: leg.x + 8, // 左腿向前
+          duration: 0.4, 
+          ease: "power2.inOut" 
+        }, 0)
+        .to(leg, { 
+          x: leg.x - 8, // 左腿向后
+          duration: 0.4, 
+          ease: "power2.inOut" 
+        }, 0.4)
+        .to(leg, { 
+          x: leg.x, // 回到原位
+          duration: 0.4, 
+          ease: "power2.inOut" 
+        }, 0.8);
+    });
+    
+    // 右腿前后摆动（与左腿相反，形成交替）
+    rightLegs.forEach(function(leg) {
+      walkTimeline
+        .to(leg, { 
+          x: leg.x - 8, // 右腿向后
+          duration: 0.4, 
+          ease: "power2.inOut" 
+        }, 0)
+        .to(leg, { 
+          x: leg.x + 8, // 右腿向前
+          duration: 0.4, 
+          ease: "power2.inOut" 
+        }, 0.4)
+        .to(leg, { 
+          x: leg.x, // 回到原位
+          duration: 0.4, 
+          ease: "power2.inOut" 
+        }, 0.8);
+    });
+    
+    if (!creature.animations) {
+      creature.animations = {};
+    }
+    creature.animations.walkTimeline = walkTimeline;
+  }
+};
+
+// 开始飞行动画（Canvas版本）
+var startFlyingAnimation = function(creature) {
+  // 停止呼吸动画
+  if (creature.animations && creature.animations.breathing) {
+    creature.animations.breathing.kill();
+  }
+  
+  // 方块上下浮动动画（飞行时的起伏）
+  if (!creature.animations) {
+    creature.animations = {};
+  }
+  
+  creature.animations.flying = gsap.to(creature.element, {
+    y: creature.element.y + 4,
+    duration: 0.4,
+    ease: "power2.inOut",
+    yoyo: true,
+    repeat: -1
+  });
+  
+  // 翅膀扇动动画
+  if (creature.wings && creature.wings.length > 0) {
+    // 将翅膀分为两组：左翅膀和右翅膀
+    var leftWings = creature.wings.filter(function(wing, index) { return index % 2 === 0; });
+    var rightWings = creature.wings.filter(function(wing, index) { return index % 2 === 1; });
+    
+    // 创建翅膀扇动时间线
+    var wingTimeline = gsap.timeline({ repeat: -1 });
+    
+    // 翅膀扇动周期
+    wingTimeline
+      // 羽毛向下摆动 - 左右翅膀垂直对称摆动
+      .to(leftWings, {
+        rotation: -45, // 左翅膀向下摆动到-45°
+        duration: 0.4,
+        ease: "power2.inOut"
+      }, 0)
+      .to(rightWings, {
+        rotation: 45, // 右翅膀向下摆动到+45°（垂直对称）
+        duration: 0.4,
+        ease: "power2.inOut"
+      }, 0)
+      // 恢复到原位
+      .to(leftWings, {
+        rotation: -30, // 左翅膀恢复到-30°
+        duration: 0.4,
+        ease: "power2.inOut"
+      }, 0.4)
+      .to(rightWings, {
+        rotation: 30, // 右翅膀恢复到+30°
+        duration: 0.4,
+        ease: "power2.inOut"
+      }, 0.4);
+    
+    creature.animations.wingTimeline = wingTimeline;
+  }
+};
+
+// 开始蠕动动画（Canvas版本）
+var startCrawlingAnimation = function(creature) {
+  // 停止呼吸动画
+  if (creature.animations && creature.animations.breathing) {
+    creature.animations.breathing.kill();
+  }
+  
+  if (!creature.animations) {
+    creature.animations = {};
+  }
+  
+  // 虫子蠕动：整体上下跳跃（一格一格的感觉）
+  creature.animations.crawling = gsap.to(creature.element, {
+    y: creature.element.y + 4,
+    duration: 0.3,
+    ease: "power2.inOut",
+    yoyo: true,
+    repeat: -1
+  });
+  
+  // 方块轻微收缩（虫子收缩效果）
+  creature.animations.crawlBounce = gsap.to(creature.element, {
+    scale: 0.95,
+    duration: 0.2,
+    ease: "power2.inOut",
+    yoyo: true,
+    repeat: -1
+  });
+  
+  // 整体轻微左右移动（前进感）
+  creature.animations.crawlMove = gsap.to(creature.element, {
+    x: creature.element.x + 2,
+    duration: 0.6,
+    ease: "power2.inOut",
+    yoyo: true,
+    repeat: -1
+  });
+};
+
+// 停止走路动画（Canvas版本）
+var stopWalkingAnimation = function(creature) {
+  if (creature.animations) {
+    if (creature.animations.walking) {
+      creature.animations.walking.kill();
+    }
+    if (creature.animations.rotation) {
+      creature.animations.rotation.kill();
+    }
+    if (creature.animations.walkTimeline) {
+      creature.animations.walkTimeline.kill();
+    }
+  }
+  
+  // 重置身体位置
+  creature.element.y = creature.row * CREATURE_CONFIG.CELL_SIZE;
+  creature.element.x = creature.col * CREATURE_CONFIG.CELL_SIZE;
+  creature.element.rotation = 0;
+  
+  // 重置脚部位置到自然状态
+  if (creature.feet) {
+    creature.feet.forEach(function(foot) {
+      foot.rotation = 0;
+      foot.x = foot.originalX || foot.x;
+      foot.y = foot.originalY || foot.y;
+    });
+  }
+};
+
+// 停止飞行动画（Canvas版本）
+var stopFlyingAnimation = function(creature) {
+  if (creature.animations) {
+    if (creature.animations.flying) {
+      creature.animations.flying.kill();
+    }
+    if (creature.animations.wingTimeline) {
+      creature.animations.wingTimeline.kill();
+    }
+  }
+  
+  // 重置身体位置
+  creature.element.y = creature.row * CREATURE_CONFIG.CELL_SIZE;
+  creature.element.x = creature.col * CREATURE_CONFIG.CELL_SIZE;
+  creature.element.rotation = 0;
+  
+  // 重置翅膀位置到初始对称状态
+  if (creature.wings) {
+    creature.wings.forEach(function(wing, index) {
+      if (index === 0) {
+        // 左翅膀：回到-15度
+        wing.rotation = -15;
+      } else {
+        // 右翅膀：回到+15度
+        wing.rotation = 15;
+      }
+    });
+  }
+};
+
+// 停止蠕动动画（Canvas版本）
+var stopCrawlingAnimation = function(creature) {
+  if (creature.animations) {
+    if (creature.animations.crawling) {
+      creature.animations.crawling.kill();
+    }
+    if (creature.animations.crawlBounce) {
+      creature.animations.crawlBounce.kill();
+    }
+    if (creature.animations.crawlMove) {
+      creature.animations.crawlMove.kill();
+    }
+  }
+  
+  // 重置身体位置
+  creature.element.y = creature.row * CREATURE_CONFIG.CELL_SIZE;
+  creature.element.x = creature.col * CREATURE_CONFIG.CELL_SIZE;
+  creature.element.rotation = 0;
+  creature.element.scale = 1;
+};
+
+// 创建简单的脚（Canvas版本）
+var createSimpleFeet = function(creature) {
+  // 清除之前的脚
+  removeSimpleFeet(creature);
+  
+  creature.feet = [];
+  
+  // 找到小人的底部方块位置
+  var bottomBlocks = creature.colorData.blocks.filter(function(block) {
+    return !creature.colorData.blocks.some(function(otherBlock) { 
+      return otherBlock[0] === block[0] && otherBlock[1] === block[1] + 1;
+    });
+  });
+  
+  // 决定腿的数量：固定2个腿
+  var legCount = 2;
+  
+  // 创建腿 - 选择最合适的底部方块
+  var selectedBlocks = [];
+  if (bottomBlocks.length === 1) {
+    // 只有1个底部方块：创建2个脚在同一个方块下方
+    selectedBlocks.push(bottomBlocks[0]);
+    selectedBlocks.push(bottomBlocks[0]);
+  } else {
+    // 多个底部方块：选择最左边和最右边的
+    selectedBlocks.push(bottomBlocks[0]); // 最左边
+    selectedBlocks.push(bottomBlocks[bottomBlocks.length - 1]); // 最右边
+  }
+  
+  // 创建腿
+  for (var i = 0; i < legCount; i++) {
+    var block = selectedBlocks[i];
+    
+    var leg = {
+      x: block[0] * CREATURE_CONFIG.CELL_SIZE + 13.5,
+      y: block[1] * CREATURE_CONFIG.CELL_SIZE + CREATURE_CONFIG.CELL_SIZE,
+      width: 3,
+      height: 20,
+      rotation: 0,
+      originalX: block[0] * CREATURE_CONFIG.CELL_SIZE + 13.5,
+      originalY: block[1] * CREATURE_CONFIG.CELL_SIZE + CREATURE_CONFIG.CELL_SIZE,
+      color: '#000'
+    };
+    
+    // 调整脚的位置：如果是同一个方块下的两个脚，稍微分开
+    if (legCount === 2 && selectedBlocks[0] === selectedBlocks[1]) {
+      // 同一个方块下的两个脚：一个偏左，一个偏右
+      leg.x = i === 0 ? block[0] * CREATURE_CONFIG.CELL_SIZE + 8 : block[0] * CREATURE_CONFIG.CELL_SIZE + 19;
+      leg.originalX = leg.x;
+    }
+    
+    creature.feet.push(leg);
+  }
+};
+
+// 移除简单的脚（Canvas版本）
+var removeSimpleFeet = function(creature) {
+  if (creature.feet) {
+    creature.feet = [];
+  }
+};
+
+// 创建简单的翅膀（Canvas版本）
+var createSimpleWings = function(creature) {
+  // 清除之前的翅膀
+  removeSimpleWings(creature);
+  
+  creature.wings = [];
+  
+  // 找到眼睛所在的那一列作为翅膀对称中心
+  var blocks = creature.colorData.blocks;
+  var minY = Math.min.apply(Math, blocks.map(function(b) { return b[1]; }));
+  
+  // 找到最顶部的方块（头部，有眼睛）
+  var topBlocks = blocks.filter(function(block) { return block[1] === minY; });
+  var headBlock = topBlocks[0];
+  
+  // 眼睛所在的那一列的X坐标（翅膀对称中心）
+  var eyeColumnX = headBlock[0];
+  
+  // 创建翅膀
+  for (var i = 0; i < 2; i++) {
+    var wing = {
+      x: eyeColumnX * CREATURE_CONFIG.CELL_SIZE + (i === 0 ? -15 : 15),
+      y: headBlock[1] * CREATURE_CONFIG.CELL_SIZE + 5,
+      width: 20,
+      height: 12,
+      rotation: i === 0 ? -30 : 30, // 左翅膀向左下倾斜，右翅膀向右下倾斜
+      color: '#000',
+      originalRotation: i === 0 ? -30 : 30
+    };
+    
+    creature.wings.push(wing);
+  }
+};
+
+// 移除简单的翅膀（Canvas版本）
+var removeSimpleWings = function(creature) {
+  if (creature.wings) {
+    creature.wings = [];
+  }
+};
+
+// 绘制脚
+var drawFoot = function(ctx, foot) {
+  ctx.save();
+  ctx.translate(foot.x, foot.y);
+  ctx.rotate(foot.rotation * Math.PI / 180);
+  
+  // 绘制小腿（垂直部分）
+  ctx.fillStyle = foot.color;
+  ctx.fillRect(0, 0, foot.width, foot.height * 0.7);
+  
+  // 绘制脚掌（水平部分）
+  ctx.fillRect(0, foot.height * 0.7, foot.width * 2, foot.width);
+  
+  ctx.restore();
+};
+
+// 绘制翅膀
+var drawWing = function(ctx, wing) {
+  ctx.save();
+  ctx.translate(wing.x, wing.y);
+  ctx.rotate(wing.rotation * Math.PI / 180);
+  
+  // 绘制简单的翅膀形状（椭圆形）
+  ctx.fillStyle = wing.color;
+  ctx.beginPath();
+  ctx.ellipse(wing.width / 2, wing.height / 2, wing.width / 2, wing.height / 2, 0, 0, 2 * Math.PI);
+  ctx.fill();
+  
+  // 绘制翅膀纹理线条
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+  ctx.lineWidth = 1;
+  for (var i = 1; i < 3; i++) {
+    ctx.beginPath();
+    ctx.moveTo(wing.width * 0.2, wing.height * i / 3);
+    ctx.lineTo(wing.width * 0.8, wing.height * i / 3);
+    ctx.stroke();
+  }
+  
+  ctx.restore();
+};
+
+// 为Canvas版本添加的别名函数
+var startWormAnimation = startCrawlingAnimation;
+var startWingAnimation = startFlyingAnimation;
+var startLegWalkingAnimation = startWalkingAnimation;

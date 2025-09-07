@@ -116,12 +116,47 @@ class MapEngine {
     this.selectedElement = null;
     this.moveHistory = [];
     
+    // 清理动画数据
+    this.animations.clear();
+    this.animationQueue = [];
+    this.blockAnimations.clear();
+    
+    // 停止所有动画
+    if (this.gridAnimation && this.gridAnimation.kill) {
+      this.gridAnimation.kill();
+    }
+    if (this.pulseAnimation && this.pulseAnimation.kill) {
+      this.pulseAnimation.kill();
+    }
+    if (this.blockAnimation && this.blockAnimation.kill) {
+      this.blockAnimation.kill();
+    }
+    if (this.gateAnimation && this.gateAnimation.kill) {
+      this.gateAnimation.kill();
+    }
+    if (this.iceAnimation && this.iceAnimation.kill) {
+      this.iceAnimation.kill();
+    }
+    if (this.masterTimeline && this.masterTimeline.kill) {
+      this.masterTimeline.kill();
+    }
+    
+    // 重置动画对象
+    this.gridAnimation = null;
+    this.pulseAnimation = null;
+    this.blockAnimation = null;
+    this.gateAnimation = null;
+    this.iceAnimation = null;
+    this.masterTimeline = null;
+    
     // 重新初始化空间索引
     for (let x = 0; x < this.GRID_SIZE; x++) {
       for (let y = 0; y < this.GRID_SIZE; y++) {
         this.spatialIndex.set(`${x},${y}`, new Set());
       }
     }
+    
+    console.log('地图数据已完全清理');
   }
   
   /**
@@ -147,13 +182,49 @@ class MapEngine {
    * @param {Object} block - 方块配置 {id, color, position, shape, layer}
    */
   addTetrisBlock(block) {
-    // 使用 block.js 中的 createBlock 函数
-    if (typeof createBlock === 'undefined') {
-      console.error('createBlock 函数未找到，请确保 block.js 已加载');
+    // 使用 creature.js 中的 createCreature 函数
+    if (typeof createCreature === 'undefined') {
+      console.error('createCreature 函数未找到，请确保 creature.js 已加载');
       return;
     }
     
-    const blockElement = createBlock(block.id, block.color, block.position, block.shape, block.layer);
+    // 获取正确的颜色和形状数据
+    let colorData = block.colorData;
+    if (!colorData && typeof BLOCK_COLORS !== 'undefined') {
+      colorData = BLOCK_COLORS[block.color];
+    }
+    
+    let shapeData = null;
+    if (typeof BLOCK_SHAPES !== 'undefined') {
+      console.log('查找形状:', block.shape, '可用形状:', Object.keys(BLOCK_SHAPES));
+      shapeData = BLOCK_SHAPES[block.shape];
+      console.log('找到的形状数据:', shapeData);
+    } else {
+      console.error('BLOCK_SHAPES 未定义');
+    }
+    
+    if (!colorData) {
+      console.error('无法找到颜色数据:', block.color);
+      return;
+    }
+    
+    if (!shapeData) {
+      console.error('无法找到形状数据:', block.shape);
+      return;
+    }
+    
+    // 合并颜色和形状数据
+    const combinedData = {
+      name: colorData.name,
+      gradient: colorData.gradient,
+      glowColor: colorData.glowColor,
+      blocks: shapeData.blocks,
+      movementType: shapeData.movementType,
+      eyePosition: shapeData.eyePosition,
+      shape: block.shape
+    };
+    
+    const blockElement = createCreature(block.position.y, block.position.x, combinedData);
     
     if (!blockElement) {
       console.error('方块创建失败:', block);
@@ -290,17 +361,14 @@ class MapEngine {
    * @returns {Array} 格子坐标数组
    */
   calculateOccupiedCells(position, shapeData) {
-    console.log('calculateOccupiedCells 输入:', { position, shapeData });
     const cells = [];
     if (shapeData.blocks) {
       // 新的格式：blocks 数组
-      console.log('使用 blocks 数组:', shapeData.blocks);
       shapeData.blocks.forEach(block => {
         cells.push(`${position.x + block[0]},${position.y + block[1]}`);
       });
     } else if (shapeData.width && shapeData.height) {
       // 旧的格式：width, height
-      console.log('使用 width/height:', { width: shapeData.width, height: shapeData.height });
       for (let x = position.x; x < position.x + shapeData.width; x++) {
         for (let y = position.y; y < position.y + shapeData.height; y++) {
           cells.push(`${x},${y}`);
@@ -309,7 +377,6 @@ class MapEngine {
     } else {
       console.warn('无法识别的 shapeData 格式:', shapeData);
     }
-    console.log('计算出的 cells:', cells);
     return cells;
   }
   
@@ -1047,19 +1114,42 @@ class MapEngine {
     const animationId = `block_move_${block.id}`;
     
     try {
-      // 创建移动动画
-      const moveAnimation = gsap.to({}, {
-        duration: 0.3,
-        ease: "power2.out",
-        onUpdate: () => {
-          // 移动动画更新
-        },
-        onComplete: () => {
-          this.animations.delete(animationId);
-        }
-      });
-      
-      this.animations.set(animationId, moveAnimation);
+      // 如果方块有 blockElement，使用 creature.js 的动画效果
+      if (block.blockElement && typeof standUpAndExtendLimbs !== 'undefined') {
+        // 开始动画效果
+        standUpAndExtendLimbs(block.blockElement);
+        
+        // 创建移动动画
+        const moveAnimation = gsap.to(block.blockElement.element, {
+          x: toPos.x * this.cellSize,
+          y: toPos.y * this.cellSize,
+          duration: 0.5,
+          ease: "power2.out",
+          onComplete: () => {
+            // 移动完成后收起动画效果
+            if (typeof sitDownAndHideLimbs !== 'undefined') {
+              sitDownAndHideLimbs(block.blockElement);
+            }
+            this.animations.delete(animationId);
+          }
+        });
+        
+        this.animations.set(animationId, moveAnimation);
+      } else {
+        // 降级到简单动画
+        const moveAnimation = gsap.to({}, {
+          duration: 0.3,
+          ease: "power2.out",
+          onUpdate: () => {
+            // 移动动画更新
+          },
+          onComplete: () => {
+            this.animations.delete(animationId);
+          }
+        });
+        
+        this.animations.set(animationId, moveAnimation);
+      }
     } catch (error) {
       console.warn(`方块 ${block.id} 移动动画创建失败:`, error);
     }
@@ -1953,8 +2043,13 @@ class MapEngine {
     const blocks = this.getAllElementsByType('tetris');
     
     blocks.forEach(block => {
-      // 直接使用原来的绘制方式，因为 block.js 现在是纯数据驱动
-      this.drawTetrisBlock(block);
+      // 如果方块有 blockElement，使用 creature.js 的绘制函数
+      if (block.blockElement && typeof drawCreature !== 'undefined') {
+        drawCreature(this.ctx, block.blockElement, this.gridOffsetX, this.gridOffsetY);
+      } else {
+        // 降级到原来的绘制方式
+        this.drawTetrisBlock(block);
+      }
     });
   }
   
@@ -2044,9 +2139,7 @@ class MapEngine {
     }
     
     // 根据形状的每个块分别绘制
-    console.log('方块', block.id, 'occupiedCells:', block.occupiedCells);
     const cells = block.occupiedCells.map(cellKey => cellKey.split(',').map(Number));
-    console.log('解析后的cells:', cells);
     
     if (cells.length === 0) {
       console.warn(`方块 ${block.id} 没有占用格子，跳过绘制`);

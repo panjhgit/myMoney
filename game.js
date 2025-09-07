@@ -5,6 +5,7 @@ console.log(
 
 // 加载必要的库和模块
 require('./src/js/gsap.min.js');
+require('./src/js/creature.js');
 require('./src/js/menu.js');
 require('./src/js/map-engine.js');
 require('./src/js/block.js');
@@ -23,10 +24,14 @@ let mapEngine = null;
 
 // 初始化主菜单
 function initMainMenu() {
-  // 强制清理所有游戏状态，确保从干净的状态开始
-  console.log('初始化主菜单，清理所有游戏状态');
+  console.log('初始化主菜单');
+  
+  // 直接销毁地图引擎实例
+  if (mapEngine) {
+    mapEngine = null;
+  }
+  
   gameState = 'menu';
-  mapEngine = null;
   mainMenu = null;
   
   // 检查 MainMenu 类是否已加载
@@ -50,10 +55,10 @@ function initMainMenu() {
 function startGame(levelId) {
   console.log(`开始游戏，关卡 ${levelId}`);
   
-  // 强制清理所有状态，确保从干净的状态开始
-  console.log('清理所有游戏状态');
-  gameState = 'menu'; // 先设置为菜单状态
-  mapEngine = null;
+  // 直接销毁旧的地图引擎实例
+  if (mapEngine) {
+    mapEngine = null;
+  }
   
   // 检查 MapEngine 类是否已加载
   if (typeof MapEngine === 'undefined') {
@@ -235,23 +240,6 @@ function setupGameEvents() {
     }
   });
   
-  // 双击事件处理 - 返回主菜单
-  let lastClickTime = 0;
-  canvas.addEventListener('click', (e) => {
-    const currentTime = Date.now();
-    if (currentTime - lastClickTime < 300) {
-      // 双击检测
-      if (gameState === 'game') {
-        console.log('双击检测到 - 返回主菜单');
-        gameState = 'menu';
-        mapEngine = null;
-        setTimeout(() => {
-          console.log('返回主菜单完成');
-        }, 50);
-      }
-    }
-    lastClickTime = currentTime;
-  });
   
   // 抖音小游戏不支持键盘事件，移除键盘监听
   // 可以通过触摸手势或其他方式实现返回功能
