@@ -394,6 +394,11 @@ class MapEngine {
       return false;
     }
     
+    // 如果选择的是不同的方块，取消之前选中的
+    if (this.selectedElement && this.selectedElement.id !== elementId) {
+      this.selectedElement = null;
+    }
+    
     this.selectedElement = element;
     return true;
   }
@@ -2400,25 +2405,19 @@ class MapEngine {
     const blocks = this.getAllElementsByType('tetris');
     for (const block of blocks) {
       if (block.occupiedCells.includes(`${gridX},${gridY}`)) {
-        // 如果点击的是已选中的方块，取消选择
-        if (this.selectedElement && this.selectedElement.id === block.id) {
-          this.selectedElement = null;
-          console.log('取消选择方块:', block.id);
+        // 每次点击方块都是选中
+        this.selectElement(block.id);
+        console.log(`选择了方块: ${block.id}`);
+        
+        // 触发眨眼动画
+        if (block.blockElement && typeof blinkAnimation !== 'undefined') {
+          console.log('触发眨眼动画:', block.id);
+          blinkAnimation(block.blockElement);
         } else {
-          // 选择新方块
-          this.selectElement(block.id);
-          console.log(`选择了方块: ${block.id}`);
-          
-          // 触发眨眼动画
-          if (block.blockElement && typeof blinkAnimation !== 'undefined') {
-            console.log('触发眨眼动画:', block.id);
-            blinkAnimation(block.blockElement);
-          } else {
-            console.log('无法触发眨眼动画:', {
-              hasBlockElement: !!block.blockElement,
-              hasBlinkAnimation: typeof blinkAnimation !== 'undefined'
-            });
-          }
+          console.log('无法触发眨眼动画:', {
+            hasBlockElement: !!block.blockElement,
+            hasBlinkAnimation: typeof blinkAnimation !== 'undefined'
+          });
         }
         return;
       }

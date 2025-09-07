@@ -80,21 +80,21 @@ const map1 = {
     {
       id: "L_shape",
       color: "purple",
-      position: { x: 2, y: 2 },
+      position: { x: 0, y: 2 },
       shape: "L-shape",
       layer: 0
     },
     {
       id: "T_shape",
       color: "orange",
-      position: { x: 3, y: 2 },
+      position: { x: 2, y: 4 },
       shape: "T-shape",
       layer: 0
     },
     {
       id: "S_shape",
       color: "cyan",
-      position: { x: 5, y: 2 },
+      position: { x: 5, y: 4 },
       shape: "S-shape",
       layer: 0
     },
@@ -103,24 +103,24 @@ const map1 = {
     {
       id: "big_L",
       color: "magenta",
-      position: { x: 0, y: 4 },
+      position: { x: 0, y: 5 },
       shape: "bigL",
       layer: 1
     },
     {
       id: "cross_shape",
       color: "red",
-      position: { x: 4, y: 4 },
+      position: { x: 4, y: 5 },
       shape: "cross",
       layer: 1
     }
   ],
   
-  // 石块配置 - 只有一个岩石作为障碍物
+  // 石块配置 - 中心一个岩石作为障碍物
   rocks: [
     {
-      id: "rock_1",
-      position: { x: 1, y: 1 },
+      id: "rock_center",
+      position: { x: 3, y: 3 },
       layer: 0
     }
   ],
