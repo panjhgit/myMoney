@@ -1986,19 +1986,22 @@ class MapEngine {
     const blocks = this.getAllElementsByType('tetris');
     
     blocks.forEach(block => {
-      // 调试：检查绘制前的位置
-      if (block.id === 'cross_shape') {
-        console.log(`绘制前 ${block.id} 位置检查:`, {
-          logicPosition: block.position,
-          renderPosition: block.blockElement?.element ? {
-            x: block.blockElement.element.x,
-            y: block.blockElement.element.y
-          } : 'no element'
-        });
-      }
-      
       // 如果方块有 blockElement，使用 creature.js 的绘制函数
       if (block.blockElement && typeof drawCreature !== 'undefined') {
+        // 确保 blockElement 的位置与逻辑位置同步
+        if (block.blockElement.element) {
+          block.blockElement.element.x = block.position.x * this.cellSize;
+          block.blockElement.element.y = block.position.y * this.cellSize;
+        }
+        
+        // 同步 creature 的 row 和 col
+        if (block.blockElement.row !== undefined) {
+          block.blockElement.row = block.position.y;
+        }
+        if (block.blockElement.col !== undefined) {
+          block.blockElement.col = block.position.x;
+        }
+        
         drawCreature(this.ctx, block.blockElement, this.gridOffsetX, this.gridOffsetY);
       } else {
         // 降级到原来的绘制方式
@@ -2464,34 +2467,17 @@ class MapEngine {
     
     // 创建走路时间线
     const walkTimeline = gsap.timeline({
-      onUpdate: () => {
-        // 动画过程中持续重绘
-        this.needsRedraw = true;
-      },
       onComplete: () => {
-        // 立即锁定位置，防止GSAP清理动画属性时重置位置
-        if (element.blockElement && element.blockElement.element) {
-          element.blockElement.element.x = toPosition.x * this.cellSize;
-          element.blockElement.element.y = toPosition.y * this.cellSize;
-          
-          // 强制锁定位置，防止被GSAP清理
-          element.blockElement.element.setAttribute = function() {}; // 禁用setAttribute
-          Object.defineProperty(element.blockElement.element, 'x', {
-            value: toPosition.x * this.cellSize,
-            writable: false,
-            configurable: false
-          });
-          Object.defineProperty(element.blockElement.element, 'y', {
-            value: toPosition.y * this.cellSize,
-            writable: false,
-            configurable: false
-          });
-          
-          console.log(`方块 ${element.id} 位置已锁定: (${element.blockElement.element.x}, ${element.blockElement.element.y})`);
-        }
+        // 动画完成后确保位置同步
+        element.position = toPosition;
+        element.occupiedCells = this.calculateOccupiedCells(toPosition, element.shapeData);
         
-        // 标记需要重绘
-        this.needsRedraw = true;
+        // 确保渲染位置也同步
+        blockElement.x = toPosition.x * this.cellSize;
+        blockElement.y = toPosition.y * this.cellSize;
+        
+        // 更新空间索引
+        this.updateSpatialIndex(element, fromPosition, toPosition);
         
         // 收起脚
         if (typeof sitDownAndHideLimbs === 'function') {
@@ -2501,43 +2487,26 @@ class MapEngine {
         // 清理动画
         this.animations.delete(animationId);
         
-        console.log(`方块 ${element.id} 移动动画完成，逻辑位置: (${toPosition.x}, ${toPosition.y})`);
+        console.log(`方块 ${element.id} 移动动画完成，最终位置: (${toPosition.x},${toPosition.y})`);
       }
     });
     
     // 注册动画
     this.animations.set(animationId, walkTimeline);
     
-    // 添加位置监控（调试用）
-    if (element.id === 'cross_shape') {
-      const finalX = toPosition.x * this.cellSize;
-      const finalY = toPosition.y * this.cellSize;
-      console.log(`开始监控 ${element.id} 动画完成后的位置变化，目标位置: (${finalX}, ${finalY})`);
-      
-      // 动画完成后开始监控位置
-      walkTimeline.eventCallback('onComplete', () => {
-        const positionMonitor = setInterval(() => {
-          const currentX = element.blockElement.element.x;
-          const currentY = element.blockElement.element.y;
-          if (Math.abs(currentX - finalX) > 1 || Math.abs(currentY - finalY) > 1) {
-            console.log(`动画完成后位置被重置！${element.id} 从目标位置 (${finalX}, ${finalY}) 变为 (${currentX}, ${currentY})`);
-            console.trace('位置重置调用栈:');
-          }
-        }, 100);
-        
-        // 10秒后停止监控
-        setTimeout(() => {
-          clearInterval(positionMonitor);
-          console.log(`停止监控 ${element.id} 位置`);
-        }, 10000);
-      });
-    }
-    
     // 一格一格移动
     path.forEach((step, index) => {
       const stepDuration = 0.4; // 每步持续时间
       const delay = index * stepDuration;
       
+      // 立即更新逻辑位置，避免闪烁
+      walkTimeline.call(() => {
+        element.position = { x: step.x, y: step.y };
+        element.occupiedCells = this.calculateOccupiedCells(element.position, element.shapeData);
+        console.log(`方块 ${element.id} 开始移动到步骤: (${step.x},${step.y})`);
+      }, [], delay);
+      
+      // 动画移动渲染位置
       walkTimeline.to(blockElement, {
         x: step.x * this.cellSize,
         y: step.y * this.cellSize,
@@ -2553,39 +2522,6 @@ class MapEngine {
         yoyo: true,
         repeat: 1
       }, delay);
-      
-      // 每一步完成时更新逻辑位置（参考old实现）
-      walkTimeline.call(() => {
-        // 更新空间索引 - 先从旧位置移除
-        if (element.occupiedCells) {
-          element.occupiedCells.forEach(cellKey => {
-            const spatialSet = this.spatialIndex.get(cellKey);
-            if (spatialSet) {
-              spatialSet.delete(element);
-            }
-          });
-        }
-        
-        // 更新元素位置
-        element.position = { x: step.x, y: step.y };
-        element.occupiedCells = this.calculateOccupiedCells(element.position, element.shapeData);
-        
-        // 同步更新渲染位置，确保逻辑和渲染一致
-        if (element.blockElement && element.blockElement.element) {
-          element.blockElement.element.x = step.x * this.cellSize;
-          element.blockElement.element.y = step.y * this.cellSize;
-        }
-        
-        // 添加到新位置的空间索引
-        element.occupiedCells.forEach(cellKey => {
-          const spatialSet = this.spatialIndex.get(cellKey);
-          if (spatialSet) {
-            spatialSet.add(element);
-          }
-        });
-        
-        console.log(`方块 ${element.id} 移动到步骤: (${step.x},${step.y}) 渲染位置: (${element.blockElement?.element?.x}, ${element.blockElement?.element?.y})`);
-      }, [], delay + stepDuration);
     });
   }
   
@@ -2636,6 +2572,14 @@ class MapEngine {
     if (element.blockElement && element.blockElement.element) {
       element.blockElement.element.x = targetPosition.x * this.cellSize;
       element.blockElement.element.y = targetPosition.y * this.cellSize;
+      
+      // 确保 creature 的 row 和 col 也同步更新
+      if (element.blockElement.row !== undefined) {
+        element.blockElement.row = targetPosition.y;
+      }
+      if (element.blockElement.col !== undefined) {
+        element.blockElement.col = targetPosition.x;
+      }
     }
     
     // 更新空间索引
@@ -2643,6 +2587,8 @@ class MapEngine {
     
     // 标记需要重新绘制
     this.needsRedraw = true;
+    
+    console.log(`方块 ${element.id} 直接移动到: (${targetPosition.x},${targetPosition.y})`);
   }
   
   /**
