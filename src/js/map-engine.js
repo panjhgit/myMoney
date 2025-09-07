@@ -2394,39 +2394,57 @@ class MapEngine {
     // 检查是否点击在网格内
     if (x < this.gridOffsetX || x > this.gridOffsetX + this.gridSize ||
         y < this.gridOffsetY || y > this.gridOffsetY + this.gridSize) {
+      console.log('点击在网格外，忽略');
       return;
     }
     
     // 计算网格坐标
     const gridX = Math.floor((x - this.gridOffsetX) / this.cellSize);
     const gridY = Math.floor((y - this.gridOffsetY) / this.cellSize);
+    console.log(`点击坐标: (${x}, ${y}) -> 网格坐标: (${gridX}, ${gridY})`);
     
     // 检查是否点击了方块
     const blocks = this.getAllElementsByType('tetris');
+    console.log(`检查 ${blocks.length} 个方块...`);
+    
     for (const block of blocks) {
+      console.log(`检查方块 ${block.id}:`, {
+        occupiedCells: block.occupiedCells,
+        clickedCell: `${gridX},${gridY}`,
+        isOccupied: block.occupiedCells.includes(`${gridX},${gridY}`)
+      });
+      
       if (block.occupiedCells.includes(`${gridX},${gridY}`)) {
         // 每次点击方块都是选中
         this.selectElement(block.id);
-        console.log(`选择了方块: ${block.id}`);
+        console.log(`选择了方块: ${block.id}，位置: (${gridX}, ${gridY})`);
         
-        // 触发眨眼动画
+        // 触发眨眼动画 - 只在点击方块时触发
         if (block.blockElement && typeof blinkAnimation !== 'undefined') {
           console.log('触发眨眼动画:', block.id);
-          blinkAnimation(block.blockElement);
+          // 检查blockElement是否有正确的结构
+          if (block.blockElement.element) {
+            blinkAnimation(block.blockElement);
+          } else {
+            console.log('blockElement没有element属性，跳过眨眼动画');
+          }
         } else {
           console.log('无法触发眨眼动画:', {
             hasBlockElement: !!block.blockElement,
             hasBlinkAnimation: typeof blinkAnimation !== 'undefined'
           });
         }
-        return;
+        return; // 重要：点击方块后直接返回，不执行移动逻辑
       }
     }
     
     // 如果点击了空白区域且有选中的方块，尝试移动
     if (this.selectedElement) {
       const targetPosition = { x: gridX, y: gridY };
+      console.log(`尝试移动选中的方块 ${this.selectedElement.id} 到位置 (${gridX}, ${gridY})`);
       this.moveElementToPosition(this.selectedElement.id, targetPosition);
+    } else {
+      console.log('点击了空白区域，没有选中的方块');
     }
   }
   
@@ -2436,7 +2454,7 @@ class MapEngine {
    * @param {Object} targetPosition - 目标位置 {x, y}
    */
   moveElementToPosition(elementId, targetPosition) {
-    const element = this.getElementById(elementId);
+    const element = this.elementRegistry.get(elementId);
     if (!element) {
       console.warn(`元素 ${elementId} 不存在`);
       return;
@@ -2456,10 +2474,8 @@ class MapEngine {
     // 更新空间索引
     this.updateSpatialIndex(element, oldPosition, targetPosition);
     
-    // 播放移动动画
-    if (element.blockElement && typeof animateBlockMove !== 'undefined') {
-      this.animateBlockMove(element.blockElement, oldPosition, targetPosition);
-    }
+    // 标记需要重新绘制
+    this.needsRedraw = true;
     
     console.log(`移动方块 ${elementId} 从 (${oldPosition.x},${oldPosition.y}) 到 (${targetPosition.x},${targetPosition.y})`);
   }
@@ -2477,25 +2493,42 @@ class MapEngine {
     const maxX = Math.max(...element.shapeData.blocks.map(block => block[0]));
     const maxY = Math.max(...element.shapeData.blocks.map(block => block[1]));
     
+    console.log(`检查位置 ${position.x},${position.y} 的有效性:`, {
+      elementId: element.id,
+      maxX, maxY,
+      gridSize: this.GRID_SIZE,
+      boundaryCheck: {
+        x: position.x + maxX,
+        y: position.y + maxY,
+        xValid: position.x + maxX < this.GRID_SIZE,
+        yValid: position.y + maxY < this.GRID_SIZE
+      }
+    });
+    
     if (position.x < 0 || position.y < 0 || 
         position.x + maxX >= this.GRID_SIZE ||
         position.y + maxY >= this.GRID_SIZE) {
+      console.log(`边界检查失败: ${position.x},${position.y}`);
       return false;
     }
     
     // 检查是否与其他元素冲突
     const newCells = this.calculateOccupiedCells(position, element.shapeData);
+    console.log(`新位置占用的格子:`, newCells);
+    
     for (const cell of newCells) {
       const elementsAtCell = this.spatialIndex.get(cell);
       if (elementsAtCell) {
-        for (const otherElement of elementsAtCell) {
-          if (otherElement.id !== element.id) {
+        for (const otherElementId of elementsAtCell) {
+          if (otherElementId !== element.id) {
+            console.log(`冲突检查失败: 格子 ${cell} 被 ${otherElementId} 占用`);
             return false; // 有冲突
           }
         }
       }
     }
     
+    console.log(`位置 ${position.x},${position.y} 有效`);
     return true;
   }
   
@@ -2511,12 +2544,9 @@ class MapEngine {
     oldCells.forEach(cell => {
       const elementsAtCell = this.spatialIndex.get(cell);
       if (elementsAtCell) {
-        const index = elementsAtCell.findIndex(el => el.id === element.id);
-        if (index !== -1) {
-          elementsAtCell.splice(index, 1);
-          if (elementsAtCell.length === 0) {
-            this.spatialIndex.delete(cell);
-          }
+        elementsAtCell.delete(element.id); // 使用Set.delete
+        if (elementsAtCell.size === 0) { // 使用Set.size
+          this.spatialIndex.delete(cell);
         }
       }
     });
@@ -2525,9 +2555,9 @@ class MapEngine {
     const newCells = this.calculateOccupiedCells(newPosition, element.shapeData);
     newCells.forEach(cell => {
       if (!this.spatialIndex.has(cell)) {
-        this.spatialIndex.set(cell, []);
+        this.spatialIndex.set(cell, new Set()); // 初始化新的Set
       }
-      this.spatialIndex.get(cell).push(element);
+      this.spatialIndex.get(cell).add(element.id); // 使用Set.add，存储element.id
     });
   }
   

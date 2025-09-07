@@ -56,6 +56,18 @@ function initMainMenu() {
 function startGame(levelId) {
   console.log(`开始游戏，关卡 ${levelId}`);
   
+  // 销毁主菜单实例并移除事件监听器
+  if (mainMenu) {
+    // 移除主菜单的事件监听器
+    if (mainMenu.canvas) {
+      mainMenu.canvas.removeEventListener('click', mainMenu.handleClick);
+      mainMenu.canvas.removeEventListener('touchstart', mainMenu.handleTouchStart);
+      mainMenu.canvas.removeEventListener('touchmove', mainMenu.handleTouchMove);
+      mainMenu.canvas.removeEventListener('touchend', mainMenu.handleTouchEnd);
+    }
+    mainMenu = null;
+  }
+  
   // 直接销毁旧的地图引擎实例
   if (mapEngine) {
     mapEngine = null;
@@ -79,6 +91,10 @@ function startGame(levelId) {
     return;
   }
   
+  // 立即切换到游戏状态
+  gameState = 'game';
+  console.log(`关卡 ${levelId} 开始，地图：${map1.name}`);
+  
   // 创建地图引擎实例
   mapEngine = new MapEngine();
   
@@ -88,16 +104,8 @@ function startGame(levelId) {
   // 加载地图数据
   mapEngine.loadMap(map1);
   
-  // 在抖音小游戏环境中，方块已经通过Canvas绘制，无需DOM操作
-  // 方块元素已经在地图引擎中管理，通过Canvas API绘制
-  
-  // 延迟切换到游戏状态，确保清理完成
-  setTimeout(() => {
-    gameState = 'game';
-    console.log(`关卡 ${levelId} 开始，地图：${map1.name}`);
-    console.log('Block 系统已加载，支持方块动画和行为');
-    console.log('游戏状态已切换到:', gameState);
-  }, 150);
+  console.log('Block 系统已加载，支持方块动画和行为');
+  console.log('游戏状态已切换到:', gameState);
 }
 
 // 游戏状态跟踪
