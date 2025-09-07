@@ -1,10 +1,10 @@
 /**
- * 方块元素系统 - 整合地图元素的行为和动画
+ * 方块元素系统 - 适配抖音小游戏Canvas环境
  * 基于原有小人系统的俄罗斯方块风格实现
  */
 
 // 方块状态常量
-const BlockStates = {
+var BlockStates = {
   idle: 'idle',
   moving: 'moving',
   selected: 'selected',
@@ -13,7 +13,7 @@ const BlockStates = {
 };
 
 // 方块配置常量
-const BLOCK_CONFIG = {
+var BLOCK_CONFIG = {
   CELL_SIZE: 30, // 每个方块30px
   EYE_SIZE: 6, // 眼睛大小
   EYE_SPACING: 12, // 眼睛间距
@@ -26,7 +26,7 @@ const BLOCK_CONFIG = {
 };
 
 // 颜色配置
-const BLOCK_COLORS = {
+var BLOCK_COLORS = {
   red: {
     name: 'red',
     gradient: 'linear-gradient(135deg, #FF6B6B, #FF8E8E)',
@@ -70,7 +70,7 @@ const BLOCK_COLORS = {
 };
 
 // 形状配置 - 基于原代码的俄罗斯方块形状
-const BLOCK_SHAPES = {
+var BLOCK_SHAPES = {
   '1x1': {
     name: '1x1',
     blocks: [[0, 0]],
@@ -106,827 +106,293 @@ const BLOCK_SHAPES = {
     eyePosition: 'top-left',
     description: '2x2方块'
   },
-  '3x1': {
-    name: '3x1',
-    blocks: [[0, 0], [1, 0], [2, 0]],
-    movementType: 'feet',
-    eyePosition: 'left',
-    description: '3个方块横线'
+  'I-shape': {
+    name: 'I-shape',
+    blocks: [[0, 0], [0, 1], [0, 2], [0, 3]],
+    movementType: 'crawl',
+    eyePosition: 'top',
+    description: 'I形方块'
   },
   'L-shape': {
     name: 'L-shape',
     blocks: [[0, 0], [0, 1], [0, 2], [1, 2]],
-    movementType: 'wings',
-    eyePosition: 'top-left',
-    description: 'L形状'
+    movementType: 'feet',
+    eyePosition: 'top',
+    description: 'L形方块'
   },
   'T-shape': {
     name: 'T-shape',
     blocks: [[0, 0], [1, 0], [2, 0], [1, 1]],
-    movementType: 'wings',
-    eyePosition: 'top-center',
-    description: 'T形状'
+    movementType: 'feet',
+    eyePosition: 'top',
+    description: 'T形方块'
+  },
+  'S-shape': {
+    name: 'S-shape',
+    blocks: [[0, 0], [1, 0], [1, 1], [2, 1]],
+    movementType: 'feet',
+    eyePosition: 'top',
+    description: 'S形方块'
   },
   'Z-shape': {
     name: 'Z-shape',
-    blocks: [[0, 0], [1, 0], [1, 1], [2, 1]],
-    movementType: 'crawl',
-    eyePosition: 'top-left',
-    description: 'Z形状'
-  },
-  'line4': {
-    name: 'line4',
-    blocks: [[0, 0], [1, 0], [2, 0], [3, 0]],
+    blocks: [[0, 1], [1, 1], [1, 0], [2, 0]],
     movementType: 'feet',
-    eyePosition: 'left',
-    description: '4个方块直线'
+    eyePosition: 'top',
+    description: 'Z形方块'
   },
   'bigL': {
     name: 'bigL',
     blocks: [[0, 0], [0, 1], [0, 2], [1, 2], [2, 2]],
-    movementType: 'wings',
-    eyePosition: 'top-left',
-    description: '大L形状'
+    movementType: 'feet',
+    eyePosition: 'top',
+    description: '大L形方块'
   },
   'cross': {
     name: 'cross',
     blocks: [[1, 0], [0, 1], [1, 1], [2, 1], [1, 2]],
-    movementType: 'wings',
-    eyePosition: 'top-center',
-    description: '十字形状'
-  },
-  'I-shape': {
-    name: 'I-shape',
-    blocks: [[0, 0], [0, 1], [0, 2], [0, 3]],
     movementType: 'feet',
-    eyePosition: 'top',
-    description: 'I形 - 4个方块竖直线'
-  },
-  'S-shape': {
-    name: 'S-shape',
-    blocks: [[1, 0], [2, 0], [0, 1], [1, 1]],
-    movementType: 'crawl',
-    eyePosition: 'top-left',
-    description: 'S形 - S字形'
-  },
-  'J-shape': {
-    name: 'J-shape',
-    blocks: [[1, 0], [1, 1], [1, 2], [0, 2]],
-    movementType: 'wings',
-    eyePosition: 'top-left',
-    description: 'J形 - 反L形'
-  },
-  'ice': {
-    name: 'ice',
-    blocks: [[0, 0]],
-    movementType: 'static',
     eyePosition: 'center',
-    description: '冰块 - 单个冰块'
+    description: '十字形方块'
   }
 };
 
-/**
- * 创建方块元素
- * @param {Object} blockData - 方块数据 {id, color, position, shape, layer}
- * @returns {Object} 方块对象
- */
-function createBlock(blockData) {
-  // 抖音小游戏环境，使用 Canvas 渲染
-  const colorData = BLOCK_COLORS[blockData.color] || BLOCK_COLORS.red;
-  const shapeData = BLOCK_SHAPES[blockData.shape] || BLOCK_SHAPES['1x1'];
+// 创建方块 - 适配抖音小游戏Canvas环境
+var createBlock = function(id, color, position, shape, layer) {
+  layer = layer || 0;
   
-  const block = {
-    id: blockData.id,
-    type: 'tetris',
-    color: blockData.color,
+  console.log('createBlock 调用参数:', { id: id, color: color, position: position, shape: shape, layer: layer });
+  console.log('BLOCK_COLORS 可用颜色:', Object.keys(BLOCK_COLORS));
+  console.log('BLOCK_SHAPES 可用形状:', Object.keys(BLOCK_SHAPES));
+  
+  var colorData = BLOCK_COLORS[color];
+  var shapeData = BLOCK_SHAPES[shape];
+  
+  console.log('查找结果:', { colorData: colorData, shapeData: shapeData });
+  
+  if (!colorData || !shapeData) {
+    console.error('无效的颜色或形状: ' + color + ', ' + shape);
+    return null;
+  }
+  
+  var block = {
+    id: id,
+    color: color,
     colorData: colorData,
-    shape: blockData.shape,
+    shape: shape,
     shapeData: shapeData,
-    position: blockData.position,
-    layer: blockData.layer || 0,
+    position: position,
+    layer: layer,
     state: BlockStates.idle,
+    element: null,
     animations: {},
     isSelected: false,
-    isMoving: false,
-    occupiedCells: calculateOccupiedCells(blockData.position, shapeData.blocks),
-    // 抖音小游戏环境不需要 DOM 元素
-    element: null,
-    $shape: null,
-    $eyes: [],
-    $blocks: []
+    isMoving: false
+  };
+  
+  // 创建Canvas元素
+  block.element = {
+    x: position.x * BLOCK_CONFIG.CELL_SIZE,
+    y: position.y * BLOCK_CONFIG.CELL_SIZE,
+    width: Math.max.apply(Math, shapeData.blocks.map(function(block) { return block[0]; })) + 1,
+    height: Math.max.apply(Math, shapeData.blocks.map(function(block) { return block[1]; })) + 1,
+    blocks: shapeData.blocks,
+    color: colorData.gradient,
+    scale: 1,
+    rotation: 0,
+    alpha: 1,
+    breathingScale: 1
   };
   
   return block;
-}
+};
 
-/**
- * 创建冰块元素
- * @param {Object} iceData - 冰块数据 {id, position, layer, meltProgress}
- * @returns {Object} 冰块对象
- */
-function createIce(iceData) {
-  const shapeData = BLOCK_SHAPES['ice'];
+// 绘制方块到Canvas
+var drawBlock = function(ctx, block, startX, startY) {
+  startX = startX || 0;
+  startY = startY || 0;
   
-  const ice = {
-    id: iceData.id,
-    type: 'ice',
-    position: iceData.position,
-    shape: 'ice',
-    shapeData: shapeData,
-    layer: iceData.layer || 1,
-    meltProgress: iceData.meltProgress || 0,
-    movable: false,
-    state: BlockStates.idle,
-    animations: {},
-    isSelected: false,
-    isMoving: false,
-    occupiedCells: calculateOccupiedCells(iceData.position, shapeData.blocks),
-    covered: true, // 初始被覆盖
-    // 抖音小游戏环境不需要 DOM 元素
-    element: null,
-    $shape: null,
-    $eyes: [],
-    $blocks: []
+  var element = block.element;
+  var x = startX + element.x;
+  var y = startY + element.y;
+  
+  ctx.save();
+  ctx.translate(x + element.width * BLOCK_CONFIG.CELL_SIZE / 2, 
+                y + element.height * BLOCK_CONFIG.CELL_SIZE / 2);
+  ctx.scale(element.scale * element.breathingScale, element.scale * element.breathingScale);
+  ctx.translate(-element.width * BLOCK_CONFIG.CELL_SIZE / 2, 
+                -element.height * BLOCK_CONFIG.CELL_SIZE / 2);
+  
+  // 绘制方块
+  element.blocks.forEach(function(blockPart) {
+    var blockX = blockPart[0] * BLOCK_CONFIG.CELL_SIZE;
+    var blockY = blockPart[1] * BLOCK_CONFIG.CELL_SIZE;
+    
+    // 绘制方块背景
+    ctx.fillStyle = getColorFromGradient(element.color);
+    ctx.fillRect(blockX, blockY, BLOCK_CONFIG.CELL_SIZE, BLOCK_CONFIG.CELL_SIZE);
+    
+    // 绘制边框
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.3)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(blockX, blockY, BLOCK_CONFIG.CELL_SIZE, BLOCK_CONFIG.CELL_SIZE);
+    
+    // 绘制眼睛（在第一个方块上）
+    if (blockPart === element.blocks[0]) {
+      drawEyes(ctx, blockX, blockY);
+    }
+  });
+  
+  ctx.restore();
+};
+
+// 绘制眼睛
+var drawEyes = function(ctx, blockX, blockY) {
+  var eyeSize = BLOCK_CONFIG.EYE_SIZE;
+  var eyeOffset = BLOCK_CONFIG.EYE_OFFSET;
+  var eyeSpacing = BLOCK_CONFIG.EYE_SPACING;
+  
+  // 左眼
+  ctx.fillStyle = 'white';
+  ctx.beginPath();
+  ctx.arc(blockX + eyeOffset, blockY + eyeOffset, eyeSize, 0, 2 * Math.PI);
+  ctx.fill();
+  
+  // 右眼
+  ctx.beginPath();
+  ctx.arc(blockX + eyeOffset + eyeSpacing, blockY + eyeOffset, eyeSize, 0, 2 * Math.PI);
+  ctx.fill();
+  
+  // 眼珠
+  ctx.fillStyle = 'black';
+  ctx.beginPath();
+  ctx.arc(blockX + eyeOffset, blockY + eyeOffset, eyeSize / 2, 0, 2 * Math.PI);
+  ctx.fill();
+  
+  ctx.beginPath();
+  ctx.arc(blockX + eyeOffset + eyeSpacing, blockY + eyeOffset, eyeSize / 2, 0, 2 * Math.PI);
+  ctx.fill();
+};
+
+// 从渐变字符串获取颜色
+var getColorFromGradient = function(gradientString) {
+  if (gradientString.includes('red')) return '#FF6B6B';
+  if (gradientString.includes('blue')) return '#45B7D1';
+  if (gradientString.includes('green')) return '#96CEB4';
+  if (gradientString.includes('yellow')) return '#FFEAA7';
+  if (gradientString.includes('purple')) return '#DDA0DD';
+  if (gradientString.includes('orange')) return '#FFA500';
+  if (gradientString.includes('cyan')) return '#00CED1';
+  if (gradientString.includes('magenta')) return '#FF69B4';
+  return '#666666';
+};
+
+// 选择方块
+var selectBlock = function(block) {
+  block.isSelected = true;
+  block.element.scale = BLOCK_CONFIG.SELECT_SCALE;
+};
+
+// 取消选择方块
+var deselectBlock = function(block) {
+  block.isSelected = false;
+  block.element.scale = 1;
+};
+
+// 移动方块
+var moveBlock = function(block, newPosition) {
+  block.position = newPosition;
+  block.element.x = newPosition.x * BLOCK_CONFIG.CELL_SIZE;
+  block.element.y = newPosition.y * BLOCK_CONFIG.CELL_SIZE;
+};
+
+// 方块退出
+var exitBlock = function(block) {
+  block.state = BlockStates.exiting;
+  block.element.alpha = 0.5;
+};
+
+// 更新方块位置
+var updateBlockPosition = function(block, x, y) {
+  block.element.x = x;
+  block.element.y = y;
+};
+
+// 销毁方块
+var destroyBlock = function(block) {
+  // 清理动画
+  if (block.animations) {
+    Object.values(block.animations).forEach(function(animation) {
+      if (animation && animation.kill) {
+        animation.kill();
+      }
+    });
+  }
+};
+
+// 创建冰块
+var createIce = function(id, position, layer) {
+  layer = layer || 1;
+  var ice = {
+    id: id,
+    position: position,
+    layer: layer,
+    element: {
+      x: position.x * BLOCK_CONFIG.CELL_SIZE,
+      y: position.y * BLOCK_CONFIG.CELL_SIZE,
+      width: BLOCK_CONFIG.CELL_SIZE,
+      height: BLOCK_CONFIG.CELL_SIZE,
+      alpha: 0.7
+    }
   };
   
   return ice;
-}
+};
 
-/**
- * 创建方块眼睛
- * @param {Object} block - 方块对象
- * @param {Object} shapeData - 形状数据
- */
-function createBlockEyes(block, shapeData) {
-  const eyePosition = shapeData.eyePosition;
-  const blocks = shapeData.blocks;
+// 绘制冰块
+var drawIce = function(ctx, ice, startX, startY) {
+  startX = startX || 0;
+  startY = startY || 0;
   
-  // 根据眼睛位置找到合适的方块
-  let eyeBlock;
-  switch (eyePosition) {
-    case 'top-left':
-      eyeBlock = blocks.find(b => b[1] === Math.min(...blocks.map(b => b[1])));
-      break;
-    case 'top-center':
-      const topBlocks = blocks.filter(b => b[1] === Math.min(...blocks.map(b => b[1])));
-      eyeBlock = topBlocks[Math.floor(topBlocks.length / 2)];
-      break;
-    case 'left':
-      eyeBlock = blocks.find(b => b[0] === Math.min(...blocks.map(b => b[0])));
-      break;
-    case 'center':
-    default:
-      eyeBlock = blocks[0];
-      break;
-  }
+  var element = ice.element;
+  var x = startX + element.x;
+  var y = startY + element.y;
   
-  if (eyeBlock) {
-    const $eye1 = createEye('30%', '25%', BLOCK_CONFIG.EYE_SIZE, BLOCK_CONFIG.EYE_SIZE, '50%');
-    const $eye2 = createEye('55%', '25%', BLOCK_CONFIG.EYE_SIZE, BLOCK_CONFIG.EYE_SIZE, '50%');
-    
-    $eye1.style.left = `${eyeBlock[0] * BLOCK_CONFIG.CELL_SIZE + BLOCK_CONFIG.EYE_OFFSET}px`;
-    $eye1.style.top = `${eyeBlock[1] * BLOCK_CONFIG.CELL_SIZE + BLOCK_CONFIG.EYE_OFFSET}px`;
-    $eye2.style.left = `${eyeBlock[0] * BLOCK_CONFIG.CELL_SIZE + BLOCK_CONFIG.EYE_OFFSET + BLOCK_CONFIG.EYE_SPACING}px`;
-    $eye2.style.top = `${eyeBlock[1] * BLOCK_CONFIG.CELL_SIZE + BLOCK_CONFIG.EYE_OFFSET}px`;
-    
-    block.element.appendChild($eye1);
-    block.element.appendChild($eye2);
-    block.$eyes = [$eye1, $eye2];
-  }
-}
+  ctx.save();
+  ctx.globalAlpha = element.alpha;
+  
+  // 绘制冰块背景
+  ctx.fillStyle = 'rgba(173, 216, 230, 0.8)';
+  ctx.fillRect(x, y, element.width, element.height);
+  
+  // 绘制冰块边框
+  ctx.strokeStyle = 'rgba(135, 206, 235, 0.9)';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(x, y, element.width, element.height);
+  
+  // 绘制冰块纹理
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(x + 5, y + 5);
+  ctx.lineTo(x + element.width - 5, y + element.height - 5);
+  ctx.moveTo(x + element.width - 5, y + 5);
+  ctx.lineTo(x + 5, y + element.height - 5);
+  ctx.stroke();
+  
+  ctx.restore();
+};
 
-/**
- * 创建眼睛元素
- * @param {string} left - 左边距
- * @param {string} top - 上边距
- * @param {number} width - 宽度
- * @param {number} height - 高度
- * @param {string} borderRadius - 圆角
- * @returns {HTMLElement} 眼睛元素
- */
-function createEye(left, top, width, height, borderRadius) {
-  const $eye = document.createElement('div');
-  $eye.className = 'block-eye';
-  $eye.style.position = 'absolute';
-  $eye.style.width = `${width}px`;
-  $eye.style.height = `${height}px`;
-  $eye.style.background = '#333';
-  $eye.style.borderRadius = borderRadius;
-  $eye.style.top = top;
-  $eye.style.left = left;
-  $eye.style.zIndex = 5;
-  $eye.style.boxShadow = '0 1px 2px rgba(0,0,0,0.3)';
-  
-  // 眼睛高光
-  const $highlight = document.createElement('div');
-  $highlight.style.position = 'absolute';
-  $highlight.style.width = '2px';
-  $highlight.style.height = '2px';
-  $highlight.style.background = 'white';
-  $highlight.style.borderRadius = '50%';
-  $highlight.style.top = '1px';
-  $highlight.style.left = '1px';
-  $highlight.style.zIndex = 6;
-  
-  $eye.appendChild($highlight);
-  return $eye;
-}
-
-/**
- * 计算方块占据的所有格子
- * @param {Object} position - 位置 {x, y}
- * @param {Array} blocks - 方块形状数组
- * @returns {Array} 格子坐标数组
- */
-function calculateOccupiedCells(position, blocks) {
-  const cells = [];
-  blocks.forEach(block => {
-    cells.push(`${position.x + block[0]},${position.y + block[1]}`);
-  });
-  return cells;
-}
-
-/**
- * 选择方块
- * @param {Object} block - 方块对象
- */
-function selectBlock(block) {
-  if (block.isSelected) return;
-  
-  block.isSelected = true;
-  block.state = BlockStates.selected;
-  
-  // 停止呼吸动画
-  if (block.animations.breathing) {
-    block.animations.breathing.kill();
-  }
-  
-  // 选中动画
-  try {
-    gsap.to(block.element, {
-      scale: BLOCK_CONFIG.SELECT_SCALE,
-      duration: BLOCK_CONFIG.ANIMATION_DURATION,
-      ease: "back.out(1.7)"
-    });
-  } catch (error) {
-    console.warn('选中动画创建失败:', error);
-  }
-  
-  // 方块发光效果
-  try {
-    gsap.to(block.$blocks, {
-      boxShadow: `0 6px 12px rgba(0,0,0,0.4), inset 0 2px 4px rgba(255,255,255,0.6), 0 0 15px ${block.colorData.glowColor}`,
-      duration: 0.4,
-      ease: "back.out(1.7)",
-      stagger: 0.1
-    });
-  } catch (error) {
-    console.warn('发光效果创建失败:', error);
-  }
-  
-  // 触发眨眼动画
-  if (block.$eyes && block.$eyes.length > 0) {
-    try {
-      gsap.to(block.$eyes, {
-        scaleY: 0.1,
-        duration: 0.1,
-        ease: "power2.inOut",
-        yoyo: true,
-        repeat: 1
-      });
-    } catch (error) {
-      console.warn('眨眼动画触发失败:', error);
-    }
-  }
-  
-  console.log(`选中方块: ${block.id}`);
-}
-
-/**
- * 取消选择方块
- * @param {Object} block - 方块对象
- */
-function deselectBlock(block) {
-  if (!block.isSelected) return;
-  
-  block.isSelected = false;
-  block.state = BlockStates.idle;
-  
-  // 恢复大小
-  try {
-    gsap.to(block.element, {
-      scale: 1,
-      duration: BLOCK_CONFIG.ANIMATION_DURATION,
-      ease: "power2.out"
-    });
-  } catch (error) {
-    console.warn('恢复大小动画失败:', error);
-  }
-  
-  // 恢复方块样式
-  try {
-    gsap.to(block.$blocks, {
-      boxShadow: '0 2px 4px rgba(0,0,0,0.2), inset 0 1px 2px rgba(255,255,255,0.3)',
-      duration: 0.3,
-      ease: "power2.in",
-      stagger: 0.05
-    });
-  } catch (error) {
-    console.warn('恢复样式动画失败:', error);
-  }
-  
-  // 恢复呼吸动画
-  setTimeout(() => {
-    try {
-      block.animations.breathing = gsap.to(block.element, {
-        scale: 1.05,
-        duration: BLOCK_CONFIG.BREATHING_DURATION,
-        ease: "power2.inOut",
-        yoyo: true,
-        repeat: -1
-      });
-    } catch (error) {
-      console.warn('恢复呼吸动画失败:', error);
-    }
-  }, 50);
-}
-
-/**
- * 移动方块
- * @param {Object} block - 方块对象
- * @param {Object} newPosition - 新位置 {x, y}
- * @param {Function} onComplete - 完成回调
- */
-function moveBlock(block, newPosition, onComplete) {
-  if (block.isMoving) return;
-  
-  block.isMoving = true;
-  block.state = BlockStates.moving;
-  
-  // 停止呼吸动画
-  if (block.animations.breathing) {
-    block.animations.breathing.kill();
-  }
-  
-  // 根据形状类型选择移动方式
-  const movementType = block.shapeData.movementType;
-  
-  switch (movementType) {
-    case 'feet':
-      moveWithFeet(block, newPosition, onComplete);
-      break;
-    case 'wings':
-      moveWithWings(block, newPosition, onComplete);
-      break;
-    case 'crawl':
-      moveWithCrawl(block, newPosition, onComplete);
-      break;
-    default:
-      moveSimple(block, newPosition, onComplete);
-  }
-}
-
-/**
- * 用脚移动（走路动画）
- * @param {Object} block - 方块对象
- * @param {Object} newPosition - 新位置
- * @param {Function} onComplete - 完成回调
- */
-function moveWithFeet(block, newPosition, onComplete) {
-  // 创建脚部
-  createBlockFeet(block);
-  
-  // 移动动画
-  try {
-    gsap.to(block.element, {
-      left: newPosition.x * BLOCK_CONFIG.CELL_SIZE,
-      top: newPosition.y * BLOCK_CONFIG.CELL_SIZE,
-      duration: BLOCK_CONFIG.MOVE_DURATION,
-      ease: "circ.inOut",
-      onComplete: () => {
-        block.isMoving = false;
-        block.state = BlockStates.idle;
-        
-        // 移除脚部
-        removeBlockFeet(block);
-        
-        // 恢复呼吸动画
-        setTimeout(() => {
-          try {
-            block.animations.breathing = gsap.to(block.element, {
-              scale: 1.05,
-              duration: BLOCK_CONFIG.BREATHING_DURATION,
-              ease: "power2.inOut",
-              yoyo: true,
-              repeat: -1
-            });
-          } catch (error) {
-            console.warn('恢复呼吸动画失败:', error);
-          }
-        }, 50);
-        
-        if (onComplete) onComplete();
-      }
-    });
-  } catch (error) {
-    console.warn('移动动画创建失败:', error);
-    // 直接完成移动
-    block.isMoving = false;
-    block.state = BlockStates.idle;
-    removeBlockFeet(block);
-    if (onComplete) onComplete();
-  }
-  
-  // 身体摆动
-  try {
-    gsap.to(block.element, {
-      rotation: "+=3deg",
-      duration: BLOCK_CONFIG.MOVE_DURATION * 0.3,
-      ease: "circ.inOut",
-      yoyo: true,
-      repeat: 1
-    });
-  } catch (error) {
-    console.warn('身体摆动动画失败:', error);
-  }
-}
-
-/**
- * 用翅膀移动（飞行动画）
- * @param {Object} block - 方块对象
- * @param {Object} newPosition - 新位置
- * @param {Function} onComplete - 完成回调
- */
-function moveWithWings(block, newPosition, onComplete) {
-  // 创建翅膀
-  createBlockWings(block);
-  
-  // 飞行动画
-  try {
-    gsap.to(block.element, {
-      left: newPosition.x * BLOCK_CONFIG.CELL_SIZE,
-      top: newPosition.y * BLOCK_CONFIG.CELL_SIZE,
-      duration: BLOCK_CONFIG.MOVE_DURATION,
-      ease: "power2.inOut",
-      onComplete: () => {
-        block.isMoving = false;
-        block.state = BlockStates.idle;
-        
-        // 移除翅膀
-        removeBlockWings(block);
-        
-        // 恢复呼吸动画
-        setTimeout(() => {
-          try {
-            block.animations.breathing = gsap.to(block.element, {
-              scale: 1.05,
-              duration: BLOCK_CONFIG.BREATHING_DURATION,
-              ease: "power2.inOut",
-              yoyo: true,
-              repeat: -1
-            });
-          } catch (error) {
-            console.warn('恢复呼吸动画失败:', error);
-          }
-        }, 50);
-        
-        if (onComplete) onComplete();
-      }
-    });
-  } catch (error) {
-    console.warn('飞行动画创建失败:', error);
-    // 直接完成移动
-    block.isMoving = false;
-    block.state = BlockStates.idle;
-    removeBlockWings(block);
-    if (onComplete) onComplete();
-  }
-  
-  // 飞行起伏
-  try {
-    gsap.to(block.$blocks, {
-      y: "+=4px",
-      duration: 0.4,
-      ease: "power2.inOut",
-      yoyo: true,
-      repeat: -1,
-      stagger: 0.1
-    });
-  } catch (error) {
-    console.warn('飞行起伏动画失败:', error);
-  }
-}
-
-/**
- * 蠕动移动（虫子动画）
- * @param {Object} block - 方块对象
- * @param {Object} newPosition - 新位置
- * @param {Function} onComplete - 完成回调
- */
-function moveWithCrawl(block, newPosition, onComplete) {
-  // 蠕动动画
-  try {
-    gsap.to(block.element, {
-      left: newPosition.x * BLOCK_CONFIG.CELL_SIZE,
-      top: newPosition.y * BLOCK_CONFIG.CELL_SIZE,
-      duration: BLOCK_CONFIG.MOVE_DURATION,
-      ease: "power2.inOut",
-      onComplete: () => {
-        block.isMoving = false;
-        block.state = BlockStates.idle;
-        
-        // 恢复呼吸动画
-        setTimeout(() => {
-          try {
-            block.animations.breathing = gsap.to(block.element, {
-              scale: 1.05,
-              duration: BLOCK_CONFIG.BREATHING_DURATION,
-              ease: "power2.inOut",
-              yoyo: true,
-              repeat: -1
-            });
-          } catch (error) {
-            console.warn('恢复呼吸动画失败:', error);
-          }
-        }, 50);
-        
-        if (onComplete) onComplete();
-      }
-    });
-  } catch (error) {
-    console.warn('蠕动动画创建失败:', error);
-    // 直接完成移动
-    block.isMoving = false;
-    block.state = BlockStates.idle;
-    if (onComplete) onComplete();
-  }
-  
-  // 上下跳跃
-  try {
-    gsap.to(block.element, {
-      y: "+=4px",
-      duration: 0.3,
-      ease: "power2.inOut",
-      yoyo: true,
-      repeat: -1
-    });
-  } catch (error) {
-    console.warn('跳跃动画失败:', error);
-  }
-  
-  // 方块收缩
-  try {
-    gsap.to(block.$blocks, {
-      scale: 0.95,
-      duration: 0.2,
-      ease: "power2.inOut",
-      yoyo: true,
-      repeat: -1,
-      stagger: 0.05
-    });
-  } catch (error) {
-    console.warn('收缩动画失败:', error);
-  }
-}
-
-/**
- * 简单移动（无特殊动画）
- * @param {Object} block - 方块对象
- * @param {Object} newPosition - 新位置
- * @param {Function} onComplete - 完成回调
- */
-function moveSimple(block, newPosition, onComplete) {
-  gsap.to(block.element, {
-    left: newPosition.x * BLOCK_CONFIG.CELL_SIZE,
-    top: newPosition.y * BLOCK_CONFIG.CELL_SIZE,
-    duration: BLOCK_CONFIG.MOVE_DURATION,
-    ease: "power2.inOut",
-    onComplete: () => {
-      block.isMoving = false;
-      block.state = BlockStates.idle;
-      
-      if (onComplete) onComplete();
-    }
-  });
-}
-
-/**
- * 创建方块脚部
- * @param {Object} block - 方块对象
- */
-function createBlockFeet(block) {
-  removeBlockFeet(block); // 清除之前的脚
-  
-  block.$feet = [];
-  
-  // 找到底部方块
-  const bottomBlocks = block.shapeData.blocks.filter(blockPos => {
-    return !block.shapeData.blocks.some(otherPos => 
-      otherPos[0] === blockPos[0] && otherPos[1] === blockPos[1] + 1
-    );
-  });
-  
-  // 创建2个脚
-  const footCount = Math.min(2, bottomBlocks.length);
-  for (let i = 0; i < footCount; i++) {
-    const blockPos = bottomBlocks[i] || bottomBlocks[0];
-    
-    const $foot = document.createElement('div');
-    $foot.className = 'block-foot';
-    $foot.style.position = 'absolute';
-    $foot.style.width = '6px';
-    $foot.style.height = '20px';
-    $foot.style.background = '#000';
-    $foot.style.borderRadius = '3px';
-    $foot.style.left = `${blockPos[0] * BLOCK_CONFIG.CELL_SIZE + 12}px`;
-    $foot.style.top = `${blockPos[1] * BLOCK_CONFIG.CELL_SIZE + BLOCK_CONFIG.CELL_SIZE}px`;
-    $foot.style.zIndex = 2;
-    
-    block.element.appendChild($foot);
-    block.$feet.push($foot);
-  }
-  
-  // 脚部出现动画
-  if (block.$feet.length > 0) {
-    try {
-      gsap.fromTo(block.$feet, 
-        { scaleY: 0, opacity: 0 },
-        { 
-          scaleY: 1, 
-          opacity: 1, 
-          duration: 0.3, 
-          ease: "back.out(1.7)",
-          stagger: 0.1
-        }
-      );
-    } catch (error) {
-      console.warn('脚部出现动画失败:', error);
-    }
-  }
-}
-
-/**
- * 移除方块脚部
- * @param {Object} block - 方块对象
- */
-function removeBlockFeet(block) {
-  if (block.$feet) {
-    block.$feet.forEach($foot => {
-      if ($foot && $foot.parentNode) {
-        $foot.parentNode.removeChild($foot);
-      }
-    });
-    block.$feet = [];
-  }
-}
-
-/**
- * 创建方块翅膀
- * @param {Object} block - 方块对象
- */
-function createBlockWings(block) {
-  removeBlockWings(block); // 清除之前的翅膀
-  
-  block.$wings = [];
-  
-  // 找到顶部方块
-  const topBlocks = block.shapeData.blocks.filter(blockPos => {
-    return !block.shapeData.blocks.some(otherPos => 
-      otherPos[0] === blockPos[0] && otherPos[1] === blockPos[1] - 1
-    );
-  });
-  
-  const headBlock = topBlocks[0];
-  
-  // 创建2个翅膀
-  for (let i = 0; i < 2; i++) {
-    const $wing = document.createElement('div');
-    $wing.className = 'block-wing';
-    $wing.style.position = 'absolute';
-    $wing.style.width = '20px';
-    $wing.style.height = '12px';
-    $wing.style.background = 'rgba(255, 255, 255, 0.8)';
-    $wing.style.borderRadius = '50% 10px 50% 10px';
-    $wing.style.left = `${headBlock[0] * BLOCK_CONFIG.CELL_SIZE + (i === 0 ? -15 : 15)}px`;
-    $wing.style.top = `${headBlock[1] * BLOCK_CONFIG.CELL_SIZE + 5}px`;
-    $wing.style.zIndex = 4;
-    $wing.style.transform = `rotate(${i === 0 ? -30 : 30}deg)`;
-    
-    block.element.appendChild($wing);
-    block.$wings.push($wing);
-  }
-  
-  // 翅膀出现动画
-  if (block.$wings.length > 0) {
-    try {
-      gsap.fromTo(block.$wings, 
-        { scaleY: 0, opacity: 0 },
-        { 
-          scaleY: 1, 
-          opacity: 1, 
-          duration: 0.3, 
-          ease: "back.out(1.7)",
-          stagger: 0.1
-        }
-      );
-    } catch (error) {
-      console.warn('翅膀出现动画失败:', error);
-    }
-  }
-}
-
-/**
- * 移除方块翅膀
- * @param {Object} block - 方块对象
- */
-function removeBlockWings(block) {
-  if (block.$wings) {
-    block.$wings.forEach($wing => {
-      if ($wing && $wing.parentNode) {
-        $wing.parentNode.removeChild($wing);
-      }
-    });
-    block.$wings = [];
-  }
-}
-
-/**
- * 方块出门动画
- * @param {Object} block - 方块对象
- * @param {Function} onComplete - 完成回调
- */
-function exitBlock(block, onComplete) {
-  block.state = BlockStates.exiting;
-  
-  // 出门动画
-  try {
-    gsap.to(block.element, {
-      duration: 0.5,
-      scale: 0,
-      rotation: 360,
-      ease: "back.in(1.7)",
-      onComplete: () => {
-        block.state = BlockStates.eliminated;
-        if (onComplete) onComplete();
-      }
-    });
-  } catch (error) {
-    console.warn('出门动画创建失败:', error);
-    // 直接完成退出
-    block.state = BlockStates.eliminated;
-    if (onComplete) onComplete();
-  }
-}
-
-/**
- * 更新方块位置
- * @param {Object} block - 方块对象
- * @param {Object} newPosition - 新位置
- */
-function updateBlockPosition(block, newPosition) {
-  block.position = newPosition;
-  block.occupiedCells = calculateOccupiedCells(newPosition, block.shapeData.blocks);
-  
-  // 更新DOM位置
-  block.element.style.left = `${newPosition.x * BLOCK_CONFIG.CELL_SIZE}px`;
-  block.element.style.top = `${newPosition.y * BLOCK_CONFIG.CELL_SIZE}px`;
-}
-
-/**
- * 销毁方块
- * @param {Object} block - 方块对象
- */
-function destroyBlock(block) {
-  // 停止所有动画
-  Object.values(block.animations).forEach(animation => {
-    if (animation && animation.kill) {
-      animation.kill();
-    }
-  });
-  
-  // 移除DOM元素
-  if (block.element && block.element.parentNode) {
-    block.element.parentNode.removeChild(block.element);
-  }
-  
-  // 清理引用
-  block.element = null;
-  block.$shape = null;
-  block.$eyes = [];
-  block.$blocks = [];
-  block.$feet = [];
-  block.$wings = [];
-  block.animations = {};
-}
-
-// 导出到全局作用域
+// 确保在抖音小游戏环境中可用
 if (typeof window !== 'undefined') {
   window.BlockStates = BlockStates;
   window.BLOCK_CONFIG = BLOCK_CONFIG;
   window.BLOCK_COLORS = BLOCK_COLORS;
   window.BLOCK_SHAPES = BLOCK_SHAPES;
   window.createBlock = createBlock;
+  window.drawBlock = drawBlock;
   window.createIce = createIce;
+  window.drawIce = drawIce;
   window.selectBlock = selectBlock;
   window.deselectBlock = deselectBlock;
   window.moveBlock = moveBlock;
@@ -939,11 +405,29 @@ if (typeof window !== 'undefined') {
   global.BLOCK_COLORS = BLOCK_COLORS;
   global.BLOCK_SHAPES = BLOCK_SHAPES;
   global.createBlock = createBlock;
+  global.drawBlock = drawBlock;
   global.createIce = createIce;
+  global.drawIce = drawIce;
   global.selectBlock = selectBlock;
   global.deselectBlock = deselectBlock;
   global.moveBlock = moveBlock;
   global.exitBlock = exitBlock;
   global.updateBlockPosition = updateBlockPosition;
   global.destroyBlock = destroyBlock;
+} else {
+  // 在抖音小游戏环境中，直接设置为全局变量
+  this.BlockStates = BlockStates;
+  this.BLOCK_CONFIG = BLOCK_CONFIG;
+  this.BLOCK_COLORS = BLOCK_COLORS;
+  this.BLOCK_SHAPES = BLOCK_SHAPES;
+  this.createBlock = createBlock;
+  this.drawBlock = drawBlock;
+  this.createIce = createIce;
+  this.drawIce = drawIce;
+  this.selectBlock = selectBlock;
+  this.deselectBlock = deselectBlock;
+  this.moveBlock = moveBlock;
+  this.exitBlock = exitBlock;
+  this.updateBlockPosition = updateBlockPosition;
+  this.destroyBlock = destroyBlock;
 }

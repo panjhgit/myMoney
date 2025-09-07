@@ -82,15 +82,8 @@ function startGame(levelId) {
   // 加载地图数据
   mapEngine.loadMap(map1);
   
-  // 将方块元素添加到画布中
-  setTimeout(() => {
-    const tetrisBlocks = mapEngine.getAllElementsByType('tetris');
-    tetrisBlocks.forEach(block => {
-      if (block.blockElement && block.blockElement.element) {
-        canvas.appendChild(block.blockElement.element);
-      }
-    });
-  }, 100);
+  // 在抖音小游戏环境中，方块已经通过Canvas绘制，无需DOM操作
+  // 方块元素已经在地图引擎中管理，通过Canvas API绘制
   
   // 延迟切换到游戏状态，确保清理完成
   setTimeout(() => {
@@ -191,8 +184,8 @@ function drawGameInfo() {
   
   // 绘制操作提示
   ctx.font = '12px Arial';
-  ctx.fillText('点击方块选择，使用方向键移动', systemInfo.windowWidth / 2, systemInfo.windowHeight - 60);
-  ctx.fillText('按 ESC 返回主菜单', systemInfo.windowWidth / 2, systemInfo.windowHeight - 40);
+  ctx.fillText('点击方块选择，拖拽移动', systemInfo.windowWidth / 2, systemInfo.windowHeight - 60);
+  ctx.fillText('双击返回主菜单', systemInfo.windowWidth / 2, systemInfo.windowHeight - 40);
 }
 
 // 默认绘制函数
@@ -242,27 +235,26 @@ function setupGameEvents() {
     }
   });
   
-  // 键盘事件
-  document.addEventListener('keydown', (e) => {
-    if (gameState === 'game' && mapEngine) {
-      mapEngine.handleKeyPress(e.key);
+  // 双击事件处理 - 返回主菜单
+  let lastClickTime = 0;
+  canvas.addEventListener('click', (e) => {
+    const currentTime = Date.now();
+    if (currentTime - lastClickTime < 300) {
+      // 双击检测
+      if (gameState === 'game') {
+        console.log('双击检测到 - 返回主菜单');
+        gameState = 'menu';
+        mapEngine = null;
+        setTimeout(() => {
+          console.log('返回主菜单完成');
+        }, 50);
+      }
     }
-    
-    // ESC键返回主菜单
-    if (e.key === 'Escape' && gameState === 'game') {
-      console.log('ESC键被按下，准备返回主菜单');
-      console.log('按键详情:', { key: e.key, code: e.code, keyCode: e.keyCode });
-      
-      // 彻底清理游戏状态
-      gameState = 'menu';
-      mapEngine = null;
-      
-      // 延迟确认清理完成
-      setTimeout(() => {
-        console.log('返回主菜单完成，当前状态:', { gameState, hasMapEngine: !!mapEngine });
-      }, 50);
-    }
+    lastClickTime = currentTime;
   });
+  
+  // 抖音小游戏不支持键盘事件，移除键盘监听
+  // 可以通过触摸手势或其他方式实现返回功能
 }
 
 // 启动游戏 - 添加延迟确保模块加载完成

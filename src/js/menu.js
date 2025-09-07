@@ -242,11 +242,14 @@ class MainMenu {
     }
   }
   
-  // 双击处理（用于调试功能）
+  // 双击处理（用于返回主菜单功能）
   handleDoubleClick(event) {
     event.preventDefault();
-    console.log('双击检测到 - 解锁更多关卡');
-    this.unlockMoreLevels(20);
+    console.log('双击检测到 - 返回主菜单');
+    // 触发返回主菜单事件
+    if (window.onReturnToMenu) {
+      window.onReturnToMenu();
+    }
   }
   
   handleClick(event) {

@@ -154,8 +154,13 @@ class MapEngine {
     }
     
     console.log('开始创建方块:', block);
-    const blockElement = createBlock(block);
-    console.log('创建方块元素完成:', block.id, 'shapeData:', blockElement.shapeData);
+    const blockElement = createBlock(block.id, block.color, block.position, block.shape, block.layer);
+    console.log('创建方块元素完成:', block.id, 'shapeData:', blockElement ? blockElement.shapeData : 'null');
+    
+    if (!blockElement) {
+      console.error('方块创建失败:', block);
+      return;
+    }
     
     if (!blockElement.shapeData || !blockElement.shapeData.blocks) {
       console.error('方块 shapeData 无效:', blockElement);
@@ -270,7 +275,7 @@ class MapEngine {
         }
         this.spatialIndex.get(cell).add(element.id);
       });
-      layer.occupiedCells.add(...element.occupiedCells);
+      element.occupiedCells.forEach(cell => layer.occupiedCells.add(cell));
     } else {
       const cellKey = `${element.position.x},${element.position.y}`;
       if (!this.spatialIndex.has(cellKey)) {
