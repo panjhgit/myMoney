@@ -44,7 +44,8 @@ var createCreature = function(row, col, colorData) {
     width: Math.max.apply(Math, colorData.blocks.map(function(block) { return block[0]; })) + 1,
     height: Math.max.apply(Math, colorData.blocks.map(function(block) { return block[1]; })) + 1,
     blocks: colorData.blocks,
-    color: colorData.gradient,
+    color: colorData.name, // 使用颜色名称而不是渐变字符串
+    gradient: colorData.gradient, // 保存渐变字符串
     scale: 1,
     rotation: 0,
     alpha: 1,

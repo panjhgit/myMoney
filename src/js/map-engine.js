@@ -2407,17 +2407,125 @@ class MapEngine {
     const blocks = this.getAllElementsByType('tetris');
     for (const block of blocks) {
       if (block.occupiedCells.includes(`${gridX},${gridY}`)) {
-        this.selectElement(block.id);
-        console.log(`点击了方块: ${block.id}`);
+        // 如果点击的是已选中的方块，取消选择
+        if (this.selectedElement && this.selectedElement.id === block.id) {
+          this.selectedElement = null;
+          console.log('取消选择方块:', block.id);
+        } else {
+          // 选择新方块
+          this.selectElement(block.id);
+          console.log(`选择了方块: ${block.id}`);
+        }
         return;
       }
     }
     
-    // 如果没有点击方块，取消选择
+    // 如果点击了空白区域且有选中的方块，尝试移动
     if (this.selectedElement) {
-      this.selectedElement = null;
-      console.log('取消选择');
+      const targetPosition = { x: gridX, y: gridY };
+      this.moveElementToPosition(this.selectedElement.id, targetPosition);
     }
+  }
+  
+  /**
+   * 移动元素到指定位置
+   * @param {string} elementId - 元素ID
+   * @param {Object} targetPosition - 目标位置 {x, y}
+   */
+  moveElementToPosition(elementId, targetPosition) {
+    const element = this.getElementById(elementId);
+    if (!element) {
+      console.warn(`元素 ${elementId} 不存在`);
+      return;
+    }
+    
+    // 检查目标位置是否有效
+    if (!this.isValidPosition(targetPosition, element)) {
+      console.log(`位置 ${targetPosition.x},${targetPosition.y} 无效`);
+      return;
+    }
+    
+    // 执行移动
+    const oldPosition = { ...element.position };
+    element.position = targetPosition;
+    element.occupiedCells = this.calculateOccupiedCells(targetPosition, element.shapeData);
+    
+    // 更新空间索引
+    this.updateSpatialIndex(element, oldPosition, targetPosition);
+    
+    // 播放移动动画
+    if (element.blockElement && typeof animateBlockMove !== 'undefined') {
+      this.animateBlockMove(element.blockElement, oldPosition, targetPosition);
+    }
+    
+    console.log(`移动方块 ${elementId} 从 (${oldPosition.x},${oldPosition.y}) 到 (${targetPosition.x},${targetPosition.y})`);
+  }
+  
+  /**
+   * 检查位置是否有效
+   * @param {Object} position - 位置 {x, y}
+   * @param {Object} element - 元素对象
+   * @returns {boolean} 是否有效
+   */
+  isValidPosition(position, element) {
+    if (element.type !== 'tetris') return true;
+    
+    // 检查边界
+    const maxX = Math.max(...element.shapeData.blocks.map(block => block[0]));
+    const maxY = Math.max(...element.shapeData.blocks.map(block => block[1]));
+    
+    if (position.x < 0 || position.y < 0 || 
+        position.x + maxX >= this.GRID_SIZE ||
+        position.y + maxY >= this.GRID_SIZE) {
+      return false;
+    }
+    
+    // 检查是否与其他元素冲突
+    const newCells = this.calculateOccupiedCells(position, element.shapeData);
+    for (const cell of newCells) {
+      const elementsAtCell = this.spatialIndex.get(cell);
+      if (elementsAtCell) {
+        for (const otherElement of elementsAtCell) {
+          if (otherElement.id !== element.id) {
+            return false; // 有冲突
+          }
+        }
+      }
+    }
+    
+    return true;
+  }
+  
+  /**
+   * 更新空间索引
+   * @param {Object} element - 元素对象
+   * @param {Object} oldPosition - 旧位置
+   * @param {Object} newPosition - 新位置
+   */
+  updateSpatialIndex(element, oldPosition, newPosition) {
+    // 移除旧位置的空间索引
+    const oldCells = this.calculateOccupiedCells(oldPosition, element.shapeData);
+    oldCells.forEach(cell => {
+      const elementsAtCell = this.spatialIndex.get(cell);
+      if (elementsAtCell) {
+        const index = elementsAtCell.findIndex(el => el.id === element.id);
+        if (index !== -1) {
+          elementsAtCell.splice(index, 1);
+          if (elementsAtCell.length === 0) {
+            this.spatialIndex.delete(cell);
+          }
+        }
+      }
+    });
+    
+    // 添加新位置的空间索引
+    const newCells = this.calculateOccupiedCells(newPosition, element.shapeData);
+    newCells.forEach(cell => {
+      if (!this.spatialIndex.has(cell)) {
+        this.spatialIndex.set(cell, []);
+      }
+      this.spatialIndex.get(cell).push(element);
+    });
   }
   
   /**
