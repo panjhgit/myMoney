@@ -1186,7 +1186,7 @@ var createSimpleWings = function(creature) {
   for (var i = 0; i < 2; i++) {
     var wing = {
       // 基于眼睛所在列对称放置翅膀 - 修复翅膀位置逻辑
-      x: eyeColumnX * cellSize + (i === 0 ? wingOffset : -wingOffset),
+      x: eyeColumnX * cellSize + (i === 0 ? wingOffset : -wingOffset + cellSize * 0.8),
       y: headY * cellSize + cellSize * 0.5, // 翅膀在头部中间位置
       width: wingWidth,
       height: wingHeight,
