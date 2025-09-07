@@ -30,42 +30,66 @@ var BLOCK_COLORS = {
   red: {
     name: 'red',
     gradient: 'linear-gradient(135deg, #FF6B6B, #FF8E8E)',
-    glowColor: 'rgba(255, 107, 107, 0.6)'
+    glowColor: 'rgba(255, 107, 107, 0.6)',
+    shape: 'single',
+    blocks: [[0, 0]]
   },
   blue: {
     name: 'blue',
     gradient: 'linear-gradient(135deg, #45B7D1, #6BC5D8)',
-    glowColor: 'rgba(69, 183, 209, 0.6)'
+    glowColor: 'rgba(69, 183, 209, 0.6)',
+    shape: 'line2',
+    blocks: [[0, 0], [1, 0]]
   },
   green: {
     name: 'green',
     gradient: 'linear-gradient(135deg, #96CEB4, #A8E6CF)',
-    glowColor: 'rgba(150, 206, 180, 0.6)'
+    glowColor: 'rgba(150, 206, 180, 0.6)',
+    shape: 'line3',
+    blocks: [[0, 0], [1, 0], [2, 0]]
   },
   yellow: {
     name: 'yellow',
     gradient: 'linear-gradient(135deg, #FFEAA7, #FFF3CD)',
-    glowColor: 'rgba(255, 234, 167, 0.6)'
+    glowColor: 'rgba(255, 234, 167, 0.6)',
+    shape: 'square',
+    blocks: [[0, 0], [1, 0], [0, 1], [1, 1]]
   },
   purple: {
     name: 'purple',
     gradient: 'linear-gradient(135deg, #DDA0DD, #E6B3E6)',
-    glowColor: 'rgba(221, 160, 221, 0.6)'
+    glowColor: 'rgba(221, 160, 221, 0.6)',
+    shape: 'lshape',
+    blocks: [[0, 0], [0, 1], [0, 2], [1, 2]]
   },
   orange: {
     name: 'orange',
     gradient: 'linear-gradient(135deg, #FFA500, #FFB347)',
-    glowColor: 'rgba(255, 165, 0, 0.6)'
+    glowColor: 'rgba(255, 165, 0, 0.6)',
+    shape: 'tshape',
+    blocks: [[0, 0], [1, 0], [2, 0], [1, 1]]
   },
   cyan: {
     name: 'cyan',
     gradient: 'linear-gradient(135deg, #00CED1, #40E0D0)',
-    glowColor: 'rgba(0, 206, 209, 0.6)'
+    glowColor: 'rgba(0, 206, 209, 0.6)',
+    shape: 'zshape',
+    blocks: [[0, 0], [1, 0], [1, 1], [2, 1]]
   },
   magenta: {
     name: 'magenta',
     gradient: 'linear-gradient(135deg, #FF69B4, #FFB6C1)',
-    glowColor: 'rgba(255, 105, 180, 0.6)'
+    glowColor: 'rgba(255, 105, 180, 0.6)',
+    shape: 'bigl',
+    blocks: [[0, 0], [0, 1], [0, 2], [1, 2], [2, 2]]
+  },
+  // 添加 cross 形状的颜色定义
+  cross: {
+    name: 'cross',
+    gradient: 'linear-gradient(135deg, #FF6B6B, #FF8E8E)',
+    glowColor: 'rgba(255, 107, 107, 0.6)',
+    shape: 'cross',
+    blocks: [[1, 0], [0, 1], [1, 1], [2, 1], [1, 2]]
   }
 };
 

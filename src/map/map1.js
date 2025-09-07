@@ -51,28 +51,28 @@ const map1 = {
       id: "single_1x1",
       color: "red",
       position: { x: 0, y: 0 },
-      shape: "1x1",
+      shape: "single",
       layer: 0
     },
     {
       id: "line_horizontal",
       color: "blue",
       position: { x: 1, y: 0 },
-      shape: "1x3",
+      shape: "line2",
       layer: 0
     },
     {
       id: "line_vertical",
       color: "green",
       position: { x: 4, y: 0 },
-      shape: "I-shape",
+      shape: "line3",
       layer: 0
     },
     {
       id: "square_2x2",
       color: "yellow",
       position: { x: 6, y: 0 },
-      shape: "2x2",
+      shape: "square",
       layer: 0
     },
     
@@ -81,21 +81,21 @@ const map1 = {
       id: "L_shape",
       color: "purple",
       position: { x: 0, y: 2 },
-      shape: "L-shape",
+      shape: "lshape",
       layer: 0
     },
     {
       id: "T_shape",
       color: "orange",
       position: { x: 2, y: 4 },
-      shape: "T-shape",
+      shape: "tshape",
       layer: 0
     },
     {
       id: "S_shape",
       color: "cyan",
       position: { x: 5, y: 4 },
-      shape: "S-shape",
+      shape: "zshape",
       layer: 0
     },
     
@@ -104,7 +104,7 @@ const map1 = {
       id: "big_L",
       color: "magenta",
       position: { x: 0, y: 5 },
-      shape: "bigL",
+      shape: "bigl",
       layer: 1
     },
     {

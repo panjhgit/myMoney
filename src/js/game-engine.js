@@ -464,7 +464,36 @@ class GameEngine {
   
   // 动画移动生物
   animateCreatureMove(creature, targetRow, targetCol) {
-    // 更新游戏状态
+    // 开始移动动画 - 根据形状类型选择不同的移动方式
+    if (typeof standUpAndExtendLimbs === 'function') {
+      standUpAndExtendLimbs(creature);
+    }
+    
+    // 创建移动时间线
+    const moveTimeline = gsap.timeline({
+      onComplete: () => {
+        // 移动完成后收起动画效果
+        if (typeof sitDownAndHideLimbs === 'function') {
+          sitDownAndHideLimbs(creature);
+        }
+        
+        // 检查冰块融化
+        this.checkIceMelt(creature);
+        
+        // 检查是否到达出口
+        this.checkForExitMatch(creature);
+      }
+    });
+    
+    // 添加移动动画
+    moveTimeline.to(creature.element, {
+      x: targetCol * this.config.CELL_SIZE,
+      y: targetRow * this.config.CELL_SIZE,
+      duration: 0.5,
+      ease: "power2.out"
+    });
+    
+    // 更新游戏状态（在动画进行中更新，避免延迟）
     creature.colorData.blocks.forEach(block => {
       const oldRow = creature.row + block[1];
       const oldCol = creature.col + block[0];
@@ -479,16 +508,6 @@ class GameEngine {
       const newCol = creature.col + block[0];
       this.gameState.board[newRow][newCol] = creature;
     });
-    
-    // 更新元素位置
-    creature.element.x = targetCol * this.config.CELL_SIZE;
-    creature.element.y = targetRow * this.config.CELL_SIZE;
-    
-    // 检查冰块融化
-    this.checkIceMelt(creature);
-    
-    // 检查是否到达出口
-    this.checkForExitMatch(creature);
   }
   
   // 检查冰块融化（核心性能优化逻辑）
