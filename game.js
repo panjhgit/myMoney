@@ -7,6 +7,7 @@ console.log(
 require('./src/js/config.js'); // 加载统一配置
 require('./src/js/gsap.min.js');
 require('./src/js/creature.js');
+require('./src/js/game-engine.js'); // 加载游戏引擎
 require('./src/js/menu.js');
 require('./src/js/map-engine.js');
 require('./src/js/block.js');
@@ -143,7 +144,13 @@ function draw() {
     drawGame();
     // 更新地图引擎
     mapEngine.update();
-    needsRedraw = false; // 游戏绘制完成后标记不需要重绘
+    // 检查地图引擎是否需要重绘
+    if (mapEngine.needsRedraw) {
+      needsRedraw = true;
+      mapEngine.needsRedraw = false;
+    } else {
+      needsRedraw = false; // 游戏绘制完成后标记不需要重绘
+    }
   } else {
     // 默认绘制 - 确保在菜单状态下不会调用游戏绘制
     if (gameState === 'menu') {

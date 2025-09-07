@@ -462,52 +462,111 @@ class GameEngine {
     return true;
   }
   
-  // 动画移动生物
+  // 动画移动生物（一格一格移动，参考old实现）
   animateCreatureMove(creature, targetRow, targetCol) {
     // 开始移动动画 - 根据形状类型选择不同的移动方式
     if (typeof standUpAndExtendLimbs === 'function') {
       standUpAndExtendLimbs(creature);
     }
     
-    // 创建移动时间线
-    const moveTimeline = gsap.timeline({
+    // 计算移动路径（只能上下左右移动，不能斜着移动）
+    const path = this.calculateStepPath(creature.row, creature.col, targetRow, targetCol);
+    
+    if (path.length === 0) {
+      // 没有有效路径，直接收起脚
+      if (typeof sitDownAndHideLimbs === 'function') {
+        sitDownAndHideLimbs(creature);
+      }
+      return;
+    }
+    
+    // 创建走路时间线
+    const walkTimeline = gsap.timeline({
       onComplete: () => {
-        // 移动完成后收起动画效果
-        if (typeof sitDownAndHideLimbs === 'function') {
-          sitDownAndHideLimbs(creature);
-        }
-        
         // 检查冰块融化
         this.checkIceMelt(creature);
         
         // 检查是否到达出口
         this.checkForExitMatch(creature);
+        
+        // 收起脚
+        if (typeof sitDownAndHideLimbs === 'function') {
+          sitDownAndHideLimbs(creature);
+        }
       }
     });
     
-    // 添加移动动画
-    moveTimeline.to(creature.element, {
-      x: targetCol * this.config.CELL_SIZE,
-      y: targetRow * this.config.CELL_SIZE,
-      duration: 0.5,
-      ease: "power2.out"
+    // 一格一格移动
+    path.forEach((step, index) => {
+      const stepDuration = this.config.STEP_DURATION || 0.4; // 每步持续时间
+      const delay = index * stepDuration;
+      
+      walkTimeline.to(creature.element, {
+        x: step.col * this.config.CELL_SIZE,
+        y: step.row * this.config.CELL_SIZE,
+        duration: stepDuration,
+        ease: "circ.inOut"
+      }, delay);
+      
+      // 添加身体摆动
+      walkTimeline.to(creature.element, {
+        rotation: "+=3deg",
+        duration: stepDuration * 0.3,
+        ease: "circ.inOut",
+        yoyo: true,
+        repeat: 1
+      }, delay);
+      
+      // 更新游戏状态
+      walkTimeline.call(() => {
+        // 清除旧位置
+        creature.colorData.blocks.forEach(block => {
+          const oldRow = creature.row + block[1];
+          const oldCol = creature.col + block[0];
+          this.gameState.board[oldRow][oldCol] = null;
+        });
+        
+        // 更新位置
+        creature.row = step.row;
+        creature.col = step.col;
+        
+        // 设置新位置
+        creature.colorData.blocks.forEach(block => {
+          const newRow = creature.row + block[1];
+          const newCol = creature.col + block[0];
+          this.gameState.board[newRow][newCol] = creature;
+        });
+      }, [], delay);
     });
+  }
+  
+  // 计算移动路径（只能上下左右移动，参考old实现）
+  calculateStepPath(startRow, startCol, targetRow, targetCol) {
+    const path = [];
+    let currentRow = startRow;
+    let currentCol = startCol;
     
-    // 更新游戏状态（在动画进行中更新，避免延迟）
-    creature.colorData.blocks.forEach(block => {
-      const oldRow = creature.row + block[1];
-      const oldCol = creature.col + block[0];
-      this.gameState.board[oldRow][oldCol] = null;
-    });
+    // 先移动行（上下）
+    while (currentRow !== targetRow) {
+      if (currentRow < targetRow) {
+        currentRow++;
+      } else {
+        currentRow--;
+      }
+      path.push({ row: currentRow, col: currentCol });
+    }
     
-    creature.row = targetRow;
-    creature.col = targetCol;
+    // 再移动列（左右）
+    while (currentCol !== targetCol) {
+      if (currentCol < targetCol) {
+        currentCol++;
+      } else {
+        currentCol--;
+      }
+      path.push({ row: currentRow, col: currentCol });
+    }
     
-    creature.colorData.blocks.forEach(block => {
-      const newRow = creature.row + block[1];
-      const newCol = creature.col + block[0];
-      this.gameState.board[newRow][newCol] = creature;
-    });
+    return path;
   }
   
   // 检查冰块融化（核心性能优化逻辑）

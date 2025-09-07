@@ -31,6 +31,7 @@ class MapEngine {
     this.blockAnimations = new Map(); // 方块动画状态
     this.gridAnimation = null; // 网格动画
     this.pulseAnimation = null; // 脉冲动画
+    this.needsRedraw = false; // 是否需要重绘
     
     this.init();
   }
@@ -2446,7 +2447,7 @@ class MapEngine {
   }
   
   /**
-   * 动画移动方块
+   * 动画移动方块（一格一格移动，参考old实现）
    * @param {Object} element - 方块元素
    * @param {Object} fromPosition - 起始位置
    * @param {Object} toPosition - 目标位置
@@ -2459,25 +2460,25 @@ class MapEngine {
     }
     
     const blockElement = element.blockElement.element;
-    const startX = fromPosition.x * this.cellSize;
-    const startY = fromPosition.y * this.cellSize;
-    const endX = toPosition.x * this.cellSize;
-    const endY = toPosition.y * this.cellSize;
     
-    // 设置起始位置
-    blockElement.x = startX;
-    blockElement.y = startY;
+    // 开始移动动画 - 根据形状类型选择不同的移动方式
+    if (typeof standUpAndExtendLimbs === 'function') {
+      standUpAndExtendLimbs(element.blockElement);
+    }
     
-    // 使用GSAP动画移动
-    const animation = gsap.to(blockElement, {
-      x: endX,
-      y: endY,
-      duration: 0.5, // 移动持续时间
-      ease: "circ.inOut",
-      onUpdate: () => {
-        // 动画过程中标记需要重绘
-        this.needsRedraw = true;
-      },
+    // 计算移动路径（只能上下左右移动，不能斜着移动）
+    const path = this.calculateStepPath(fromPosition, toPosition);
+    
+    if (path.length === 0) {
+      // 没有有效路径，直接收起脚
+      if (typeof sitDownAndHideLimbs === 'function') {
+        sitDownAndHideLimbs(element.blockElement);
+      }
+      return;
+    }
+    
+    // 创建走路时间线
+    const walkTimeline = gsap.timeline({
       onComplete: () => {
         // 动画完成后更新逻辑位置
         element.position = toPosition;
@@ -2489,18 +2490,69 @@ class MapEngine {
         // 标记需要重绘
         this.needsRedraw = true;
         
+        // 收起脚
+        if (typeof sitDownAndHideLimbs === 'function') {
+          sitDownAndHideLimbs(element.blockElement);
+        }
+        
         console.log(`方块 ${element.id} 移动动画完成`);
       }
     });
     
-    // 添加身体摆动效果
-    gsap.to(blockElement, {
-      rotation: "+=3deg",
-      duration: 0.25,
-      ease: "circ.inOut",
-      yoyo: true,
-      repeat: 1
+    // 一格一格移动
+    path.forEach((step, index) => {
+      const stepDuration = 0.4; // 每步持续时间
+      const delay = index * stepDuration;
+      
+      walkTimeline.to(blockElement, {
+        x: step.x * this.cellSize,
+        y: step.y * this.cellSize,
+        duration: stepDuration,
+        ease: "circ.inOut"
+      }, delay);
+      
+      // 添加身体摆动
+      walkTimeline.to(blockElement, {
+        rotation: "+=3deg",
+        duration: stepDuration * 0.3,
+        ease: "circ.inOut",
+        yoyo: true,
+        repeat: 1
+      }, delay);
     });
+  }
+  
+  /**
+   * 计算移动路径（只能上下左右移动，参考old实现）
+   * @param {Object} fromPosition - 起始位置
+   * @param {Object} toPosition - 目标位置
+   */
+  calculateStepPath(fromPosition, toPosition) {
+    const path = [];
+    let currentX = fromPosition.x;
+    let currentY = fromPosition.y;
+    
+    // 先移动行（上下）
+    while (currentY !== toPosition.y) {
+      if (currentY < toPosition.y) {
+        currentY++;
+      } else {
+        currentY--;
+      }
+      path.push({ x: currentX, y: currentY });
+    }
+    
+    // 再移动列（左右）
+    while (currentX !== toPosition.x) {
+      if (currentX < toPosition.x) {
+        currentX++;
+      } else {
+        currentX--;
+      }
+      path.push({ x: currentX, y: currentY });
+    }
+    
+    return path;
   }
   
   /**
