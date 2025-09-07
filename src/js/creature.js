@@ -839,68 +839,38 @@ var startWalkingAnimation = function(creature) {
         ease: "power1.inOut" 
       }, 0.9);
     
-    // 真正的走路动画 - 重心转移和步伐节奏
+    // 水平交替走路动画 - 右腿移动到左腿位置，左腿移动到右腿位置
     if (creature.feet && creature.feet.length >= 2) {
       var leftLeg = creature.feet[0];
       var rightLeg = creature.feet[1];
-      var stepDistance = CREATURE_CONFIG.CELL_SIZE * 0.1; // 步伐距离，确保在身体内
       
-      // 第一步：左腿支撑，右腿抬起向前
+      // 计算腿之间的水平距离
+      var legDistance = Math.abs(rightLeg.originalX - leftLeg.originalX);
+      
+      // 第一步：右腿移动到左腿位置，左腿移动到右腿位置
       walkTimeline
         .to(rightLeg, { 
-          x: rightLeg.originalX + stepDistance, // 右腿向前迈步
-          rotation: 15, // 轻微向前倾斜
-          duration: 0.2, 
-          ease: "power2.out" 
+          x: leftLeg.originalX, // 右腿移动到左腿位置
+          duration: 0.4, 
+          ease: "power2.inOut" 
         }, 0)
-        .to(rightLeg, { 
-          x: rightLeg.originalX + stepDistance, // 右腿落地
-          rotation: 0, // 垂直
-          duration: 0.1, 
-          ease: "power2.in" 
-        }, 0.2)
+        .to(leftLeg, { 
+          x: rightLeg.originalX, // 左腿移动到右腿位置
+          duration: 0.4, 
+          ease: "power2.inOut" 
+        }, 0)
         
-        // 第二步：右腿支撑，左腿抬起向前
-        .to(leftLeg, { 
-          x: leftLeg.originalX + stepDistance, // 左腿向前迈步
-          rotation: 15, // 轻微向前倾斜
-          duration: 0.2, 
-          ease: "power2.out" 
-        }, 0.3)
-        .to(leftLeg, { 
-          x: leftLeg.originalX + stepDistance, // 左腿落地
-          rotation: 0, // 垂直
-          duration: 0.1, 
-          ease: "power2.in" 
-        }, 0.5)
-        
-        // 第三步：左腿支撑，右腿抬起向前
+        // 第二步：腿回到原位
         .to(rightLeg, { 
-          x: rightLeg.originalX + stepDistance * 2, // 右腿继续向前
-          rotation: 15, // 轻微向前倾斜
-          duration: 0.2, 
-          ease: "power2.out" 
-        }, 0.6)
-        .to(rightLeg, { 
-          x: rightLeg.originalX + stepDistance * 2, // 右腿落地
-          rotation: 0, // 垂直
-          duration: 0.1, 
-          ease: "power2.in" 
-        }, 0.8)
-        
-        // 第四步：右腿支撑，左腿抬起向前
+          x: rightLeg.originalX, // 右腿回到原位
+          duration: 0.4, 
+          ease: "power2.inOut" 
+        }, 0.4)
         .to(leftLeg, { 
-          x: leftLeg.originalX + stepDistance * 2, // 左腿继续向前
-          rotation: 15, // 轻微向前倾斜
-          duration: 0.2, 
-          ease: "power2.out" 
-        }, 0.9)
-        .to(leftLeg, { 
-          x: leftLeg.originalX + stepDistance * 2, // 左腿落地
-          rotation: 0, // 垂直
-          duration: 0.1, 
-          ease: "power2.in" 
-        }, 1.1);
+          x: leftLeg.originalX, // 左腿回到原位
+          duration: 0.4, 
+          ease: "power2.inOut" 
+        }, 0.4);
     }
     
     if (!creature.animations) {
