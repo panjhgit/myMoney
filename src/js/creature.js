@@ -79,7 +79,7 @@ var drawCreature = function(ctx, creature, startX, startY) {
     
     // 绘制眼睛（在第一个方块上）
     if (block === element.blocks[0]) {
-      drawEyes(ctx, blockX, blockY);
+      drawEyes(ctx, blockX, blockY, creature.element);
     }
   });
   
@@ -101,7 +101,7 @@ var drawCreature = function(ctx, creature, startX, startY) {
 };
 
 // 绘制眼睛
-var drawEyes = function(ctx, blockX, blockY) {
+var drawEyes = function(ctx, blockX, blockY, element) {
   var eyeSize = CREATURE_CONFIG.EYE_SIZE;
   var cellSize = CREATURE_CONFIG.CELL_SIZE;
   
@@ -110,12 +110,6 @@ var drawEyes = function(ctx, blockX, blockY) {
   var centerY = blockY + cellSize / 3; // 稍微偏上一点
   var eyeSpacing = CREATURE_CONFIG.EYE_SPACING;
   
-  console.log('绘制眼睛:', { 
-    blockX, blockY, 
-    centerX, centerY, 
-    eyeSize, eyeSpacing,
-    cellSize 
-  });
   
   // 绘制眉毛（在眼睛上方）
   ctx.strokeStyle = 'black';
@@ -140,27 +134,57 @@ var drawEyes = function(ctx, blockX, blockY) {
   );
   ctx.stroke();
   
-  // 左眼
-  ctx.fillStyle = 'white';
-  ctx.beginPath();
-  ctx.arc(centerX - eyeSpacing / 2, centerY, eyeSize, 0, 2 * Math.PI);
-  ctx.fill();
+  // 获取眼睛动画属性
+  var eyeScaleY = 1;
+  var eyeAlpha = 1;
+  if (element && element.eyeAnimation) {
+    eyeScaleY = element.eyeAnimation.eyeScaleY || 1;
+    eyeAlpha = element.eyeAnimation.eyeAlpha || 1;
+  }
   
-  // 右眼
-  ctx.beginPath();
-  ctx.arc(centerX + eyeSpacing / 2, centerY, eyeSize, 0, 2 * Math.PI);
-  ctx.fill();
+  // 设置眼睛透明度
+  ctx.globalAlpha = eyeAlpha;
   
-  // 左眼瞳孔
-  ctx.fillStyle = 'black';
-  ctx.beginPath();
-  ctx.arc(centerX - eyeSpacing / 2, centerY, eyeSize / 2, 0, 2 * Math.PI);
-  ctx.fill();
+  // 如果眼睛正在闭合，绘制闭合效果
+  if (eyeScaleY < 0.5) {
+    // 绘制闭合的眼睛（细线）
+    ctx.strokeStyle = 'black';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(centerX - eyeSpacing / 2 - eyeSize, centerY);
+    ctx.lineTo(centerX - eyeSpacing / 2 + eyeSize, centerY);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(centerX + eyeSpacing / 2 - eyeSize, centerY);
+    ctx.lineTo(centerX + eyeSpacing / 2 + eyeSize, centerY);
+    ctx.stroke();
+  } else {
+    // 正常睁开的眼睛
+    // 左眼
+    ctx.fillStyle = 'white';
+    ctx.beginPath();
+    ctx.arc(centerX - eyeSpacing / 2, centerY, eyeSize, 0, 2 * Math.PI);
+    ctx.fill();
+    
+    // 右眼
+    ctx.beginPath();
+    ctx.arc(centerX + eyeSpacing / 2, centerY, eyeSize, 0, 2 * Math.PI);
+    ctx.fill();
+    
+    // 左眼瞳孔
+    ctx.fillStyle = 'black';
+    ctx.beginPath();
+    ctx.arc(centerX - eyeSpacing / 2, centerY, eyeSize / 2, 0, 2 * Math.PI);
+    ctx.fill();
+    
+    // 右眼瞳孔
+    ctx.beginPath();
+    ctx.arc(centerX + eyeSpacing / 2, centerY, eyeSize / 2, 0, 2 * Math.PI);
+    ctx.fill();
+  }
   
-  // 右眼瞳孔
-  ctx.beginPath();
-  ctx.arc(centerX + eyeSpacing / 2, centerY, eyeSize / 2, 0, 2 * Math.PI);
-  ctx.fill();
+  // 恢复透明度
+  ctx.globalAlpha = 1;
 };
 
 // 从渐变字符串获取颜色
@@ -204,6 +228,68 @@ var destroyCreature = function(creature) {
       }
     });
   }
+};
+
+// 眨眼动画（Canvas版本）- 只让眼睛部分眨眼
+var blinkAnimation = function(creature) {
+  if (!creature || !creature.element) {
+    return;
+  }
+  
+  // 停止之前的眨眼动画
+  if (creature.animations && creature.animations.blink) {
+    creature.animations.blink.kill();
+  }
+  
+  // 确保 animations 对象存在
+  if (!creature.animations) {
+    creature.animations = {};
+  }
+  
+  // 为眼睛创建独立的动画对象
+  if (!creature.element.eyeAnimation) {
+    creature.element.eyeAnimation = {
+      eyeScaleY: 1, // 眼睛的垂直缩放
+      eyeAlpha: 1   // 眼睛的透明度
+    };
+  }
+  
+  // 眨眼动画：只影响眼睛部分
+  var blinkTimeline = gsap.timeline();
+  
+  // 第一阶段：眼睛闭合（垂直缩放到0）
+  blinkTimeline.to(creature.element.eyeAnimation, {
+    eyeScaleY: 0, // 眼睛垂直缩放为0，模拟闭合
+    duration: 0.08,
+    ease: "power2.inOut",
+  })
+  // 第二阶段：眼睛睁开（恢复原状）
+  .to(creature.element.eyeAnimation, {
+    eyeScaleY: 1, // 恢复原始大小
+    duration: 0.12,
+    ease: "power2.out",
+  });
+  
+  // 保存动画引用
+  creature.animations.blink = blinkTimeline;
+  
+  // 动画完成后清理
+  blinkTimeline.eventCallback("onComplete", function() {
+    if (creature.animations && creature.animations.blink) {
+      creature.animations.blink = null;
+    }
+    // 标记需要重绘
+    if (typeof markNeedsRedraw === 'function') {
+      markNeedsRedraw();
+    }
+  });
+  
+  // 动画进行中也需要重绘
+  blinkTimeline.eventCallback("onUpdate", function() {
+    if (typeof markNeedsRedraw === 'function') {
+      markNeedsRedraw();
+    }
+  });
 };
 
 // 确保在抖音小游戏环境中可用
@@ -917,6 +1003,7 @@ if (typeof window !== 'undefined') {
   window.startWormAnimation = startWormAnimation;
   window.startWingAnimation = startWingAnimation;
   window.startLegWalkingAnimation = startLegWalkingAnimation;
+  window.blinkAnimation = blinkAnimation;
   window.CREATURE_CONFIG = CREATURE_CONFIG;
 }
 
@@ -937,6 +1024,7 @@ if (typeof global !== 'undefined') {
   global.startWormAnimation = startWormAnimation;
   global.startWingAnimation = startWingAnimation;
   global.startLegWalkingAnimation = startLegWalkingAnimation;
+  global.blinkAnimation = blinkAnimation;
   global.CREATURE_CONFIG = CREATURE_CONFIG;
 }
 
@@ -957,5 +1045,7 @@ if (typeof this !== 'undefined') {
   this.startWormAnimation = startWormAnimation;
   this.startWingAnimation = startWingAnimation;
   this.startLegWalkingAnimation = startLegWalkingAnimation;
+  this.blinkAnimation = blinkAnimation;
   this.CREATURE_CONFIG = CREATURE_CONFIG;
 }
+

@@ -2407,6 +2407,17 @@ class MapEngine {
           // 选择新方块
           this.selectElement(block.id);
           console.log(`选择了方块: ${block.id}`);
+          
+          // 触发眨眼动画
+          if (block.blockElement && typeof blinkAnimation !== 'undefined') {
+            console.log('触发眨眼动画:', block.id);
+            blinkAnimation(block.blockElement);
+          } else {
+            console.log('无法触发眨眼动画:', {
+              hasBlockElement: !!block.blockElement,
+              hasBlinkAnimation: typeof blinkAnimation !== 'undefined'
+            });
+          }
         }
         return;
       }

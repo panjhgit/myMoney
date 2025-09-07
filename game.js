@@ -100,25 +100,42 @@ function startGame(levelId) {
   }, 150);
 }
 
+// 游戏状态跟踪
+let needsRedraw = true; // 是否需要重绘
+let lastDrawTime = 0;
+const DRAW_THROTTLE = 16; // 限制绘制频率，约60fps
+
 // 主绘制函数 - 适配抖音小游戏环境
 function draw() {
-  // 调试信息
-  if (Math.random() < 0.01) { // 每100帧打印一次，避免刷屏
+  const currentTime = Date.now();
+  
+  // 只有在需要重绘时才绘制
+  if (!needsRedraw && (currentTime - lastDrawTime) < DRAW_THROTTLE) {
+    // 继续循环，但不绘制
+    scheduleNextDraw();
+    return;
+  }
+  
+  // 调试信息（减少频率）
+  if (Math.random() < 0.001) { // 每1000帧打印一次
     console.log('当前状态:', { 
       gameState, 
       hasMainMenu: !!mainMenu, 
       hasMapEngine: !!mapEngine,
-      mapEngineType: mapEngine ? mapEngine.constructor.name : 'null'
+      mapEngineType: mapEngine ? mapEngine.constructor.name : 'null',
+      needsRedraw: needsRedraw
     });
   }
   
   if (gameState === 'menu' && mainMenu) {
     mainMenu.draw();
+    needsRedraw = false; // 菜单绘制完成后标记不需要重绘
   } else if (gameState === 'game' && mapEngine) {
     // 游戏绘制逻辑
     drawGame();
     // 更新地图引擎
     mapEngine.update();
+    needsRedraw = false; // 游戏绘制完成后标记不需要重绘
   } else {
     // 默认绘制 - 确保在菜单状态下不会调用游戏绘制
     if (gameState === 'menu') {
@@ -129,22 +146,29 @@ function draw() {
       }
     }
     drawDefault();
+    needsRedraw = false; // 默认绘制完成后标记不需要重绘
   }
   
-  // 抖音小游戏环境下的循环处理
+  lastDrawTime = currentTime;
+  scheduleNextDraw();
+}
+
+// 调度下一次绘制
+function scheduleNextDraw() {
   if (typeof requestAnimationFrame !== 'undefined') {
-    // 浏览器环境
     requestAnimationFrame(draw);
   } else if (typeof wx !== 'undefined' && wx.requestAnimationFrame) {
-    // 微信小游戏环境
     wx.requestAnimationFrame(draw);
   } else if (typeof tt !== 'undefined' && tt.requestAnimationFrame) {
-    // 抖音小游戏环境
     tt.requestAnimationFrame(draw);
   } else {
-    // 使用定时器作为备选方案
-    setTimeout(draw, 16); // 约60fps
+    setTimeout(draw, DRAW_THROTTLE);
   }
+}
+
+// 标记需要重绘（在用户交互或动画时调用）
+function markNeedsRedraw() {
+  needsRedraw = true;
 }
 
 // 游戏绘制函数
@@ -237,12 +261,24 @@ function setupGameEvents() {
       }
       
       mapEngine.handleClick(x, y);
+      markNeedsRedraw(); // 游戏交互后需要重绘
     }
   });
   
   
   // 抖音小游戏不支持键盘事件，移除键盘监听
   // 可以通过触摸手势或其他方式实现返回功能
+}
+
+// 导出到全局作用域
+if (typeof window !== 'undefined') {
+  window.markNeedsRedraw = markNeedsRedraw;
+}
+if (typeof global !== 'undefined') {
+  global.markNeedsRedraw = markNeedsRedraw;
+}
+if (typeof this !== 'undefined') {
+  this.markNeedsRedraw = markNeedsRedraw;
 }
 
 // 启动游戏 - 添加延迟确保模块加载完成
