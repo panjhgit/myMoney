@@ -1446,7 +1446,7 @@ class MapEngine {
     
     // 绘制网格背景 - 使用GSAP动画属性
     const bgAlpha = 0.15 + (gridAlpha - 1) * 0.1 + gridGlow * 0.2;
-    ctx.fillStyle = `rgba(255, 255, 255, ${bgAlpha})`;
+    ctx.fillStyle = `rgba(128, 128, 128, 1)`; // 改为灰色背景
     
     // 应用缩放变换
     ctx.save();

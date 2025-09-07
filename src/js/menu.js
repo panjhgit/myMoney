@@ -147,31 +147,32 @@ class MainMenu {
   calculatePositions() {
     const centerX = this.systemInfo.windowWidth / 2;
     
-    // 手机优化：更小的关卡和更紧凑的布局
-    const levelSize = 60; // 减小关卡大小
-    const levelSpacing = 75; // 减小间距
-    const topMargin = 120; // 顶部留出更多空间给UI
-    const bottomMargin = 100; // 底部留出空间
-    const startY = this.systemInfo.windowHeight - bottomMargin; // 从底部开始
+    // 固定4x4网格布局（连续滚动）
+    const levelSize = 60; // 关卡大小
+    const levelSpacing = 75; // 关卡间距
+    const topMargin = 300; // 进一步增加顶部空间，完全避免重叠
+    const bottomMargin = 100; // 底部空间给开始游戏按钮
+    const gameAreaHeight = this.systemInfo.windowHeight - topMargin - bottomMargin; // 固定的游戏区域高度
     
-    // 计算每行关卡数（手机屏幕通常较窄）
-    const levelsPerRow = Math.floor((this.systemInfo.windowWidth - 40) / levelSpacing);
-    const totalRows = Math.ceil(this.totalLevels / levelsPerRow);
+    // 固定4x4网格（连续滚动）
+    const levelsPerRow = 4; // 固定每行4个关卡
+    const totalRows = Math.ceil(this.totalLevels / levelsPerRow); // 总行数（500个关卡需要125行）
     
-    // 计算最大滚动距离
-    this.maxScrollY = Math.max(0, totalRows * levelSpacing - (this.systemInfo.windowHeight - topMargin - bottomMargin));
+    // 计算网格在屏幕中的位置（居中）
+    const gridWidth = (levelsPerRow - 1) * levelSpacing + levelSize;
+    const startX = (this.systemInfo.windowWidth - gridWidth) / 2;
+    const startY = topMargin; // 从顶部边距开始
     
-    // 设置关卡位置（从下到上，从左到右）
+    // 计算最大滚动距离 - 连续滚动，覆盖所有关卡
+    this.maxScrollY = Math.max(0, totalRows * levelSpacing - gameAreaHeight);
+    
+    // 设置关卡位置（连续排列）
     for (let i = 0; i < this.levels.length; i++) {
-      const row = Math.floor(i / levelsPerRow);
-      const col = i % levelsPerRow;
-      
-      // 居中排列 - 简化计算
-      const totalContentWidth = (levelsPerRow - 1) * levelSpacing + levelSize;
-      const startX = (this.systemInfo.windowWidth - totalContentWidth) / 2;
+      const row = Math.floor(i / levelsPerRow); // 当前关卡在第几行
+      const col = i % levelsPerRow; // 在当前行中的列
       
       this.levels[i].x = startX + col * levelSpacing;
-      this.levels[i].y = startY - (row * levelSpacing);
+      this.levels[i].y = startY + (row * levelSpacing);
     }
     
     // 初始滚动到当前关卡附近
@@ -556,20 +557,20 @@ class MainMenu {
   }
   
   drawTopBar() {
-    const padding = 15; // 减小边距
+    const padding = 100; // 固定在顶部区域，避开关卡
     const topBarY = padding + this.animationState.topBar.y;
     const topBarAlpha = this.animationState.topBar.alpha;
     
     this.ctx.save();
     this.ctx.globalAlpha = topBarAlpha;
     
-    // 绘制半透明背景
+    // 绘制半透明背景 - 修复背景矩形计算
     this.ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
-    this.drawRoundedRect(padding, topBarY, this.systemInfo.windowWidth - padding * 2, 50, 10);
+    this.drawRoundedRect(15, topBarY, this.systemInfo.windowWidth - 30, 50, 10);
     
     // 货币显示
-    this.drawCoinIcon(padding + 10, topBarY + 10);
-    this.drawCurrencyText(padding + 40, topBarY + 10);
+    this.drawCoinIcon(25, topBarY + 10);
+    this.drawCurrencyText(55, topBarY + 10);
     
     // 生命值显示
     this.drawHeartIcon(this.systemInfo.windowWidth - 100, topBarY + 10);
@@ -649,10 +650,10 @@ class MainMenu {
   
   
   drawLevels() {
-    // 只绘制可见的关卡（性能优化）
+    // 只绘制可见的16个关卡（4x4网格）
     const visibleLevels = this.levels.filter(level => {
       const screenY = level.y - this.scrollY;
-      return screenY > -100 && screenY < this.systemInfo.windowHeight + 100;
+      return screenY >= 300 && screenY < 600; // 在关卡区域内显示
     });
     
     for (let level of visibleLevels) {
@@ -678,8 +679,8 @@ class MainMenu {
     const screenX = level.x;
     const screenY = level.y - this.scrollY;
     
-    // 如果不在屏幕范围内，跳过绘制
-    if (screenY < -60 || screenY > this.systemInfo.windowHeight + 60) {
+    // 确保只显示在关卡区域内
+    if (screenY < 300 || screenY > 600) {
       return;
     }
     

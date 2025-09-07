@@ -174,7 +174,7 @@ function markNeedsRedraw() {
 // 游戏绘制函数
 function drawGame() {
   // 清空画布
-  ctx.fillStyle = '#2C3E50';
+  ctx.fillStyle = '#FFFFFF'; // 改为白色背景
   ctx.fillRect(0, 0, systemInfo.windowWidth, systemInfo.windowHeight);
   
   // 绘制地图状态信息
@@ -191,30 +191,7 @@ function drawGame() {
 function drawGameInfo() {
   if (!mapEngine) return;
   
-  const mapState = mapEngine.getMapState();
-  
-  // 绘制游戏标题
-  ctx.fillStyle = '#FFFFFF';
-  ctx.font = 'bold 24px Arial';
-  ctx.textAlign = 'center';
-  ctx.fillText('多层方块 Puzzle', systemInfo.windowWidth / 2, 40);
-  
-  // 绘制地图名称
-  ctx.font = '16px Arial';
-  ctx.fillText(map1.name, systemInfo.windowWidth / 2, 70);
-  
-  // 绘制游戏状态
-  ctx.font = '14px Arial';
-  ctx.fillText(`状态: ${mapState.gameState}`, systemInfo.windowWidth / 2, 100);
-  
-  // 绘制选中的元素
-  if (mapState.selectedElement) {
-    ctx.fillText(`选中: ${mapState.selectedElement.id}`, systemInfo.windowWidth / 2, 120);
-  }
-  
-  // 绘制操作提示
-  ctx.font = '12px Arial';
-  ctx.fillText('点击方块选择，拖拽移动', systemInfo.windowWidth / 2, systemInfo.windowHeight - 60);
+  // 不绘制任何文字，只保留空白背景
 }
 
 // 默认绘制函数
