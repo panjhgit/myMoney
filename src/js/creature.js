@@ -923,30 +923,39 @@ var startFlyingAnimation = function(creature) {
     repeat: -1
   });
   
-  // 翅膀扇动动画 - 以根部为轴，翅膀尖向下扇动
+  // 翅膀扇动动画 - Y轴对称向下扇动
   if (creature.wings && creature.wings.length > 0) {
+    // 将翅膀分为左右翅膀
+    var leftWings = creature.wings.filter(function(wing) { return wing.side === 'left'; });
+    var rightWings = creature.wings.filter(function(wing) { return wing.side === 'right'; });
+    
     // 创建翅膀扇动时间线
     var wingTimeline = gsap.timeline({ repeat: -1 });
     
-    // 翅膀扇动周期：翅膀尖向下扇动，然后恢复
-    creature.wings.forEach(function(wing, index) {
-      var isLeftWing = index === 0; // 左翅膀
-      var originalRotation = wing.originalRotation;
-      
-      // 翅膀向下扇动（翅膀尖向下）
-      wingTimeline.to(wing, {
-        rotation: originalRotation + (isLeftWing ? -30 : 30), // 左翅膀向左下，右翅膀向右下
+    // 翅膀向下扇动：向下 -> 恢复 -> 向下 -> 恢复
+    wingTimeline
+      // 向下扇动 - 左右翅膀Y轴对称向下
+      .to(leftWings, {
+        rotation: -30, // 左翅膀向下扇动
         duration: 0.3,
         ease: "power2.out"
       }, 0)
-      
-      // 翅膀恢复原位
-      .to(wing, {
-        rotation: originalRotation, // 恢复到原始角度
+      .to(rightWings, {
+        rotation: 30, // 右翅膀向下扇动（Y轴对称）
+        duration: 0.3,
+        ease: "power2.out"
+      }, 0)
+      // 恢复到原位
+      .to(leftWings, {
+        rotation: -15, // 左翅膀恢复
+        duration: 0.3,
+        ease: "power2.in"
+      }, 0.3)
+      .to(rightWings, {
+        rotation: 15, // 右翅膀恢复
         duration: 0.3,
         ease: "power2.in"
       }, 0.3);
-    });
     
     creature.animations.wingTimeline = wingTimeline;
   }
@@ -1164,39 +1173,37 @@ var createSimpleWings = function(creature) {
   
   creature.wings = [];
   
-  // 找到躯干的中心线（对称轴）
+  // 找到躯干的对称轴（基于最顶部方块的X坐标）
   var blocks = creature.colorData.blocks;
   var minY = Math.min.apply(Math, blocks.map(function(b) { return b[1]; }));
-  var maxY = Math.max.apply(Math, blocks.map(function(b) { return b[1]; }));
   
-  // 找到躯干的中心X坐标（对称轴）
-  var centerX = 0;
-  var centerY = 0;
+  // 找到最顶部的方块（头部，有眼睛的方块）
+  var topBlocks = blocks.filter(function(block) { return block[1] === minY; });
+  var headBlock = topBlocks[0]; // 取第一个顶部方块作为参考
   
-  // 计算躯干的中心点
-  var totalX = 0, totalY = 0;
-  blocks.forEach(function(block) {
-    totalX += block[0];
-    totalY += block[1];
-  });
-  centerX = totalX / blocks.length;
-  centerY = totalY / blocks.length;
+  // 眼睛所在的列的X坐标（翅膀对称中心）
+  var eyeColumnX = headBlock[0];
+  var headY = headBlock[1];
   
-  // 创建左右翅膀，位置在躯干格子外
+  // 翅膀尺寸 - 调整为合适大小
   var cellSize = CREATURE_CONFIG.CELL_SIZE;
-  var wingOffset = cellSize * 0.8; // 翅膀在躯干外80%格子大小的距离
+  var wingWidth = cellSize * 0.7; // 增加到70%
+  var wingHeight = cellSize * 0.5; // 增加到50%
+  var wingOffset = cellSize * 0.6; // 翅膀在躯干外60%格子大小的距离
   
   for (var i = 0; i < 2; i++) {
     var wing = {
-      x: centerX * cellSize + (i === 0 ? -wingOffset : wingOffset), // 左翅膀在左，右翅膀在右
-      y: centerY * cellSize, // 翅膀在躯干中心高度
-      width: cellSize * 0.6, // 翅膀宽度：格子大小的60%
-      height: cellSize * 0.4, // 翅膀高度：格子大小的40%
-      rotation: i === 0 ? -20 : 20, // 左翅膀向左倾斜，右翅膀向右倾斜
-      color: '#2C3E50', // 深蓝色，与腿颜色一致
-      originalRotation: i === 0 ? -20 : 20,
-      originalX: centerX * cellSize + (i === 0 ? -wingOffset : wingOffset),
-      originalY: centerY * cellSize
+      // 基于眼睛所在列对称放置翅膀
+      x: eyeColumnX * cellSize + (i === 0 ? wingOffset : -wingOffset), // 左翅膀往右，右翅膀往左
+      y: headY * cellSize + cellSize * 0.1, // 翅膀在头部上方位置
+      width: wingWidth,
+      height: wingHeight,
+      rotation: i === 0 ? -15 : 15, // 修正角度，确保对称
+      color: '#2C3E50', // 深蓝色
+      originalRotation: i === 0 ? -15 : 15,
+      originalX: eyeColumnX * cellSize + (i === 0 ? wingOffset : -wingOffset),
+      originalY: headY * cellSize + cellSize * 0.1,
+      side: i === 0 ? 'right' : 'left' // i=0是右翅膀，i=1是左翅膀
     };
     
     creature.wings.push(wing);
@@ -1273,10 +1280,10 @@ var drawWing = function(ctx, wing) {
       
       // 根据翅膀方向设置变换
       if (wing.side === 'right') {
-        ctx.scale(-targetScale, targetScale);
+        ctx.scale(-targetScale, targetScale); // 右翅膀水平翻转
         ctx.translate(-1368 * svgScale, 0);
       } else {
-        ctx.scale(targetScale, targetScale);
+        ctx.scale(targetScale, targetScale); // 左翅膀正常缩放
       }
       
       // 应用SVG的内置变换
