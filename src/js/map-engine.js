@@ -1078,29 +1078,59 @@ class MapEngine {
   }
   
   /**
-   * 开始方块进入动画
+   * 开始方块进入动画 - 更生动的效果
    * @param {Object} block - 方块对象
    */
   animateBlockEnter(block) {
     const animationId = `block_enter_${block.id}`;
     
     try {
-      // 使用简单的数值对象作为动画目标
-      const animationTarget = { scale: 0, alpha: 0 };
-      const enterAnimation = gsap.fromTo(animationTarget, {
-        scale: 0,
-        alpha: 0
-      }, {
-        duration: 0.8,
-        scale: 1,
-        alpha: 1,
-        ease: "back.out(1.7)",
+      // 直接对 blockElement.element 进行动画
+      if (!block.blockElement || !block.blockElement.element) {
+        console.warn(`方块 ${block.id} 没有 blockElement，跳过进入动画`);
+        return;
+      }
+      
+      const element = block.blockElement.element;
+      
+      // 设置初始状态
+      element.scale = 0;
+      element.alpha = 0;
+      element.rotation = -180;
+      element.y = element.y - 50; // 从上方开始
+      
+      // 创建更丰富的进入动画
+      const enterTimeline = gsap.timeline({
         onComplete: () => {
           this.animations.delete(animationId);
         }
       });
       
-      this.animations.set(animationId, enterAnimation);
+      // 第一阶段：从上方掉落
+      enterTimeline.to(element, {
+        duration: 0.6,
+        scale: 1.2, // 先放大一点
+        alpha: 1,
+        rotation: 0,
+        y: element.y + 50, // 回到原位置
+        ease: "bounce.out(1.2)" // 弹跳效果
+      })
+      // 第二阶段：轻微回弹
+      .to(element, {
+        duration: 0.3,
+        scale: 1,
+        ease: "elastic.out(1, 0.8)"
+      })
+      // 第三阶段：轻微呼吸效果
+      .to(element, {
+        duration: 0.2,
+        scale: 1.05,
+        ease: "power2.inOut",
+        yoyo: true,
+        repeat: 1
+      });
+      
+      this.animations.set(animationId, enterTimeline);
     } catch (error) {
       console.warn(`方块 ${block.id} 进入动画创建失败:`, error);
     }
@@ -1174,7 +1204,7 @@ class MapEngine {
   }
   
   /**
-   * 开始方块选中动画
+   * 开始方块选中动画 - 更生动的选中效果
    * @param {Object} block - 方块对象
    */
   animateBlockSelect(block) {
@@ -1182,26 +1212,53 @@ class MapEngine {
     
     try {
       // 创建选中动画 - 使用简单的数值对象
-      const animationObj = {scale: 1};
-      const selectAnimation = gsap.to(animationObj, {
-        duration: 0.5,
-        scale: 1.05,
-        ease: "power2.out",
-        repeat: -1,
-        yoyo: true,
+      const animationObj = {
+        scale: 1,
+        rotation: 0,
+        glow: 0
+      };
+      
+      // 创建时间线动画
+      const selectTimeline = gsap.timeline({
         onComplete: () => {
           this.animations.delete(animationId);
         }
       });
       
-      this.animations.set(animationId, selectAnimation);
+      // 第一阶段：快速放大并旋转
+      selectTimeline.to(animationObj, {
+        duration: 0.2,
+        scale: 1.15,
+        rotation: 10,
+        glow: 0.5,
+        ease: "power2.out"
+      })
+      // 第二阶段：轻微回弹
+      .to(animationObj, {
+        duration: 0.3,
+        scale: 1.08,
+        rotation: -5,
+        ease: "elastic.out(1, 0.6)"
+      })
+      // 第三阶段：持续脉冲效果
+      .to(animationObj, {
+        duration: 0.8,
+        scale: 1.12,
+        rotation: 0,
+        glow: 0.8,
+        ease: "power2.inOut",
+        yoyo: true,
+        repeat: -1
+      });
+      
+      this.animations.set(animationId, selectTimeline);
     } catch (error) {
       console.warn(`方块 ${block.id} 选中动画创建失败:`, error);
     }
   }
   
   /**
-   * 开始方块退出动画
+   * 开始方块退出动画 - 更生动的退出效果
    * @param {Object} block - 方块对象
    */
   animateBlockExit(block) {
@@ -1209,18 +1266,38 @@ class MapEngine {
     
     try {
       // 创建退出动画 - 使用简单的数值对象
-      const animationObj = {scale: 1, alpha: 1};
-      const exitAnimation = gsap.to(animationObj, {
-        duration: 0.6,
-        scale: 0,
-        alpha: 0,
-        ease: "back.in(1.7)",
+      const animationObj = {
+        scale: 1, 
+        alpha: 1,
+        rotation: 0,
+        y: 0
+      };
+      
+      // 创建时间线动画
+      const exitTimeline = gsap.timeline({
         onComplete: () => {
           this.animations.delete(animationId);
         }
       });
       
-      this.animations.set(animationId, exitAnimation);
+      // 第一阶段：快速旋转并放大
+      exitTimeline.to(animationObj, {
+        duration: 0.3,
+        scale: 1.2,
+        rotation: 360,
+        ease: "power2.out"
+      })
+      // 第二阶段：向上飞走并缩小
+      .to(animationObj, {
+        duration: 0.4,
+        scale: 0,
+        alpha: 0,
+        y: -30,
+        rotation: 720, // 继续旋转
+        ease: "back.in(1.7)"
+      });
+      
+      this.animations.set(animationId, exitTimeline);
     } catch (error) {
       console.warn(`方块 ${block.id} 退出动画创建失败:`, error);
     }
@@ -2494,9 +2571,9 @@ class MapEngine {
     // 注册动画
     this.animations.set(animationId, walkTimeline);
     
-    // 一格一格移动
+    // 一格一格移动 - 使用更自然的动画效果
     path.forEach((step, index) => {
-      const stepDuration = 0.4; // 每步持续时间
+      const stepDuration = 0.6; // 增加每步持续时间，让动画更流畅
       const delay = index * stepDuration;
       
       // 立即更新逻辑位置，避免闪烁
@@ -2506,19 +2583,55 @@ class MapEngine {
         console.log(`方块 ${element.id} 开始移动到步骤: (${step.x},${step.y})`);
       }, [], delay);
       
-      // 动画移动渲染位置
+      // 使用更自然的缓动函数和物理效果
+      if (typeof Physics2DPlugin !== 'undefined' && Physics2DPlugin) {
+        // 使用Physics2D插件创建更自然的移动效果
+        walkTimeline.to(blockElement, {
+          x: step.x * this.cellSize,
+          y: step.y * this.cellSize,
+          duration: stepDuration,
+          ease: "power2.out",
+          physics2D: {
+            velocity: 200 + Math.random() * 100, // 随机速度变化
+            angle: 0,
+            gravity: 0,
+            friction: 0.8,
+            bounce: 0.1 // 轻微弹跳
+          }
+        }, delay);
+      } else {
+        // 降级到普通动画，但使用更自然的缓动
+        walkTimeline.to(blockElement, {
+          x: step.x * this.cellSize,
+          y: step.y * this.cellSize,
+          duration: stepDuration,
+          ease: "elastic.out(1, 0.6)" // 弹性缓动，更生动
+        }, delay);
+      }
+      
+      // 添加更丰富的身体动画
       walkTimeline.to(blockElement, {
-        x: step.x * this.cellSize,
-        y: step.y * this.cellSize,
-        duration: stepDuration,
-        ease: "circ.inOut"
+        rotation: "+=5deg", // 增加旋转角度
+        duration: stepDuration * 0.4,
+        ease: "power2.inOut",
+        yoyo: true,
+        repeat: 1
       }, delay);
       
-      // 添加身体摆动
+      // 添加轻微的缩放效果（呼吸感）
       walkTimeline.to(blockElement, {
-        rotation: "+=3deg",
+        scale: 1.05,
+        duration: stepDuration * 0.2,
+        ease: "power2.out",
+        yoyo: true,
+        repeat: 1
+      }, delay);
+      
+      // 添加垂直弹跳效果
+      walkTimeline.to(blockElement, {
+        y: step.y * this.cellSize - 3, // 轻微向上
         duration: stepDuration * 0.3,
-        ease: "circ.inOut",
+        ease: "power2.out",
         yoyo: true,
         repeat: 1
       }, delay);

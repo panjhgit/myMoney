@@ -87,7 +87,18 @@ var drawCreature = function(ctx, creature, startX, startY) {
   // 绘制脚（如果存在）
   if (creature.feet && creature.feet.length > 0) {
     creature.feet.forEach(function(foot) {
-      drawFoot(ctx, foot);
+      // 调整脚的位置，使其相对于creature的坐标系统
+      var adjustedFoot = {
+        x: foot.x,
+        y: foot.y,
+        width: foot.width,
+        height: foot.height,
+        rotation: foot.rotation,
+        originalX: foot.originalX,
+        originalY: foot.originalY,
+        color: foot.color
+      };
+      drawFoot(ctx, adjustedFoot);
     });
   }
   
@@ -828,45 +839,69 @@ var startWalkingAnimation = function(creature) {
         ease: "power1.inOut" 
       }, 0.9);
     
-    // 左腿前后摆动
-    leftLegs.forEach(function(leg) {
+    // 真正的走路动画 - 重心转移和步伐节奏
+    if (creature.feet && creature.feet.length >= 2) {
+      var leftLeg = creature.feet[0];
+      var rightLeg = creature.feet[1];
+      var stepDistance = CREATURE_CONFIG.CELL_SIZE * 0.1; // 步伐距离，确保在身体内
+      
+      // 第一步：左腿支撑，右腿抬起向前
       walkTimeline
-        .to(leg, { 
-          x: leg.x + 8, // 左腿向前
-          duration: 0.4, 
-          ease: "power2.inOut" 
+        .to(rightLeg, { 
+          x: rightLeg.originalX + stepDistance, // 右腿向前迈步
+          rotation: 15, // 轻微向前倾斜
+          duration: 0.2, 
+          ease: "power2.out" 
         }, 0)
-        .to(leg, { 
-          x: leg.x - 8, // 左腿向后
-          duration: 0.4, 
-          ease: "power2.inOut" 
-        }, 0.4)
-        .to(leg, { 
-          x: leg.x, // 回到原位
-          duration: 0.4, 
-          ease: "power2.inOut" 
-        }, 0.8);
-    });
-    
-    // 右腿前后摆动（与左腿相反，形成交替）
-    rightLegs.forEach(function(leg) {
-      walkTimeline
-        .to(leg, { 
-          x: leg.x - 8, // 右腿向后
-          duration: 0.4, 
-          ease: "power2.inOut" 
-        }, 0)
-        .to(leg, { 
-          x: leg.x + 8, // 右腿向前
-          duration: 0.4, 
-          ease: "power2.inOut" 
-        }, 0.4)
-        .to(leg, { 
-          x: leg.x, // 回到原位
-          duration: 0.4, 
-          ease: "power2.inOut" 
-        }, 0.8);
-    });
+        .to(rightLeg, { 
+          x: rightLeg.originalX + stepDistance, // 右腿落地
+          rotation: 0, // 垂直
+          duration: 0.1, 
+          ease: "power2.in" 
+        }, 0.2)
+        
+        // 第二步：右腿支撑，左腿抬起向前
+        .to(leftLeg, { 
+          x: leftLeg.originalX + stepDistance, // 左腿向前迈步
+          rotation: 15, // 轻微向前倾斜
+          duration: 0.2, 
+          ease: "power2.out" 
+        }, 0.3)
+        .to(leftLeg, { 
+          x: leftLeg.originalX + stepDistance, // 左腿落地
+          rotation: 0, // 垂直
+          duration: 0.1, 
+          ease: "power2.in" 
+        }, 0.5)
+        
+        // 第三步：左腿支撑，右腿抬起向前
+        .to(rightLeg, { 
+          x: rightLeg.originalX + stepDistance * 2, // 右腿继续向前
+          rotation: 15, // 轻微向前倾斜
+          duration: 0.2, 
+          ease: "power2.out" 
+        }, 0.6)
+        .to(rightLeg, { 
+          x: rightLeg.originalX + stepDistance * 2, // 右腿落地
+          rotation: 0, // 垂直
+          duration: 0.1, 
+          ease: "power2.in" 
+        }, 0.8)
+        
+        // 第四步：右腿支撑，左腿抬起向前
+        .to(leftLeg, { 
+          x: leftLeg.originalX + stepDistance * 2, // 左腿继续向前
+          rotation: 15, // 轻微向前倾斜
+          duration: 0.2, 
+          ease: "power2.out" 
+        }, 0.9)
+        .to(leftLeg, { 
+          x: leftLeg.originalX + stepDistance * 2, // 左腿落地
+          rotation: 0, // 垂直
+          duration: 0.1, 
+          ease: "power2.in" 
+        }, 1.1);
+    }
     
     if (!creature.animations) {
       creature.animations = {};
@@ -1066,42 +1101,66 @@ var createSimpleFeet = function(creature) {
     });
   });
   
-  // 决定腿的数量：固定2个腿
-  var legCount = 2;
-  
-  // 创建腿 - 选择最合适的底部方块
+  // 决定腿的数量：只有1x1和2x2方块才有腿
+  var legCount = 0;
   var selectedBlocks = [];
-  if (bottomBlocks.length === 1) {
-    // 只有1个底部方块：创建2个脚在同一个方块下方
+  
+  // 检查方块形状
+  var blocks = creature.colorData.blocks;
+  var is1x1 = blocks.length === 1; // 1x1方块
+  var is2x2 = blocks.length === 4 && 
+              blocks.every(function(block) {
+                return blocks.some(function(otherBlock) {
+                  return (Math.abs(block[0] - otherBlock[0]) <= 1 && 
+                          Math.abs(block[1] - otherBlock[1]) <= 1);
+                });
+              }); // 2x2方块
+  
+  if (is1x1) {
+    // 1x1方块：2条腿
+    legCount = 2;
     selectedBlocks.push(bottomBlocks[0]);
     selectedBlocks.push(bottomBlocks[0]);
-  } else {
-    // 多个底部方块：选择最左边和最右边的
+  } else if (is2x2) {
+    // 2x2方块：2条腿
+    legCount = 2;
     selectedBlocks.push(bottomBlocks[0]); // 最左边
     selectedBlocks.push(bottomBlocks[bottomBlocks.length - 1]); // 最右边
+  } else {
+    // 其他形状：无腿
+    legCount = 0;
   }
   
   // 创建腿
   for (var i = 0; i < legCount; i++) {
     var block = selectedBlocks[i];
+    var cellSize = CREATURE_CONFIG.CELL_SIZE;
+    
+    // 计算腿的位置 - 确保在身体内部
+    var legX, legY;
+    
+    if (legCount === 2 && selectedBlocks[0] === selectedBlocks[1]) {
+      // 同一个方块下的两个脚：在方块内部，合理间距
+      var centerX = block[0] * cellSize + cellSize / 2;
+      var spacing = cellSize * 0.25; // 25%的格子宽度作为间距，确保在身体内
+      legX = i === 0 ? centerX - spacing : centerX + spacing;
+    } else {
+      // 不同方块下的脚：在各自方块内部居中
+      legX = block[0] * cellSize + cellSize / 2;
+    }
+    
+    legY = block[1] * cellSize + cellSize; // 在方块下方
     
     var leg = {
-      x: block[0] * CREATURE_CONFIG.CELL_SIZE + 13.5,
-      y: block[1] * CREATURE_CONFIG.CELL_SIZE + CREATURE_CONFIG.CELL_SIZE,
-      width: 3,
-      height: 20,
+      x: legX,
+      y: legY,
+      width: Math.max(4, cellSize * 0.08), // 腿宽度：格子大小的8%，最小4像素
+      height: Math.max(15, cellSize * 0.35), // 腿高度：格子大小的35%，最小15像素
       rotation: 0,
-      originalX: block[0] * CREATURE_CONFIG.CELL_SIZE + 13.5,
-      originalY: block[1] * CREATURE_CONFIG.CELL_SIZE + CREATURE_CONFIG.CELL_SIZE,
-      color: '#000'
+      originalX: legX,
+      originalY: legY,
+      color: '#2C3E50' // 深蓝色，更可爱
     };
-    
-    // 调整脚的位置：如果是同一个方块下的两个脚，稍微分开
-    if (legCount === 2 && selectedBlocks[0] === selectedBlocks[1]) {
-      // 同一个方块下的两个脚：一个偏左，一个偏右
-      leg.x = i === 0 ? block[0] * CREATURE_CONFIG.CELL_SIZE + 8 : block[0] * CREATURE_CONFIG.CELL_SIZE + 19;
-      leg.originalX = leg.x;
-    }
     
     creature.feet.push(leg);
   }
@@ -1155,18 +1214,41 @@ var removeSimpleWings = function(creature) {
   }
 };
 
-// 绘制脚
+// 绘制脚 - L形状，连续，可爱
 var drawFoot = function(ctx, foot) {
   ctx.save();
   ctx.translate(foot.x, foot.y);
   ctx.rotate(foot.rotation * Math.PI / 180);
   
-  // 绘制小腿（垂直部分）
+  // 设置更可爱的颜色
   ctx.fillStyle = foot.color;
-  ctx.fillRect(0, 0, foot.width, foot.height * 0.7);
+  ctx.strokeStyle = '#222';
+  ctx.lineWidth = 1;
   
-  // 绘制脚掌（水平部分）
-  ctx.fillRect(0, foot.height * 0.7, foot.width * 2, foot.width);
+  // 绘制L形状的腿和脚
+  var legWidth = foot.width;
+  var legHeight = foot.height * 0.6; // 小腿高度
+  var footWidth = foot.width * 1.8; // 脚掌宽度，比小腿大
+  var footHeight = foot.width * 1.2; // 脚掌高度
+  
+  // 绘制小腿（垂直部分）
+  ctx.fillRect(-legWidth/2, 0, legWidth, legHeight);
+  
+  // 绘制脚掌（水平部分）- 与小腿连接形成L形
+  ctx.fillRect(-legWidth/2, legHeight - 1, footWidth, footHeight);
+  
+  // 添加可爱的细节 - 脚趾
+  ctx.fillStyle = '#444';
+  var toeWidth = footWidth / 3;
+  for (var i = 0; i < 3; i++) {
+    ctx.fillRect(-legWidth/2 + i * toeWidth, legHeight + footHeight - footWidth * 0.3, 
+                 toeWidth * 0.8, footWidth * 0.3);
+  }
+  
+  // 添加高光效果
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+  ctx.fillRect(-legWidth/2 + 1, 1, legWidth - 2, legHeight * 0.3);
+  ctx.fillRect(-legWidth/2 + 1, legHeight, footWidth * 0.3, footHeight * 0.3);
   
   ctx.restore();
 };
