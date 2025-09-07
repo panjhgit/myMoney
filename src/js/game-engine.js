@@ -244,6 +244,12 @@ class GameEngine {
   
   // 创建生物元素（Canvas版本）
   createCreatureElement(creature) {
+    // 安全检查：确保 colorData 和 blocks 存在
+    if (!creature.colorData || !creature.colorData.blocks || creature.colorData.blocks.length === 0) {
+      console.error('createCreatureElement: creature.colorData.blocks 无效:', creature);
+      return null;
+    }
+    
     const element = {
       x: creature.col * this.config.CELL_SIZE,
       y: creature.row * this.config.CELL_SIZE,
@@ -318,8 +324,12 @@ class GameEngine {
   
   // 设置事件监听器 - 适配抖音小游戏环境
   setupEventListeners() {
-    this.canvas.addEventListener('click', (e) => this.handleClick(e));
-    this.canvas.addEventListener('touchstart', (e) => this.handleTouch(e), { passive: false });
+    // 保存绑定的函数引用，用于正确移除事件监听器
+    this.boundHandleClick = (e) => this.handleClick(e);
+    this.boundHandleTouch = (e) => this.handleTouch(e);
+    
+    this.canvas.addEventListener('click', this.boundHandleClick);
+    this.canvas.addEventListener('touchstart', this.boundHandleTouch, { passive: false });
   }
   
   // 处理点击事件
@@ -328,21 +338,32 @@ class GameEngine {
     
     let x, y;
     
-    // 抖音小游戏环境兼容处理
+    // 抖音小游戏环境兼容处理 - 改进坐标转换
     if (typeof this.canvas.getBoundingClientRect === 'function') {
       // 浏览器环境
       const rect = this.canvas.getBoundingClientRect();
       x = event.clientX - rect.left;
       y = event.clientY - rect.top;
+      
+      // 考虑Canvas缩放
+      const scaleX = this.canvas.width / rect.width;
+      const scaleY = this.canvas.height / rect.height;
+      x *= scaleX;
+      y *= scaleY;
     } else {
       // 抖音小游戏环境 - 直接使用坐标
       x = event.clientX || event.x || 0;
       y = event.clientY || event.y || 0;
     }
     
-    // 转换屏幕坐标到游戏坐标
-    const gameX = x;
-    const gameY = y;
+    // 转换屏幕坐标到游戏坐标 - 考虑棋盘偏移
+    const boardWidth = this.config.BOARD_SIZE * this.config.CELL_SIZE;
+    const boardHeight = this.config.BOARD_SIZE * this.config.CELL_SIZE;
+    const startX = (this.systemInfo.windowWidth - boardWidth) / 2;
+    const startY = (this.systemInfo.windowHeight - boardHeight) / 2;
+    
+    const gameX = x - startX;
+    const gameY = y - startY;
     
     // 检查是否点击了生物
     const clickedCreature = this.getCreatureAtPosition(gameX, gameY);
@@ -937,9 +958,17 @@ class GameEngine {
       clearInterval(this.gameTimer);
     }
     
-    // 移除事件监听器
-    this.canvas.removeEventListener('click', this.handleClick);
-    this.canvas.removeEventListener('touchstart', this.handleTouch);
+    // 移除事件监听器 - 使用保存的函数引用
+    if (this.boundHandleClick) {
+      this.canvas.removeEventListener('click', this.boundHandleClick);
+    }
+    if (this.boundHandleTouch) {
+      this.canvas.removeEventListener('touchstart', this.boundHandleTouch);
+    }
+    
+    // 清理函数引用
+    this.boundHandleClick = null;
+    this.boundHandleTouch = null;
     
     console.log(`游戏引擎 ${this.levelId} 已销毁`);
   }

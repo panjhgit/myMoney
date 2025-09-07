@@ -1430,13 +1430,13 @@ class MapEngine {
     this.ctx = ctx;
     this.systemInfo = systemInfo;
     
-    // 安全获取系统信息，防止 NaN 或 Infinity
+    // 安全获取系统信息，防止 NaN 或 Infinity 或零值
     const windowWidth = Number(systemInfo.windowWidth) || 375;
     const windowHeight = Number(systemInfo.windowHeight) || 667;
     
-    // 确保值是有限的
-    if (!isFinite(windowWidth) || !isFinite(windowHeight)) {
-      console.warn('系统信息包含非有限值，使用默认值');
+    // 确保值是有限的且大于零
+    if (!isFinite(windowWidth) || !isFinite(windowHeight) || windowWidth <= 0 || windowHeight <= 0) {
+      console.warn('系统信息包含非有限值或零值，使用默认值:', { windowWidth, windowHeight });
       systemInfo.windowWidth = 375;
       systemInfo.windowHeight = 667;
     }
@@ -2220,11 +2220,23 @@ class MapEngine {
       console.warn('获取方块动画属性失败:', error);
     }
     
-    // 根据形状的每个块分别绘制
-    const cells = block.occupiedCells.map(cellKey => cellKey.split(',').map(Number));
+    // 安全检查：确保 occupiedCells 存在且有效
+    if (!block.occupiedCells || !Array.isArray(block.occupiedCells) || block.occupiedCells.length === 0) {
+      console.warn(`方块 ${block.id} 没有有效的 occupiedCells，跳过绘制`);
+      return;
+    }
+    
+    // 根据形状的每个块分别绘制 - 安全地解析坐标
+    const cells = block.occupiedCells.map(cellKey => {
+      if (typeof cellKey !== 'string' || !cellKey.includes(',')) {
+        console.warn(`无效的 cellKey 格式: ${cellKey}`);
+        return [0, 0]; // 返回默认坐标
+      }
+      return cellKey.split(',').map(Number);
+    }).filter(cell => !isNaN(cell[0]) && !isNaN(cell[1])); // 过滤掉无效坐标
     
     if (cells.length === 0) {
-      console.warn(`方块 ${block.id} 没有占用格子，跳过绘制`);
+      console.warn(`方块 ${block.id} 没有有效的格子坐标，跳过绘制`);
       return;
     }
     

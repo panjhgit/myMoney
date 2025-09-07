@@ -114,6 +114,11 @@ var drawCreature = function(ctx, creature, startX, startY) {
 
 // 智能选择眼睛绘制位置
 var shouldDrawEyesOnBlock = function(currentBlock, allBlocks) {
+  // 安全检查：确保 allBlocks 数组不为空
+  if (!allBlocks || allBlocks.length === 0) {
+    return false;
+  }
+  
   // 对于1x1方块，在唯一方块上绘制眼睛
   if (allBlocks.length === 1) {
     return currentBlock === allBlocks[0];
@@ -121,13 +126,14 @@ var shouldDrawEyesOnBlock = function(currentBlock, allBlocks) {
   
   // 对于2x2方块，在左上角方块上绘制眼睛
   if (allBlocks.length === 4) {
-    // 找到最左上角的方块
-    var topLeftBlock = allBlocks.reduce(function(min, block) {
-      if (block[1] < min[1] || (block[1] === min[1] && block[0] < min[0])) {
-        return block;
+    // 安全地找到最左上角的方块
+    var topLeftBlock = allBlocks[0]; // 初始化为第一个元素
+    for (var i = 1; i < allBlocks.length; i++) {
+      var block = allBlocks[i];
+      if (block[1] < topLeftBlock[1] || (block[1] === topLeftBlock[1] && block[0] < topLeftBlock[0])) {
+        topLeftBlock = block;
       }
-      return min;
-    });
+    }
     return currentBlock === topLeftBlock;
   }
   
@@ -145,13 +151,27 @@ var drawEyes = function(ctx, blockX, blockY, element) {
   var centerY = blockY + cellSize / 3; // 稍微偏上一点
   var eyeSpacing = CREATURE_CONFIG.EYE_SPACING;
   
-  // 获取眼睛类型配置
+  // 获取眼睛类型配置 - 安全检查
   var eyeType = 'circle'; // 默认眼睛类型
-  if (element && element.eyeType && typeof EYE_TYPES !== 'undefined') {
+  if (element && element.eyeType && typeof EYE_TYPES !== 'undefined' && EYE_TYPES) {
     eyeType = element.eyeType;
   }
   
-  var eyeConfig = EYE_TYPES && EYE_TYPES[eyeType] ? EYE_TYPES[eyeType] : EYE_TYPES.circle;
+  // 安全地获取眼睛配置，提供默认值
+  var eyeConfig;
+  if (typeof EYE_TYPES !== 'undefined' && EYE_TYPES && EYE_TYPES[eyeType]) {
+    eyeConfig = EYE_TYPES[eyeType];
+  } else if (typeof EYE_TYPES !== 'undefined' && EYE_TYPES && EYE_TYPES.circle) {
+    eyeConfig = EYE_TYPES.circle;
+  } else {
+    // 提供一个默认的眼睛配置
+    eyeConfig = {
+      shape: 'circle',
+      size: 1.0,
+      pupilSize: 0.5,
+      eyebrowStyle: 'curved'
+    };
+  }
   
   // 根据眼睛类型调整大小
   var adjustedEyeSize = eyeSize * eyeConfig.size;
@@ -437,8 +457,12 @@ var drawClosedEyes = function(ctx, centerX, centerY, eyeSize, eyeSpacing, eyeCon
   ctx.stroke();
 };
 
-// 从渐变字符串获取颜色
+// 从渐变字符串获取颜色（统一版本）
 var getColorFromGradient = function(gradientString) {
+  if (!gradientString || typeof gradientString !== 'string') {
+    return '#666666';
+  }
+  
   if (gradientString.includes('red')) return '#FF6B6B';
   if (gradientString.includes('blue')) return '#45B7D1';
   if (gradientString.includes('green')) return '#96CEB4';
@@ -447,6 +471,9 @@ var getColorFromGradient = function(gradientString) {
   if (gradientString.includes('orange')) return '#FFA500';
   if (gradientString.includes('cyan')) return '#00CED1';
   if (gradientString.includes('magenta')) return '#FF69B4';
+  if (gradientString.includes('pink')) return '#FFB6C1';
+  if (gradientString.includes('lime')) return '#32CD32';
+  if (gradientString.includes('indigo')) return '#4B0082';
   return '#666666';
 };
 
@@ -542,54 +569,7 @@ var blinkAnimation = function(creature) {
   });
 };
 
-// 确保在抖音小游戏环境中可用
-if (typeof window !== 'undefined') {
-  window.CreatureStates = CreatureStates;
-  window.createCreature = createCreature;
-  window.drawCreature = drawCreature;
-  window.moveCreature = moveCreature;
-  window.selectCreature = selectCreature;
-  window.deselectCreature = deselectCreature;
-  window.destroyCreature = destroyCreature;
-  
-  // 动画效果函数
-  window.standUpAndExtendLimbs = standUpAndExtendLimbs;
-  window.sitDownAndHideLimbs = sitDownAndHideLimbs;
-  window.startWormAnimation = startWormAnimation;
-  window.startWingAnimation = startWingAnimation;
-  window.startLegWalkingAnimation = startLegWalkingAnimation;
-} else if (typeof global !== 'undefined') {
-  global.CreatureStates = CreatureStates;
-  global.createCreature = createCreature;
-  global.drawCreature = drawCreature;
-  global.moveCreature = moveCreature;
-  global.selectCreature = selectCreature;
-  global.deselectCreature = deselectCreature;
-  global.destroyCreature = destroyCreature;
-  
-  // 动画效果函数
-  global.standUpAndExtendLimbs = standUpAndExtendLimbs;
-  global.sitDownAndHideLimbs = sitDownAndHideLimbs;
-  global.startWormAnimation = startWormAnimation;
-  global.startWingAnimation = startWingAnimation;
-  global.startLegWalkingAnimation = startLegWalkingAnimation;
-} else {
-  // 在抖音小游戏环境中，直接设置为全局变量
-  this.CreatureStates = CreatureStates;
-  this.createCreature = createCreature;
-  this.drawCreature = drawCreature;
-  this.moveCreature = moveCreature;
-  this.selectCreature = selectCreature;
-  this.deselectCreature = deselectCreature;
-  this.destroyCreature = destroyCreature;
-  
-  // 动画效果函数
-  this.standUpAndExtendLimbs = standUpAndExtendLimbs;
-  this.sitDownAndHideLimbs = sitDownAndHideLimbs;
-  this.startWormAnimation = startWormAnimation;
-  this.startWingAnimation = startWingAnimation;
-  this.startLegWalkingAnimation = startLegWalkingAnimation;
-}
+// 注意：全局导出统一在文件末尾进行，避免重复导出
 
 // 图形配置对象 - 统一管理所有图形的属性
 var SHAPE_CONFIGS = {
@@ -1087,6 +1067,12 @@ var createSimpleFeet = function(creature) {
   
   creature.feet = [];
   
+  // 安全检查：确保 colorData 和 blocks 存在
+  if (!creature.colorData || !creature.colorData.blocks || creature.colorData.blocks.length === 0) {
+    console.warn('createSimpleFeet: creature.colorData.blocks 无效');
+    return;
+  }
+  
   // 找到小人的底部方块位置
   var bottomBlocks = creature.colorData.blocks.filter(function(block) {
     return !creature.colorData.blocks.some(function(otherBlock) { 
@@ -1173,6 +1159,12 @@ var createSimpleWings = function(creature) {
   
   creature.wings = [];
   
+  // 安全检查：确保 colorData 和 blocks 存在
+  if (!creature.colorData || !creature.colorData.blocks || creature.colorData.blocks.length === 0) {
+    console.warn('createSimpleWings: creature.colorData.blocks 无效');
+    return;
+  }
+  
   // 找到躯干的对称轴（基于最顶部方块的X坐标）
   var blocks = creature.colorData.blocks;
   var minY = Math.min.apply(Math, blocks.map(function(b) { return b[1]; }));
@@ -1193,8 +1185,8 @@ var createSimpleWings = function(creature) {
   
   for (var i = 0; i < 2; i++) {
     var wing = {
-      // 基于眼睛所在列对称放置翅膀
-      x: eyeColumnX * cellSize + (i === 0 ? wingOffset : -wingOffset + cellSize * 0.8), // 恢复到最开始"这回对了"的状态
+      // 基于眼睛所在列对称放置翅膀 - 修复翅膀位置逻辑
+      x: eyeColumnX * cellSize + (i === 0 ? wingOffset : -wingOffset),
       y: headY * cellSize + cellSize * 0.5, // 翅膀在头部中间位置
       width: wingWidth,
       height: wingHeight,
@@ -1374,63 +1366,4 @@ if (typeof this !== 'undefined') {
   this.CREATURE_CONFIG = CREATURE_CONFIG;
 }
 
-// 绘制三角形眼睛
-var drawTriangleEyes = function(ctx, centerX, centerY, eyeSize, eyeSpacing, eyeConfig) {
-  // 左眼（正三角形）
-  ctx.fillStyle = 'white';
-  ctx.beginPath();
-  ctx.moveTo(centerX - eyeSpacing / 2, centerY - eyeSize); // 顶点（上）
-  ctx.lineTo(centerX - eyeSpacing / 2 - eyeSize, centerY + eyeSize); // 左下角
-  ctx.lineTo(centerX - eyeSpacing / 2 + eyeSize, centerY + eyeSize); // 右下角
-  ctx.closePath();
-  ctx.fill();
-  
-  // 右眼（正三角形）
-  ctx.beginPath();
-  ctx.moveTo(centerX + eyeSpacing / 2, centerY - eyeSize); // 顶点（上）
-  ctx.lineTo(centerX + eyeSpacing / 2 - eyeSize, centerY + eyeSize); // 左下角
-  ctx.lineTo(centerX + eyeSpacing / 2 + eyeSize, centerY + eyeSize); // 右下角
-  ctx.closePath();
-  ctx.fill();
-  
-  // 瞳孔（小圆形，位于正三角形中心稍微往下）
-  ctx.fillStyle = 'black';
-  ctx.beginPath();
-  ctx.arc(centerX - eyeSpacing / 2, centerY + eyeSize * 0.2, eyeSize * eyeConfig.pupilSize, 0, 2 * Math.PI);
-  ctx.fill();
-  ctx.beginPath();
-  ctx.arc(centerX + eyeSpacing / 2, centerY + eyeSize * 0.2, eyeSize * eyeConfig.pupilSize, 0, 2 * Math.PI);
-  ctx.fill();
-};
-
-// 绘制五角星眼睛
-var drawStarEyes = function(ctx, centerX, centerY, eyeSize, eyeSpacing, eyeConfig) {
-  // 绘制墨镜（正方形，圆角，无连接桥）
-  ctx.fillStyle = 'black';
-  
-  // 左眼镜片（圆角正方形，更大）
-  ctx.beginPath();
-  ctx.roundRect(centerX - eyeSpacing / 2 - eyeSize * 0.7, centerY - eyeSize * 0.7, eyeSize * 1.4, eyeSize * 1.4, eyeSize * 0.3);
-  ctx.fill();
-  
-  // 右眼镜片（圆角正方形，更大）
-  ctx.beginPath();
-  ctx.roundRect(centerX + eyeSpacing / 2 - eyeSize * 0.7, centerY - eyeSize * 0.7, eyeSize * 1.4, eyeSize * 1.4, eyeSize * 0.3);
-  ctx.fill();
-  
-  // 添加反光效果（根据眨眼动画调整透明度）
-  var eyeScaleY = eyeConfig && eyeConfig.eyeAnimation ? eyeConfig.eyeAnimation.eyeScaleY || 1 : 1;
-  var reflectionAlpha = eyeScaleY < 0.5 ? 0.3 : 0.8; // 眨眼时反光减弱
-  ctx.fillStyle = 'rgba(255, 255, 255, ' + reflectionAlpha + ')';
-  
-  // 左眼镜片反光
-  ctx.beginPath();
-  ctx.roundRect(centerX - eyeSpacing / 2 - eyeSize * 0.5, centerY - eyeSize * 0.5, eyeSize * 0.4, eyeSize * 0.3, eyeSize * 0.1);
-  ctx.fill();
-  
-  // 右眼镜片反光
-  ctx.beginPath();
-  ctx.roundRect(centerX + eyeSpacing / 2 - eyeSize * 0.5, centerY - eyeSize * 0.5, eyeSize * 0.4, eyeSize * 0.3, eyeSize * 0.1);
-  ctx.fill();
-};
 

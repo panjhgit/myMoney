@@ -309,55 +309,43 @@ var drawBlock = function(ctx, block, startX, startY) {
     ctx.lineWidth = 1;
     ctx.strokeRect(blockX, blockY, BLOCK_CONFIG.CELL_SIZE, BLOCK_CONFIG.CELL_SIZE);
     
-    // 绘制眼睛（在第一个方块上）
+    // 绘制眼睛（在第一个方块上）- 使用简化版本
     if (blockPart === element.blocks[0]) {
-      drawEyes(ctx, blockX, blockY);
+      // 简化的眼睛绘制，避免依赖 creature.js
+      var eyeSize = BLOCK_CONFIG.EYE_SIZE;
+      var eyeOffset = BLOCK_CONFIG.EYE_OFFSET;
+      var eyeSpacing = BLOCK_CONFIG.EYE_SPACING;
+      
+      // 左眼
+      ctx.fillStyle = 'white';
+      ctx.beginPath();
+      ctx.arc(blockX + eyeOffset, blockY + eyeOffset, eyeSize, 0, 2 * Math.PI);
+      ctx.fill();
+      
+      // 右眼
+      ctx.beginPath();
+      ctx.arc(blockX + eyeOffset + eyeSpacing, blockY + eyeOffset, eyeSize, 0, 2 * Math.PI);
+      ctx.fill();
+      
+      // 眼珠
+      ctx.fillStyle = 'black';
+      ctx.beginPath();
+      ctx.arc(blockX + eyeOffset, blockY + eyeOffset, eyeSize / 2, 0, 2 * Math.PI);
+      ctx.fill();
+      
+      ctx.beginPath();
+      ctx.arc(blockX + eyeOffset + eyeSpacing, blockY + eyeOffset, eyeSize / 2, 0, 2 * Math.PI);
+      ctx.fill();
     }
   });
   
   ctx.restore();
 };
 
-// 绘制眼睛
-var drawEyes = function(ctx, blockX, blockY) {
-  var eyeSize = BLOCK_CONFIG.EYE_SIZE;
-  var eyeOffset = BLOCK_CONFIG.EYE_OFFSET;
-  var eyeSpacing = BLOCK_CONFIG.EYE_SPACING;
-  
-  // 左眼
-  ctx.fillStyle = 'white';
-  ctx.beginPath();
-  ctx.arc(blockX + eyeOffset, blockY + eyeOffset, eyeSize, 0, 2 * Math.PI);
-  ctx.fill();
-  
-  // 右眼
-  ctx.beginPath();
-  ctx.arc(blockX + eyeOffset + eyeSpacing, blockY + eyeOffset, eyeSize, 0, 2 * Math.PI);
-  ctx.fill();
-  
-  // 眼珠
-  ctx.fillStyle = 'black';
-  ctx.beginPath();
-  ctx.arc(blockX + eyeOffset, blockY + eyeOffset, eyeSize / 2, 0, 2 * Math.PI);
-  ctx.fill();
-  
-  ctx.beginPath();
-  ctx.arc(blockX + eyeOffset + eyeSpacing, blockY + eyeOffset, eyeSize / 2, 0, 2 * Math.PI);
-  ctx.fill();
-};
+// 注意：drawEyes 函数在 creature.js 中定义，这里不重复定义
+// 如果需要在 block.js 中使用，应该调用 creature.js 中的版本
 
-// 从渐变字符串获取颜色
-var getColorFromGradient = function(gradientString) {
-  if (gradientString.includes('red')) return '#FF6B6B';
-  if (gradientString.includes('blue')) return '#45B7D1';
-  if (gradientString.includes('green')) return '#96CEB4';
-  if (gradientString.includes('yellow')) return '#FFEAA7';
-  if (gradientString.includes('purple')) return '#DDA0DD';
-  if (gradientString.includes('orange')) return '#FFA500';
-  if (gradientString.includes('cyan')) return '#00CED1';
-  if (gradientString.includes('magenta')) return '#FF69B4';
-  return '#666666';
-};
+// 注意：getColorFromGradient 函数在 creature.js 中定义，这里不重复定义
 
 // 选择方块
 var selectBlock = function(block) {
