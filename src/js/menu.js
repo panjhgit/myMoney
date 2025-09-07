@@ -123,15 +123,7 @@ class MainMenu {
       delay: 1.2
     });
     
-    // 关卡21的礼品盒特殊动画
-    gsap.to(this.levels[2], {
-      scale: 1.1,
-      duration: 0.3,
-      ease: "power2.out",
-      delay: 1.5,
-      yoyo: true,
-      repeat: 2
-    });
+    // 移除特殊关卡动画，保持界面简洁
   }
   
   // 备用动画（当 GSAP 不可用时）

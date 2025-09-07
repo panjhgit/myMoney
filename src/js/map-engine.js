@@ -153,9 +153,7 @@ class MapEngine {
       return;
     }
     
-    console.log('开始创建方块:', block);
     const blockElement = createBlock(block.id, block.color, block.position, block.shape, block.layer);
-    console.log('创建方块元素完成:', block.id, 'shapeData:', blockElement ? blockElement.shapeData : 'null');
     
     if (!blockElement) {
       console.error('方块创建失败:', block);
@@ -180,7 +178,6 @@ class MapEngine {
       blockElement: blockElement // 保存 block.js 创建的元素
     };
     
-    console.log('添加方块到地图:', element.id, 'occupiedCells:', element.occupiedCells);
     this.addElement(element);
   }
   
@@ -209,9 +206,7 @@ class MapEngine {
    * @param {Object} ice - 冰层配置 {id, position, layer, meltProgress}
    */
   addIceLayer(ice) {
-    console.log('开始创建冰块:', ice);
     const iceElement = createIce(ice);
-    console.log('创建冰块元素完成:', ice.id, 'shapeData:', iceElement.shapeData);
 
     if (!iceElement.shapeData || !iceElement.shapeData.blocks) {
       console.error('冰块 shapeData 无效:', iceElement);
@@ -1533,6 +1528,9 @@ class MapEngine {
     // 绘制石块
     this.drawRocks();
     
+    // 绘制冰层
+    this.drawIceLayers();
+    
     // 绘制俄罗斯方块（包括被冰块包裹的方块）
     this.drawTetrisBlocks();
   }
@@ -1954,49 +1952,21 @@ class MapEngine {
   drawTetrisBlocks() {
     const blocks = this.getAllElementsByType('tetris');
     
-    console.log('绘制方块数量:', blocks.length);
     blocks.forEach(block => {
-      console.log('绘制方块:', block.id, '位置:', block.position, 'occupiedCells:', block.occupiedCells);
       // 直接使用原来的绘制方式，因为 block.js 现在是纯数据驱动
       this.drawTetrisBlock(block);
     });
   }
   
   /**
-   * 绘制使用 block.js 创建的方块元素
+   * 绘制使用 block.js 创建的方块元素 - 已废弃，使用纯Canvas绘制
    * @param {Object} block - 方块对象
+   * @deprecated 此函数包含DOM操作，在抖音小游戏环境中不可用
    */
   drawBlockElement(block) {
-    const blockElement = block.blockElement;
-    const element = blockElement.element;
-    
-    // 更新方块位置
-    const screenX = this.gridOffsetX + block.position.x * this.cellSize;
-    const screenY = this.gridOffsetY + block.position.y * this.cellSize;
-    
-    element.style.left = `${screenX}px`;
-    element.style.top = `${screenY}px`;
-    
-    // 更新方块大小
-    const maxWidth = Math.max(...blockElement.shapeData.blocks.map(b => b[0])) + 1;
-    const maxHeight = Math.max(...blockElement.shapeData.blocks.map(b => b[1])) + 1;
-    
-    element.style.width = `${maxWidth * this.cellSize}px`;
-    element.style.height = `${maxHeight * this.cellSize}px`;
-    
-    // 更新层级
-    element.style.zIndex = block.layer + 10;
-    
-    // 如果方块被选中，添加选中效果
-    if (this.selectedElement === block) {
-      if (!blockElement.isSelected) {
-        selectBlock(blockElement);
-      }
-    } else {
-      if (blockElement.isSelected) {
-        deselectBlock(blockElement);
-      }
-    }
+    // 在抖音小游戏环境中，所有绘制都通过Canvas完成
+    // 此函数已被 drawTetrisBlock 替代
+    console.warn('drawBlockElement 已废弃，请使用 drawTetrisBlock');
   }
   
   /**
