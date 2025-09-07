@@ -174,7 +174,7 @@ function markNeedsRedraw() {
 // 游戏绘制函数
 function drawGame() {
   // 清空画布
-  ctx.fillStyle = '#FFFFFF'; // 改为白色背景
+  ctx.fillStyle = '#FFFFFF'; // 改回白色背景
   ctx.fillRect(0, 0, systemInfo.windowWidth, systemInfo.windowHeight);
   
   // 绘制地图状态信息
