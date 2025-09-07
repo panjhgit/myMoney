@@ -1194,16 +1194,16 @@ var createSimpleWings = function(creature) {
   for (var i = 0; i < 2; i++) {
     var wing = {
       // 基于眼睛所在列对称放置翅膀
-      x: eyeColumnX * cellSize + (i === 0 ? wingOffset : -wingOffset), // 左翅膀往右，右翅膀往左
-      y: headY * cellSize + cellSize * 0.1, // 翅膀在头部上方位置
+      x: eyeColumnX * cellSize + (i === 0 ? wingOffset : -wingOffset), // 对照HTML：i=0右翅膀在右侧，i=1左翅膀在左侧
+      y: headY * cellSize + cellSize * 0.5, // 翅膀在头部中间位置
       width: wingWidth,
       height: wingHeight,
       rotation: i === 0 ? -15 : 15, // 修正角度，确保对称
       color: '#2C3E50', // 深蓝色
       originalRotation: i === 0 ? -15 : 15,
       originalX: eyeColumnX * cellSize + (i === 0 ? wingOffset : -wingOffset),
-      originalY: headY * cellSize + cellSize * 0.1,
-      side: i === 0 ? 'right' : 'left' // i=0是右翅膀，i=1是左翅膀
+      originalY: headY * cellSize + cellSize * 0.5,
+      side: i === 0 ? 'right' : 'left' // 对照HTML：i=0是右翅膀，i=1是左翅膀
     };
     
     creature.wings.push(wing);
@@ -1240,16 +1240,6 @@ var drawFoot = function(ctx, foot) {
   // 绘制脚掌（水平部分）- 与小腿连接形成L形
   ctx.fillRect(-legWidth/2, legHeight - 1, footWidth, footHeight);
   
-  // 添加可爱的细节 - 脚趾
-  ctx.fillStyle = '#444';
-  var toeWidth = footWidth / 3;
-  for (var i = 0; i < 3; i++) {
-    ctx.fillRect(-legWidth/2 + i * toeWidth, legHeight + footHeight - footWidth * 0.3, 
-                 toeWidth * 0.8, footWidth * 0.3);
-  }
-  
-  // 添加高光效果
-  ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
   ctx.fillRect(-legWidth/2 + 1, 1, legWidth - 2, legHeight * 0.3);
   ctx.fillRect(-legWidth/2 + 1, legHeight, footWidth * 0.3, footHeight * 0.3);
   
@@ -1274,11 +1264,10 @@ var drawWing = function(ctx, wing) {
   
   // 使用完整的原始SVG路径
   if (typeof Path2D !== 'undefined') {
-    try {
       var svgScale = 0.1;
       var targetScale = Math.min(w / (1368 * svgScale), h / (1368 * svgScale)) * 0.4;
       
-      // 根据翅膀方向设置变换
+      // 根据翅膀方向设置变换（参考HTML版本逻辑）
       if (wing.side === 'right') {
         ctx.scale(-targetScale, targetScale); // 右翅膀水平翻转
         ctx.translate(-1368 * svgScale, 0);
@@ -1296,18 +1285,6 @@ var drawWing = function(ctx, wing) {
       var path = new Path2D(originalPath);
       ctx.fill(path);
       ctx.stroke(path);
-    } catch (e) {
-      // 如果SVG路径失败，回退到简化版本
-      ctx.beginPath();
-      ctx.moveTo(0, 0);
-      ctx.quadraticCurveTo(w * 0.3, w * 0.2, w * 0.6, w * 0.1);
-      ctx.quadraticCurveTo(w * 0.8, w * 0.3, w * 0.9, w * 0.5);
-      ctx.quadraticCurveTo(w * 0.7, w * 0.8, w * 0.4, w * 0.9);
-      ctx.quadraticCurveTo(w * 0.1, w * 0.7, 0, w * 0.5);
-      ctx.closePath();
-      ctx.fill();
-      ctx.stroke();
-    }
   } else {
     // 不支持Path2D时的备用方案
     ctx.beginPath();
