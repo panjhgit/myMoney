@@ -18,6 +18,7 @@ class MainMenu {
     this.maxScrollY = 0;
     this.isScrolling = false;
     this.scrollVelocity = 0;
+    this.hasDrawn = false; // 标记是否已绘制过
     this.scrollFriction = 0.95;
     
     // UI 配置
@@ -511,7 +512,6 @@ class MainMenu {
     this.drawTopBar();
     this.drawLevels();
     this.drawPlayButton();
-    this.drawScrollIndicator();
   }
   
   drawBackground() {
@@ -557,9 +557,12 @@ class MainMenu {
   }
   
   drawTopBar() {
+    console.log('drawTopBar 开始');
     const padding = 100; // 固定在顶部区域，避开关卡
     const topBarY = padding + this.animationState.topBar.y;
     const topBarAlpha = this.animationState.topBar.alpha;
+    
+    console.log('topBarY:', topBarY, 'topBarAlpha:', topBarAlpha);
     
     this.ctx.save();
     this.ctx.globalAlpha = topBarAlpha;
@@ -580,6 +583,23 @@ class MainMenu {
     this.drawCurrentLevelText(this.systemInfo.windowWidth / 2, topBarY + 10);
     
     this.ctx.restore();
+    console.log('drawTopBar 完成');
+  }
+  
+  // 绘制圆角矩形
+  drawRoundedRect(x, y, width, height, radius) {
+    this.ctx.beginPath();
+    this.ctx.moveTo(x + radius, y);
+    this.ctx.lineTo(x + width - radius, y);
+    this.ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+    this.ctx.lineTo(x + width, y + height - radius);
+    this.ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+    this.ctx.lineTo(x + radius, y + height);
+    this.ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+    this.ctx.lineTo(x, y + radius);
+    this.ctx.quadraticCurveTo(x, y, x + radius, y);
+    this.ctx.closePath();
+    this.ctx.fill();
   }
   
   drawCoinIcon(x, y) {
@@ -650,15 +670,55 @@ class MainMenu {
   
   
   drawLevels() {
-    // 只绘制可见的16个关卡（4x4网格）
+    console.log('drawLevels 开始，关卡数量:', this.levels.length);
+    // 只绘制可见的关卡
     const visibleLevels = this.levels.filter(level => {
       const screenY = level.y - this.scrollY;
       return screenY >= 300 && screenY < 600; // 在关卡区域内显示
     });
     
+    console.log('可见关卡数量:', visibleLevels.length);
     for (let level of visibleLevels) {
       this.drawLevelBlock(level);
     }
+    console.log('drawLevels 完成');
+  }
+  
+  drawLevelBlock(level) {
+    const isCurrentLevel = level.id === this.currentLevel;
+    let color;
+    
+    if (!level.unlocked) {
+      color = this.colors.level.locked;
+    } else if (level.completed) {
+      color = this.colors.level.completed;
+    } else if (isCurrentLevel) {
+      color = this.colors.level.current;
+    } else {
+      color = this.colors.level.unlocked;
+    }
+    
+    // 计算屏幕坐标
+    const screenX = level.x;
+    const screenY = level.y - this.scrollY;
+    
+    this.ctx.save();
+    this.ctx.globalAlpha = level.alpha;
+    this.ctx.translate(screenX, screenY);
+    this.ctx.scale(level.scale, level.scale);
+    this.ctx.rotate(level.rotation * Math.PI / 180);
+    
+    // 绘制关卡方块
+    this.ctx.fillStyle = color;
+    this.ctx.fillRect(-30, -30, 60, 60);
+    
+    // 绘制关卡数字
+    this.ctx.fillStyle = this.colors.text;
+    this.ctx.font = 'bold 16px Arial';
+    this.ctx.textAlign = 'center';
+    this.ctx.fillText(level.id.toString(), 0, 5);
+    
+    this.ctx.restore();
   }
   
   drawLevelBlock(level) {

@@ -50,6 +50,8 @@ function initMainMenu() {
     startGame(levelId);
   };
   
+  // 确保菜单能显示，强制重绘
+  needsRedraw = true;
   draw();
 }
 
@@ -116,59 +118,19 @@ const DRAW_THROTTLE = 16; // 限制绘制频率，约60fps
 
 // 主绘制函数 - 适配抖音小游戏环境
 function draw() {
-  const currentTime = Date.now();
-  
-  // 只有在需要重绘时才绘制
-  if (!needsRedraw && (currentTime - lastDrawTime) < DRAW_THROTTLE) {
-    // 继续循环，但不绘制
-    scheduleNextDraw();
-    return;
-  }
-  
-  // 调试信息（减少频率）
-  if (Math.random() < 0.001) { // 每1000帧打印一次
-    console.log('当前状态:', { 
-      gameState, 
-      hasMainMenu: !!mainMenu, 
-      hasMapEngine: !!mapEngine,
-      mapEngineType: mapEngine ? mapEngine.constructor.name : 'null',
-      needsRedraw: needsRedraw
-    });
-  }
-  
   if (gameState === 'menu' && mainMenu) {
     mainMenu.draw();
-    needsRedraw = false; // 菜单绘制完成后标记不需要重绘
   } else if (gameState === 'game' && mapEngine) {
-    // 游戏绘制逻辑
     drawGame();
-    // 更新地图引擎
     mapEngine.update();
-    // 检查地图引擎是否需要重绘
-    if (mapEngine.needsRedraw) {
-      needsRedraw = true;
-      mapEngine.needsRedraw = false;
-    } else {
-      needsRedraw = false; // 游戏绘制完成后标记不需要重绘
-    }
   } else {
-    // 默认绘制 - 确保在菜单状态下不会调用游戏绘制
-    if (gameState === 'menu') {
-      // 强制清理 mapEngine，防止残留
-      if (mapEngine) {
-        console.warn('菜单状态下发现残留的 mapEngine，强制清理');
-        mapEngine = null;
-      }
-    }
     drawDefault();
-    needsRedraw = false; // 默认绘制完成后标记不需要重绘
   }
   
-  lastDrawTime = currentTime;
   scheduleNextDraw();
 }
 
-// 调度下一次绘制
+// 调度下一次绘制（只在需要时）
 function scheduleNextDraw() {
   if (typeof requestAnimationFrame !== 'undefined') {
     requestAnimationFrame(draw);

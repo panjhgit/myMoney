@@ -899,9 +899,13 @@ class MapEngine {
    * 更新游戏状态（每帧调用）
    */
   update() {
+    // 静态游戏，只在有交互时才更新
     if (this.gameState === 'playing') {
       this.checkIceMelting();
     }
+    
+    // 不再自动设置 needsRedraw，只在有动画时才设置
+    // this.needsRedraw = false; // 移除这行，让调用者决定是否需要重绘
   }
   
   /**
@@ -961,7 +965,7 @@ class MapEngine {
         }
       };
 
-      // 网格呼吸动画 - 使用更复杂的缓动
+      // 网格呼吸动画 - 只在有交互时运行
       this.gridAnimation = gsap.to(this.animationTargets.grid, {
         scale: 1.03,
         alpha: 0.85,
@@ -970,10 +974,10 @@ class MapEngine {
         ease: "power2.inOut",
         repeat: -1,
         yoyo: true,
-        paused: false
+        paused: true // 默认暂停，只在需要时启动
       });
 
-      // 脉冲动画 - 使用弹性缓动
+      // 脉冲动画 - 只在有交互时运行
       this.pulseAnimation = gsap.to(this.animationTargets.pulse, {
         scale: 1.12,
         alpha: 0.7,
@@ -982,19 +986,19 @@ class MapEngine {
         ease: "elastic.out(1, 0.4)",
         repeat: -1,
         yoyo: true,
-        paused: false
+        paused: true // 默认暂停，只在需要时启动
       });
 
-      // 方块动画 - 移除旋转摆动，只保留轻微的缩放效果
+      // 方块动画 - 静态，不运行
       this.blockAnimation = gsap.to(this.animationTargets.blocks, {
-        scale: 1.02,
-        rotation: 0, // 移除旋转
-        bounce: 0, // 移除弹跳
-        duration: 3.5,
-        ease: "power1.inOut",
-        repeat: -1,
-        yoyo: true,
-        paused: false
+        scale: 1,
+        rotation: 0,
+        bounce: 0,
+        duration: 0,
+        ease: "none",
+        repeat: 0,
+        yoyo: false,
+        paused: true // 完全暂停
       });
 
       // 门动画 - 移除所有特效，保持静态
@@ -1023,8 +1027,8 @@ class MapEngine {
         paused: true
       });
 
-      // 创建时间轴动画 - 组合多个动画
-      this.masterTimeline = gsap.timeline({ repeat: -1 });
+      // 创建时间轴动画 - 静态，不运行
+      this.masterTimeline = gsap.timeline({ repeat: 0, paused: true });
       this.masterTimeline
         .add(this.gridAnimation, 0)
         .add(this.pulseAnimation, 0.5)
@@ -1102,56 +1106,7 @@ class MapEngine {
     }
   }
   
-  /**
-   * 开始方块移动动画
-   * @param {Object} block - 方块对象
-   * @param {Object} fromPos - 起始位置
-   * @param {Object} toPos - 目标位置
-   */
-  animateBlockMove(block, fromPos, toPos) {
-    const animationId = `block_move_${block.id}`;
-    
-    try {
-      // 如果方块有 blockElement，使用 creature.js 的动画效果
-      if (block.blockElement && typeof standUpAndExtendLimbs !== 'undefined') {
-        // 开始动画效果
-        standUpAndExtendLimbs(block.blockElement);
-        
-        // 创建移动动画
-        const moveAnimation = gsap.to(block.blockElement.element, {
-          x: toPos.x * this.cellSize,
-          y: toPos.y * this.cellSize,
-          duration: 0.5,
-          ease: "power2.out",
-          onComplete: () => {
-            // 移动完成后收起动画效果
-            if (typeof sitDownAndHideLimbs !== 'undefined') {
-              sitDownAndHideLimbs(block.blockElement);
-            }
-            this.animations.delete(animationId);
-          }
-        });
-        
-        this.animations.set(animationId, moveAnimation);
-      } else {
-        // 降级到简单动画
-        const moveAnimation = gsap.to({}, {
-          duration: 0.3,
-          ease: "power2.out",
-          onUpdate: () => {
-            // 移动动画更新
-          },
-          onComplete: () => {
-            this.animations.delete(animationId);
-          }
-        });
-        
-        this.animations.set(animationId, moveAnimation);
-      }
-    } catch (error) {
-      console.warn(`方块 ${block.id} 移动动画创建失败:`, error);
-    }
-  }
+  // 删除了旧的直接移动版本的animateBlockMove函数，避免冲突
 
   /**
    * 使用Physics2D插件创建方块移动动画
@@ -1162,8 +1117,8 @@ class MapEngine {
   animateBlockMoveWithPhysics(block, fromPos, toPos) {
     try {
       if (typeof gsap === 'undefined' || !gsap || !Physics2DPlugin) {
-        console.warn('Physics2D插件不可用，使用简单移动');
-        this.animateBlockMove(block, fromPos, toPos);
+        console.warn('Physics2D插件不可用，使用executeMove');
+        this.executeMove(block, toPos);
         return;
       }
 
@@ -1214,7 +1169,7 @@ class MapEngine {
     } catch (error) {
       console.warn('Physics2D动画创建失败:', error);
       // 降级到简单动画
-      this.animateBlockMove(block, fromPos, toPos);
+      this.executeMove(block, toPos);
     }
   }
   
@@ -2031,6 +1986,17 @@ class MapEngine {
     const blocks = this.getAllElementsByType('tetris');
     
     blocks.forEach(block => {
+      // 调试：检查绘制前的位置
+      if (block.id === 'cross_shape') {
+        console.log(`绘制前 ${block.id} 位置检查:`, {
+          logicPosition: block.position,
+          renderPosition: block.blockElement?.element ? {
+            x: block.blockElement.element.x,
+            y: block.blockElement.element.y
+          } : 'no element'
+        });
+      }
+      
       // 如果方块有 blockElement，使用 creature.js 的绘制函数
       if (block.blockElement && typeof drawCreature !== 'undefined') {
         drawCreature(this.ctx, block.blockElement, this.gridOffsetX, this.gridOffsetY);
@@ -2459,6 +2425,17 @@ class MapEngine {
       return;
     }
     
+    // 检查是否已有动画在运行，如果有则停止
+    const animationId = `block_move_${element.id}`;
+    if (this.animations.has(animationId)) {
+      console.log(`停止方块 ${element.id} 的旧动画`);
+      const oldAnimation = this.animations.get(animationId);
+      if (oldAnimation && oldAnimation.kill) {
+        oldAnimation.kill();
+      }
+      this.animations.delete(animationId);
+    }
+    
     const blockElement = element.blockElement.element;
     
     // 开始移动动画 - 根据形状类型选择不同的移动方式
@@ -2469,8 +2446,16 @@ class MapEngine {
     // 计算移动路径（只能上下左右移动，不能斜着移动）
     const path = this.calculateStepPath(fromPosition, toPosition);
     
+    console.log(`方块 ${element.id} 移动路径:`, {
+      from: fromPosition,
+      to: toPosition,
+      path: path,
+      pathLength: path.length
+    });
+    
     if (path.length === 0) {
       // 没有有效路径，直接收起脚
+      console.log(`方块 ${element.id} 没有有效路径`);
       if (typeof sitDownAndHideLimbs === 'function') {
         sitDownAndHideLimbs(element.blockElement);
       }
@@ -2479,13 +2464,31 @@ class MapEngine {
     
     // 创建走路时间线
     const walkTimeline = gsap.timeline({
+      onUpdate: () => {
+        // 动画过程中持续重绘
+        this.needsRedraw = true;
+      },
       onComplete: () => {
-        // 动画完成后更新逻辑位置
-        element.position = toPosition;
-        element.occupiedCells = this.calculateOccupiedCells(toPosition, element.shapeData);
-        
-        // 更新空间索引
-        this.updateSpatialIndex(element, fromPosition, toPosition);
+        // 立即锁定位置，防止GSAP清理动画属性时重置位置
+        if (element.blockElement && element.blockElement.element) {
+          element.blockElement.element.x = toPosition.x * this.cellSize;
+          element.blockElement.element.y = toPosition.y * this.cellSize;
+          
+          // 强制锁定位置，防止被GSAP清理
+          element.blockElement.element.setAttribute = function() {}; // 禁用setAttribute
+          Object.defineProperty(element.blockElement.element, 'x', {
+            value: toPosition.x * this.cellSize,
+            writable: false,
+            configurable: false
+          });
+          Object.defineProperty(element.blockElement.element, 'y', {
+            value: toPosition.y * this.cellSize,
+            writable: false,
+            configurable: false
+          });
+          
+          console.log(`方块 ${element.id} 位置已锁定: (${element.blockElement.element.x}, ${element.blockElement.element.y})`);
+        }
         
         // 标记需要重绘
         this.needsRedraw = true;
@@ -2495,9 +2498,40 @@ class MapEngine {
           sitDownAndHideLimbs(element.blockElement);
         }
         
-        console.log(`方块 ${element.id} 移动动画完成`);
+        // 清理动画
+        this.animations.delete(animationId);
+        
+        console.log(`方块 ${element.id} 移动动画完成，逻辑位置: (${toPosition.x}, ${toPosition.y})`);
       }
     });
+    
+    // 注册动画
+    this.animations.set(animationId, walkTimeline);
+    
+    // 添加位置监控（调试用）
+    if (element.id === 'cross_shape') {
+      const finalX = toPosition.x * this.cellSize;
+      const finalY = toPosition.y * this.cellSize;
+      console.log(`开始监控 ${element.id} 动画完成后的位置变化，目标位置: (${finalX}, ${finalY})`);
+      
+      // 动画完成后开始监控位置
+      walkTimeline.eventCallback('onComplete', () => {
+        const positionMonitor = setInterval(() => {
+          const currentX = element.blockElement.element.x;
+          const currentY = element.blockElement.element.y;
+          if (Math.abs(currentX - finalX) > 1 || Math.abs(currentY - finalY) > 1) {
+            console.log(`动画完成后位置被重置！${element.id} 从目标位置 (${finalX}, ${finalY}) 变为 (${currentX}, ${currentY})`);
+            console.trace('位置重置调用栈:');
+          }
+        }, 100);
+        
+        // 10秒后停止监控
+        setTimeout(() => {
+          clearInterval(positionMonitor);
+          console.log(`停止监控 ${element.id} 位置`);
+        }, 10000);
+      });
+    }
     
     // 一格一格移动
     path.forEach((step, index) => {
@@ -2519,6 +2553,39 @@ class MapEngine {
         yoyo: true,
         repeat: 1
       }, delay);
+      
+      // 每一步完成时更新逻辑位置（参考old实现）
+      walkTimeline.call(() => {
+        // 更新空间索引 - 先从旧位置移除
+        if (element.occupiedCells) {
+          element.occupiedCells.forEach(cellKey => {
+            const spatialSet = this.spatialIndex.get(cellKey);
+            if (spatialSet) {
+              spatialSet.delete(element);
+            }
+          });
+        }
+        
+        // 更新元素位置
+        element.position = { x: step.x, y: step.y };
+        element.occupiedCells = this.calculateOccupiedCells(element.position, element.shapeData);
+        
+        // 同步更新渲染位置，确保逻辑和渲染一致
+        if (element.blockElement && element.blockElement.element) {
+          element.blockElement.element.x = step.x * this.cellSize;
+          element.blockElement.element.y = step.y * this.cellSize;
+        }
+        
+        // 添加到新位置的空间索引
+        element.occupiedCells.forEach(cellKey => {
+          const spatialSet = this.spatialIndex.get(cellKey);
+          if (spatialSet) {
+            spatialSet.add(element);
+          }
+        });
+        
+        console.log(`方块 ${element.id} 移动到步骤: (${step.x},${step.y}) 渲染位置: (${element.blockElement?.element?.x}, ${element.blockElement?.element?.y})`);
+      }, [], delay + stepDuration);
     });
   }
   
