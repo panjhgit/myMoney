@@ -2703,12 +2703,16 @@ class MapEngine {
         const visited = new Set();
         visited.add(`${startPos.x},${startPos.y}`);
 
-        // 四个方向：上下左右（优化：按距离目标的方向排序）
+        // 八个方向：上下左右 + 四个对角线方向
         const directions = [
             { dx: 0, dy: -1 }, // 上
             { dx: 0, dy: 1 },  // 下
             { dx: -1, dy: 0 }, // 左
-            { dx: 1, dy: 0 }   // 右
+            { dx: 1, dy: 0 },  // 右
+            { dx: -1, dy: -1 }, // 左上
+            { dx: 1, dy: -1 },  // 右上
+            { dx: -1, dy: 1 },  // 左下
+            { dx: 1, dy: 1 }    // 右下
         ];
 
         // 限制搜索深度，避免无限搜索（增加深度限制以应对复杂路径）
@@ -2723,6 +2727,8 @@ class MapEngine {
             if (currentPathLength >= maxDepth) {
                 continue;
             }
+
+            this.debugLog(`BFS: 处理位置 (${position.x},${position.y}), 路径长度: ${currentPathLength}, 队列剩余: ${queue.length}`);
 
             // 尝试四个方向
             for (const dir of directions) {
@@ -2767,7 +2773,166 @@ class MapEngine {
 
         // 没有找到路径
         this.debugLog(`BFS搜索失败: 从(${startPos.x},${startPos.y})到(${targetPos.x},${targetPos.y}), 最大深度: ${maxDepth}, 已访问位置数: ${visited.size}`);
+        
+        // 尝试使用改进的搜索策略
+        this.debugLog(`尝试使用改进的搜索策略...`);
+        const improvedPath = this.calculateImprovedPath(element, startPos, targetPos);
+        if (improvedPath.length > 0) {
+            this.pathCache.set(pathCacheKey, improvedPath);
+            return improvedPath;
+        }
+        
         this.pathCache.set(pathCacheKey, []);
+        return [];
+    }
+
+    /**
+     * 改进的路径搜索策略
+     * 当BFS失败时，尝试更智能的搜索方法
+     * @param {Object} element - 方块元素
+     * @param {Object} startPos - 起始位置
+     * @param {Object} targetPos - 目标位置
+     * @returns {Array} 路径数组
+     */
+    calculateImprovedPath(element, startPos, targetPos) {
+        this.debugLog(`改进搜索: 从(${startPos.x},${startPos.y})到(${targetPos.x},${targetPos.y})`);
+        
+        // 策略1: 尝试直接路径（忽略中间障碍物）
+        const directPath = this.calculateDirectPath(element, startPos, targetPos);
+        if (directPath.length > 0) {
+            this.debugLog(`直接路径成功: ${directPath.length} 步`);
+            return directPath;
+        }
+        
+        // 策略2: 尝试绕行路径（优先选择远离障碍物的方向）
+        const detourPath = this.calculateDetourPath(element, startPos, targetPos);
+        if (detourPath.length > 0) {
+            this.debugLog(`绕行路径成功: ${detourPath.length} 步`);
+            return detourPath;
+        }
+        
+        // 策略3: 寻找最近的可达位置
+        const nearestPos = this.findNearestReachablePosition(element, startPos, targetPos);
+        if (nearestPos.x !== startPos.x || nearestPos.y !== startPos.y) {
+            this.debugLog(`找到最近可达位置: (${nearestPos.x},${nearestPos.y})`);
+            return this.calculateBFSPath(element, startPos, nearestPos);
+        }
+        
+        this.debugLog(`改进搜索失败: 无法找到任何路径`);
+        return [];
+    }
+
+    /**
+     * 计算直接路径（直线移动）
+     * @param {Object} element - 方块元素
+     * @param {Object} startPos - 起始位置
+     * @param {Object} targetPos - 目标位置
+     * @returns {Array} 路径数组
+     */
+    calculateDirectPath(element, startPos, targetPos) {
+        const path = [];
+        let currentPos = { ...startPos };
+        
+        // 计算移动方向
+        const dx = targetPos.x - startPos.x;
+        const dy = targetPos.y - startPos.y;
+        
+        // 如果目标位置就是起始位置
+        if (dx === 0 && dy === 0) {
+            return [];
+        }
+        
+        // 尝试直线移动
+        const steps = Math.max(Math.abs(dx), Math.abs(dy));
+        const stepX = dx === 0 ? 0 : (dx > 0 ? 1 : -1);
+        const stepY = dy === 0 ? 0 : (dy > 0 ? 1 : -1);
+        
+        for (let i = 0; i < steps; i++) {
+            currentPos.x += stepX;
+            currentPos.y += stepY;
+            
+            // 检查是否碰撞
+            if (this.checkCollisionAtPosition(element, currentPos, element.id)) {
+                this.debugLog(`直接路径在位置 (${currentPos.x},${currentPos.y}) 遇到碰撞`);
+                return [];
+            }
+            
+            path.push({ ...currentPos });
+        }
+        
+        return path;
+    }
+
+    /**
+     * 计算绕行路径（优先选择远离障碍物的方向）
+     * @param {Object} element - 方块元素
+     * @param {Object} startPos - 起始位置
+     * @param {Object} targetPos - 目标位置
+     * @returns {Array} 路径数组
+     */
+    calculateDetourPath(element, startPos, targetPos) {
+        // 使用优先级队列，优先选择距离目标更近且障碍物更少的方向
+        const queue = [{ position: startPos, path: [], priority: 0 }];
+        const visited = new Set();
+        visited.add(`${startPos.x},${startPos.y}`);
+        
+        const directions = [
+            { dx: 0, dy: -1, name: '上' },
+            { dx: 0, dy: 1, name: '下' },
+            { dx: -1, dy: 0, name: '左' },
+            { dx: 1, dy: 0, name: '右' },
+            { dx: -1, dy: -1, name: '左上' },
+            { dx: 1, dy: -1, name: '右上' },
+            { dx: -1, dy: 1, name: '左下' },
+            { dx: 1, dy: 1, name: '右下' }
+        ];
+        
+        while (queue.length > 0) {
+            // 按优先级排序（优先级越低越优先）
+            queue.sort((a, b) => a.priority - b.priority);
+            const { position, path } = queue.shift();
+            
+            if (path.length >= 10) { // 限制绕行路径长度
+                continue;
+            }
+            
+            // 尝试四个方向
+            for (const dir of directions) {
+                const newX = position.x + dir.dx;
+                const newY = position.y + dir.dy;
+                const newPos = { x: newX, y: newY };
+                const newPosKey = `${newX},${newY}`;
+                
+                if (visited.has(newPosKey)) {
+                    continue;
+                }
+                
+                // 检查边界
+                if (!this.isPositionWithinBounds(newPos, element.shapeData)) {
+                    continue;
+                }
+                
+                // 检查碰撞
+                if (this.checkCollisionAtPosition(element, newPos, element.id)) {
+                    continue;
+                }
+                
+                visited.add(newPosKey);
+                
+                // 计算优先级（距离目标的曼哈顿距离）
+                const distanceToTarget = Math.abs(newX - targetPos.x) + Math.abs(newY - targetPos.y);
+                const newPath = [...path, newPos];
+                
+                // 如果到达目标
+                if (newX === targetPos.x && newY === targetPos.y) {
+                    this.debugLog(`绕行路径成功: ${newPath.length} 步`);
+                    return newPath;
+                }
+                
+                queue.push({ position: newPos, path: newPath, priority: distanceToTarget });
+            }
+        }
+        
         return [];
     }
 
@@ -2779,23 +2944,32 @@ class MapEngine {
      * @returns {Object} 最近的可达位置
      */
     findNearestReachablePosition(element, startPos, targetPos) {
-        // 如果目标位置可达，直接返回
-        if (!this.checkCollisionAtPosition(element, targetPos, element.id)) {
-            return targetPos;
-        }
-
+        this.debugLog(`寻找最近可达位置: 从(${startPos.x},${startPos.y})到(${targetPos.x},${targetPos.y})`);
+        
         // 使用BFS寻找最近的可达位置
         const queue = [{ position: startPos, distance: 0 }];
         const visited = new Set();
         visited.add(`${startPos.x},${startPos.y}`);
 
+        let bestPosition = startPos;
+        let bestDistance = Math.abs(startPos.x - targetPos.x) + Math.abs(startPos.y - targetPos.y);
+
         const directions = [
+            // 四个基本方向
             { dx: 0, dy: -1 }, { dx: 0, dy: 1 },
-            { dx: -1, dy: 0 }, { dx: 1, dy: 0 }
+            { dx: -1, dy: 0 }, { dx: 1, dy: 0 },
+            // 四个对角线方向
+            { dx: -1, dy: -1 }, { dx: 1, dy: -1 },
+            { dx: -1, dy: 1 }, { dx: 1, dy: 1 }
         ];
 
         while (queue.length > 0) {
             const { position, distance } = queue.shift();
+
+            // 限制搜索深度，避免无限搜索
+            if (distance > 5) {
+                continue;
+            }
 
             for (const dir of directions) {
                 const newX = position.x + dir.dx;
@@ -2819,9 +2993,11 @@ class MapEngine {
                     // 计算到目标的距离
                     const distanceToTarget = Math.abs(newX - targetPos.x) + Math.abs(newY - targetPos.y);
                     
-                    // 如果这个位置比目标位置更近，返回它
-                    if (distanceToTarget < (Math.abs(startPos.x - targetPos.x) + Math.abs(startPos.y - targetPos.y))) {
-                        return newPos;
+                    // 如果这个位置比当前最佳位置更接近目标，更新最佳位置
+                    if (distanceToTarget < bestDistance) {
+                        bestPosition = newPos;
+                        bestDistance = distanceToTarget;
+                        this.debugLog(`找到更好的位置: (${newX},${newY}), 距离目标: ${distanceToTarget}`);
                     }
                 }
 
@@ -2829,8 +3005,8 @@ class MapEngine {
             }
         }
 
-        // 如果找不到更近的位置，返回起始位置
-        return startPos;
+        this.debugLog(`最近可达位置: (${bestPosition.x},${bestPosition.y}), 距离目标: ${bestDistance}`);
+        return bestPosition;
     }
 
     /**
@@ -2845,11 +3021,36 @@ class MapEngine {
         const path = this.calculateBFSPath(element, fromPosition, toPosition);
         
         if (path.length === 0) {
-            // 如果目标位置不可达，寻找最近的可达位置
-            const nearestPos = this.findNearestReachablePosition(element, fromPosition, toPosition);
-            if (nearestPos.x !== fromPosition.x || nearestPos.y !== fromPosition.y) {
-                return this.calculateBFSPath(element, fromPosition, nearestPos);
+            this.debugLog(`calculateStepPath: BFS失败，尝试改进的搜索策略...`);
+            // 使用改进的搜索策略
+            const improvedPath = this.calculateImprovedPath(element, fromPosition, toPosition);
+            if (improvedPath.length > 0) {
+                this.debugLog(`calculateStepPath: 改进搜索成功，找到 ${improvedPath.length} 步路径`);
+                return improvedPath;
             }
+            
+            // 如果改进搜索也失败，寻找最近的可达位置
+            this.debugLog(`calculateStepPath: 改进搜索失败，寻找最近可达位置...`);
+            const nearestPos = this.findNearestReachablePosition(element, fromPosition, toPosition);
+            
+            // 防止无限循环：检查找到的位置是否与起始位置不同
+            if (nearestPos.x !== fromPosition.x || nearestPos.y !== fromPosition.y) {
+                this.debugLog(`calculateStepPath: 找到最近可达位置 (${nearestPos.x},${nearestPos.y})`);
+                // 再次检查这个位置是否真的可达
+                const nearestPath = this.calculateBFSPath(element, fromPosition, nearestPos);
+                if (nearestPath.length > 0) {
+                    this.debugLog(`calculateStepPath: 成功找到到最近位置的路径，长度: ${nearestPath.length}`);
+                    return nearestPath;
+                } else {
+                    this.debugLog(`calculateStepPath: 到最近位置的路径也不可达，放弃移动`);
+                }
+            } else {
+                this.debugLog(`calculateStepPath: 最近可达位置就是起始位置，无法移动`);
+            }
+            
+            // 如果所有方法都失败，返回空路径
+            this.debugLog(`calculateStepPath: 所有搜索策略都失败，无法移动`);
+            return [];
         }
         
         return path;
