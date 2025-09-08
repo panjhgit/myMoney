@@ -560,12 +560,9 @@ class MainMenu {
   }
   
   drawTopBar() {
-    console.log('drawTopBar 开始');
     const padding = 100; // 固定在顶部区域，避开关卡
     const topBarY = padding + this.animationState.topBar.y;
     const topBarAlpha = this.animationState.topBar.alpha;
-    
-    console.log('topBarY:', topBarY, 'topBarAlpha:', topBarAlpha);
     
     this.ctx.save();
     this.ctx.globalAlpha = topBarAlpha;
@@ -586,7 +583,6 @@ class MainMenu {
     this.drawCurrentLevelText(this.systemInfo.windowWidth / 2, topBarY + 10);
     
     this.ctx.restore();
-    console.log('drawTopBar 完成');
   }
   
   // 绘制圆角矩形
@@ -673,18 +669,15 @@ class MainMenu {
   
   
   drawLevels() {
-    console.log('drawLevels 开始，关卡数量:', this.levels.length);
     // 只绘制可见的关卡
     const visibleLevels = this.levels.filter(level => {
       const screenY = level.y - this.scrollY;
       return screenY >= 280 && screenY < 620; // 扩大显示范围，确保第二关可见
     });
     
-    console.log('可见关卡数量:', visibleLevels.length);
     for (let level of visibleLevels) {
       this.drawLevelBlock(level);
     }
-    console.log('drawLevels 完成');
   }
   
   drawLevelBlock(level) {

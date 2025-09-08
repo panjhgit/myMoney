@@ -238,14 +238,50 @@ var createBlock = function(id, color, position, shape, layer) {
   console.log('BLOCK_SHAPES 可用形状:', Object.keys(BLOCK_SHAPES));
   
   var colorData = BLOCK_COLORS[color];
-  var shapeData = BLOCK_SHAPES[shape];
   
-  console.log('查找结果:', { colorData: colorData, shapeData: shapeData });
+  console.log('查找结果:', { colorData: colorData });
   
-  if (!colorData || !shapeData) {
-    console.error('无效的颜色或形状: ' + color + ', ' + shape);
+  if (!colorData) {
+    console.error('无效的颜色: ' + color);
     return null;
   }
+  
+  // 使用 colorData 中的 blocks 数据作为 shapeData
+  // 根据方块形状智能选择运动类型和眼睛位置
+  var movementType = 'feet'; // 默认用脚移动
+  var eyePosition = 'center'; // 默认眼睛在中心
+  var eyeType = 'circle'; // 默认圆形眼睛
+  
+  // 根据方块形状调整运动类型和眼睛位置
+  if (colorData.blocks.length === 1) {
+    // 单个方块
+    movementType = 'feet';
+    eyePosition = 'center';
+    eyeType = 'circle';
+  } else if (colorData.blocks.length === 2) {
+    // 两个方块
+    movementType = 'feet';
+    eyePosition = 'top';
+    eyeType = 'square';
+  } else if (colorData.blocks.length === 3) {
+    // 三个方块
+    movementType = 'crawl';
+    eyePosition = 'top';
+    eyeType = 'triangle';
+  } else if (colorData.blocks.length >= 4) {
+    // 四个或更多方块
+    movementType = 'feet';
+    eyePosition = 'top';
+    eyeType = 'star';
+  }
+  
+  var shapeData = {
+    blocks: colorData.blocks,
+    movementType: movementType,
+    eyePosition: eyePosition,
+    eyeType: eyeType,
+    description: colorData.shape || '方块'
+  };
   
   var block = {
     id: id,

@@ -141,14 +141,21 @@ const DRAW_THROTTLE = 16; // 限制绘制频率，约60fps
 function draw() {
   if (gameState === 'menu' && mainMenu) {
     mainMenu.draw();
+    // 主菜单需要持续重绘来显示动画效果
+    scheduleNextDraw();
   } else if (gameState === 'game' && mapEngine) {
     drawGame();
     mapEngine.update();
+    // 游戏状态需要持续重绘
+    scheduleNextDraw();
   } else {
     drawDefault();
+    // 只在需要时调度下一次绘制
+    if (needsRedraw) {
+      scheduleNextDraw();
+      needsRedraw = false; // 重置重绘标志
+    }
   }
-  
-  scheduleNextDraw();
 }
 
 // 调度下一次绘制（只在需要时）

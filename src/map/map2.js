@@ -7,8 +7,6 @@ const map2 = {
   name: "翅膀测试地图",
   description: "包含一个L形木块，可以测试翅膀的扇动效果",
   difficulty: "简单",
-  width: 8,
-  height: 8,
   
   // 地图背景（空白）
   background: {
