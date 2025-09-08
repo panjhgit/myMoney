@@ -25,6 +25,16 @@ class MapEngine {
         // 性能优化缓存
         this.collisionCache = new Map(); // 碰撞检测缓存
         this.pathCache = new Map(); // 路径计算缓存
+        
+        // 调试开关
+        this.debugMode = true; // 设置为false关闭调试日志
+        
+        // 调试日志方法
+        this.debugLog = (...args) => {
+            if (this.debugMode) {
+                console.log(...args);
+            }
+        };
 
         // 动画相关
         this.animations = new Map(); // 存储动画对象
@@ -98,6 +108,9 @@ class MapEngine {
 
         this.gameState = 'ready';
         console.log('地图加载完成:', mapData.name);
+        
+        // 清理空间索引，移除非layer 0的元素
+        this.cleanupSpatialIndex();
         
         // 打印完整的网格状态
         this.printGridState();
@@ -238,13 +251,13 @@ class MapEngine {
             movable: true,
             isMoving: false, // 初始化移动状态
             movingTo: null, // 初始化移动目标
-            occupiedCells: this.calculateOccupiedCells(block.position, blockElement.shapeData),
+            // occupiedCells 现在实时计算，不再缓存
             blockElement: blockElement, // 保存 block.js 创建的元素
             movementType: block.movementType, // 运动类型（feet, wings, crawl）
             wingConfig: block.wingConfig // 翅膀配置
         };
         
-        console.log(`创建方块: 地图ID=${block.id}, 元素ID=${element.id}, blockElementID=${blockElement.id}`);
+        this.debugLog(`创建方块: 地图ID=${block.id}, 元素ID=${element.id}, blockElementID=${blockElement.id}`);
 
         this.addElement(element);
     }
@@ -303,22 +316,56 @@ class MapEngine {
         const layer = this.layers.get(element.layer);
         layer.elements.set(element.id, element);
 
-        // 更新空间索引
-        if (element.type === 'tetris') {
-            element.occupiedCells.forEach(cell => {
-                if (!this.spatialIndex.has(cell)) {
-                    this.spatialIndex.set(cell, new Set());
+        // 更新空间索引 - 只对layer 0的元素更新空间索引
+        if (element.layer === 0) {
+            if (element.type === 'tetris') {
+                // 俄罗斯方块：实时计算占据格子
+                const occupiedCells = this.calculateOccupiedCells(element.position, element.shapeData);
+                occupiedCells.forEach(cell => {
+                    if (!this.spatialIndex.has(cell)) {
+                        this.spatialIndex.set(cell, new Set());
+                    }
+                    this.spatialIndex.get(cell).add(element.id);
+                });
+                occupiedCells.forEach(cell => layer.occupiedCells.add(cell));
+            } else if (element.type === 'gate') {
+                // 门：计算所有占据格子
+                const gateCells = this.calculateGateCells(element);
+                gateCells.forEach(cell => {
+                    if (!this.spatialIndex.has(cell)) {
+                        this.spatialIndex.set(cell, new Set());
+                    }
+                    this.spatialIndex.get(cell).add(element.id);
+                });
+                gateCells.forEach(cell => layer.occupiedCells.add(cell));
+            } else if (element.type === 'rock') {
+                // 岩石：计算所有占据格子
+                const rockCells = this.calculateRockCells(element);
+                rockCells.forEach(cell => {
+                    if (!this.spatialIndex.has(cell)) {
+                        this.spatialIndex.set(cell, new Set());
+                    }
+                    this.spatialIndex.get(cell).add(element.id);
+                });
+                rockCells.forEach(cell => layer.occupiedCells.add(cell));
+            } else {
+                // 其他类型：单格子
+                const cellKey = `${element.position.x},${element.position.y}`;
+                if (!this.spatialIndex.has(cellKey)) {
+                    this.spatialIndex.set(cellKey, new Set());
                 }
-                this.spatialIndex.get(cell).add(element.id);
-            });
-            element.occupiedCells.forEach(cell => layer.occupiedCells.add(cell));
-        } else {
-            const cellKey = `${element.position.x},${element.position.y}`;
-            if (!this.spatialIndex.has(cellKey)) {
-                this.spatialIndex.set(cellKey, new Set());
+                this.spatialIndex.get(cellKey).add(element.id);
+                layer.occupiedCells.add(cellKey);
             }
-            this.spatialIndex.get(cellKey).add(element.id);
-            layer.occupiedCells.add(cellKey);
+        } else {
+            // 下层元素：只添加到layer的occupiedCells，不添加到空间索引
+            if (element.type === 'tetris') {
+                const occupiedCells = this.calculateOccupiedCells(element.position, element.shapeData);
+                occupiedCells.forEach(cell => layer.occupiedCells.add(cell));
+            } else {
+                const cellKey = `${element.position.x},${element.position.y}`;
+                layer.occupiedCells.add(cellKey);
+            }
         }
 
         this.elementRegistry.set(element.id, element);
@@ -371,19 +418,19 @@ class MapEngine {
     }
 
     /**
-     * 计算方块占据的所有格子
+     * 计算方块占据的所有格子（统一的位置计算方法）
      * @param {Object} position - 位置 {x, y}
      * @param {Object} shapeData - 形状数据 {blocks: [[x, y], ...]}
      * @returns {Array} 格子坐标数组
      */
     calculateOccupiedCells(position, shapeData) {
         const cells = [];
-        if (shapeData.blocks) {
+        if (shapeData && shapeData.blocks) {
             // 新的格式：blocks 数组
             shapeData.blocks.forEach(block => {
                 cells.push(`${position.x + block[0]},${position.y + block[1]}`);
             });
-        } else if (shapeData.width && shapeData.height) {
+        } else if (shapeData && shapeData.width && shapeData.height) {
             // 旧的格式：width, height
             for (let x = position.x; x < position.x + shapeData.width; x++) {
                 for (let y = position.y; y < position.y + shapeData.height; y++) {
@@ -394,6 +441,37 @@ class MapEngine {
             console.warn('无法识别的 shapeData 格式:', shapeData);
         }
         return cells;
+    }
+
+    /**
+     * 统一的位置更新方法（新的数据流核心）
+     * @param {Object} element - 元素对象
+     * @param {Object} newPosition - 新位置 {x, y}
+     */
+    updateElementPosition(element, newPosition) {
+        const oldPosition = element.position;
+        
+        // 1. 更新逻辑位置（唯一数据源）
+        element.position = newPosition;
+        
+        // 2. 更新空间索引
+        this.updateSpatialIndexForElement(element, oldPosition, newPosition);
+        
+        // 3. 更新渲染位置（如果存在）
+        if (element.blockElement && element.blockElement.element) {
+            element.blockElement.element.x = newPosition.x * this.cellSize;
+            element.blockElement.element.y = newPosition.y * this.cellSize;
+            
+            // 同步 creature.js 的位置
+            if (element.blockElement.row !== undefined) {
+                element.blockElement.row = newPosition.y;
+            }
+            if (element.blockElement.col !== undefined) {
+                element.blockElement.col = newPosition.x;
+            }
+        }
+        
+        this.debugLog(`位置更新: ${element.id} 从 (${oldPosition.x},${oldPosition.y}) 到 (${newPosition.x},${newPosition.y})`);
     }
 
     /**
@@ -490,16 +568,25 @@ class MapEngine {
 
                 const element = this.elementRegistry.get(elementId);
 
-                // 检查石块碰撞
-                if (element.type === 'rock') {
-                    hasCollision = true;
-                    break;
-                }
+                // 只检查layer 0的元素
+                if (element && element.layer === 0) {
+                    // 检查石块碰撞
+                    if (element.type === 'rock') {
+                        hasCollision = true;
+                        break;
+                    }
 
-                // 检查其他俄罗斯方块碰撞
-                if (element.type === 'tetris' && element.movable) {
-                    hasCollision = true;
-                    break;
+                    // 检查门碰撞
+                    if (element.type === 'gate') {
+                        hasCollision = true;
+                        break;
+                    }
+
+                    // 检查其他俄罗斯方块碰撞
+                    if (element.type === 'tetris' && element.movable && element.isMoving !== true) {
+                        hasCollision = true;
+                        break;
+                    }
                 }
             }
 
@@ -512,32 +599,15 @@ class MapEngine {
     }
 
     /**
-     * 执行移动
+     * 执行移动（使用新的统一位置更新）
      * @param {Object} element - 要移动的元素
      * @param {Object} newPosition - 新位置
      */
     executeMove(element, newPosition) {
-        const oldCells = [...element.occupiedCells];
-        const newCells = this.calculateOccupiedCells(newPosition, element.shapeData);
-
-        // 更新空间索引
-        oldCells.forEach(cell => {
-            const cellSet = this.spatialIndex.get(cell);
-            if (cellSet) {
-                cellSet.delete(element.id);
-            }
-        });
-
-        newCells.forEach(cell => {
-            if (!this.spatialIndex.has(cell)) {
-                this.spatialIndex.set(cell, new Set());
-            }
-            this.spatialIndex.get(cell).add(element.id);
-        });
-
-        // 更新元素位置
-        element.position = newPosition;
-        element.occupiedCells = newCells;
+        const oldPosition = element.position;
+        
+        // 使用新的统一位置更新方法
+        this.updateElementPosition(element, newPosition);
 
         // 如果方块有 blockElement，使用 block.js 的移动动画
         if (element.blockElement && typeof moveBlock !== 'undefined') {
@@ -554,7 +624,10 @@ class MapEngine {
 
         // 记录移动历史
         this.moveHistory.push({
-            elementId: element.id, from: oldCells, to: newCells, timestamp: Date.now()
+            elementId: element.id, 
+            from: this.calculateOccupiedCells(oldPosition, element.shapeData), 
+            to: this.calculateOccupiedCells(newPosition, element.shapeData), 
+            timestamp: Date.now()
         });
 
         // 清除相关缓存
@@ -665,8 +738,8 @@ class MapEngine {
      * @returns {boolean} 是否在门内
      */
     isElementAtGate(element, gate) {
-        // 检查方块是否在网格边缘，且与门的方向匹配
-        const elementCells = element.occupiedCells;
+        // 检查方块是否在网格边缘，且与门的方向匹配（实时计算占据格子）
+        const elementCells = this.calculateOccupiedCells(element.position, element.shapeData);
 
         switch (gate.direction) {
             case 'up':
@@ -730,12 +803,51 @@ class MapEngine {
      */
     checkWinCondition() {
         const tetrisBlocks = this.getAllElementsByType('tetris');
-
-        if (tetrisBlocks.length === 0) {
+        
+        console.log(`检查通关条件: 当前还有 ${tetrisBlocks.length} 个方块`);
+        
+        // 如果还有方块，检查是否所有方块都已经到达目标位置
+        if (tetrisBlocks.length > 0) {
+            // 检查是否所有方块都已经在正确的位置（通过门）
+            const allBlocksAtTarget = tetrisBlocks.every(block => {
+                return this.isBlockAtCorrectGate(block);
+            });
+            
+            if (allBlocksAtTarget) {
+                console.log('所有方块都已到达目标位置，关卡完成！');
+                this.gameState = 'completed';
+                this.onGameComplete();
+            } else {
+                console.log('还有方块未到达目标位置，继续游戏');
+            }
+        } else {
+            // 没有方块了，关卡完成
+            console.log('所有方块都已离开，关卡完成！');
             this.gameState = 'completed';
-            console.log('恭喜通关！');
             this.onGameComplete();
         }
+    }
+    
+    /**
+     * 检查方块是否在正确的门位置
+     * @param {Object} block - 方块元素
+     * @returns {boolean} 是否在正确的门位置
+     */
+    isBlockAtCorrectGate(block) {
+        const gates = this.getAllElementsByType('gate');
+        
+        // 找到与方块颜色匹配的门
+        const matchingGate = gates.find(gate => gate.color === block.color);
+        if (!matchingGate) {
+            console.log(`方块 ${block.id} 没有找到匹配的门 (颜色: ${block.color})`);
+            return false;
+        }
+        
+        // 检查方块是否在门的位置
+        const isAtGate = this.isElementAtGate(block, matchingGate);
+        console.log(`方块 ${block.id} (${block.color}) 是否在门 ${matchingGate.id} (${matchingGate.color}) 位置: ${isAtGate}`);
+        
+        return isAtGate;
     }
 
     /**
@@ -754,21 +866,57 @@ class MapEngine {
         const layer = this.layers.get(element.layer);
         layer.elements.delete(elementId);
 
-        // 更新空间索引
-        if (element.type === 'tetris') {
-            element.occupiedCells.forEach(cell => {
-                const cellSet = this.spatialIndex.get(cell);
+        // 更新空间索引 - 只对layer 0的元素更新空间索引
+        if (element.layer === 0) {
+            if (element.type === 'tetris') {
+                // 俄罗斯方块：实时计算占据格子
+                const occupiedCells = this.calculateOccupiedCells(element.position, element.shapeData);
+                occupiedCells.forEach(cell => {
+                    const cellSet = this.spatialIndex.get(cell);
+                    if (cellSet) {
+                        cellSet.delete(elementId);
+                        if (cellSet.size === 0) {
+                            this.spatialIndex.delete(cell);
+                        }
+                    }
+                });
+            } else if (element.type === 'gate') {
+                // 门：计算所有占据格子
+                const gateCells = this.calculateGateCells(element);
+                gateCells.forEach(cell => {
+                    const cellSet = this.spatialIndex.get(cell);
+                    if (cellSet) {
+                        cellSet.delete(elementId);
+                        if (cellSet.size === 0) {
+                            this.spatialIndex.delete(cell);
+                        }
+                    }
+                });
+            } else if (element.type === 'rock') {
+                // 岩石：计算所有占据格子
+                const rockCells = this.calculateRockCells(element);
+                rockCells.forEach(cell => {
+                    const cellSet = this.spatialIndex.get(cell);
+                    if (cellSet) {
+                        cellSet.delete(elementId);
+                        if (cellSet.size === 0) {
+                            this.spatialIndex.delete(cell);
+                        }
+                    }
+                });
+            } else {
+                // 其他类型：单格子
+                const cellKey = `${element.position.x},${element.position.y}`;
+                const cellSet = this.spatialIndex.get(cellKey);
                 if (cellSet) {
                     cellSet.delete(elementId);
+                    if (cellSet.size === 0) {
+                        this.spatialIndex.delete(cellKey);
+                    }
                 }
-            });
-        } else {
-            const cellKey = `${element.position.x},${element.position.y}`;
-            const cellSet = this.spatialIndex.get(cellKey);
-            if (cellSet) {
-                cellSet.delete(elementId);
             }
         }
+        // 下层元素不需要从空间索引中移除，因为它们本来就不在空间索引中
 
         this.elementRegistry.delete(elementId);
     }
@@ -836,8 +984,8 @@ class MapEngine {
      * @returns {boolean} 是否完全显露
      */
     isElementFullyRevealed(hiddenElement, layer) {
-        // 检查方块的所有占据格子
-        const occupiedCells = hiddenElement.occupiedCells;
+        // 检查方块的所有占据格子（实时计算）
+        const occupiedCells = this.calculateOccupiedCells(hiddenElement.position, hiddenElement.shapeData);
         
         for (const cellKey of occupiedCells) {
             const [x, y] = cellKey.split(',').map(Number);
@@ -891,8 +1039,9 @@ class MapEngine {
         // 遍历该层级的所有元素
         for (const element of layerData.elements.values()) {
             if (element.type === 'tetris' && element.layer === layer) {
-                // 检查该方块的占据位置是否包含目标格子
-                if (element.occupiedCells && element.occupiedCells.includes(cellKey)) {
+                // 检查该方块的占据位置是否包含目标格子（实时计算）
+                const occupiedCells = this.calculateOccupiedCells(element.position, element.shapeData);
+                if (occupiedCells.includes(cellKey)) {
                     return element;
                 }
             }
@@ -955,7 +1104,8 @@ class MapEngine {
         }
         
         // 更新空间索引
-        hiddenElement.occupiedCells.forEach(cellKey => {
+        const occupiedCells = this.calculateOccupiedCells(hiddenElement.position, hiddenElement.shapeData);
+        occupiedCells.forEach(cellKey => {
             if (!this.spatialIndex.has(cellKey)) {
                 this.spatialIndex.set(cellKey, new Set());
             }
@@ -1688,7 +1838,7 @@ class MapEngine {
         blocks.forEach(block => {
             // 如果方块有 blockElement，使用 creature.js 的绘制函数
             if (block.blockElement && typeof drawCreature !== 'undefined') {
-                // 确保 blockElement 的位置与逻辑位置同步
+                // 确保 blockElement 的位置与逻辑位置同步（使用统一的位置更新）
                 if (block.blockElement.element) {
                     block.blockElement.element.x = block.position.x * this.cellSize;
                     block.blockElement.element.y = block.position.y * this.cellSize;
@@ -1785,14 +1935,16 @@ class MapEngine {
             console.warn('获取方块动画属性失败:', error);
         }
 
-        // 安全检查：确保 occupiedCells 存在且有效
-        if (!block.occupiedCells || !Array.isArray(block.occupiedCells) || block.occupiedCells.length === 0) {
-            console.warn(`方块 ${block.id} 没有有效的 occupiedCells，跳过绘制`);
+        // 根据形状的每个块分别绘制 - 实时计算占据格子
+        const drawOccupiedCells = this.calculateOccupiedCells(block.position, block.shapeData);
+        
+        if (drawOccupiedCells.length === 0) {
+            console.warn(`方块 ${block.id} 没有有效的格子坐标，跳过绘制`);
             return;
         }
 
-        // 根据形状的每个块分别绘制 - 安全地解析坐标
-        const cells = block.occupiedCells.map(cellKey => {
+        // 安全地解析坐标
+        const cells = drawOccupiedCells.map(cellKey => {
             if (typeof cellKey !== 'string' || !cellKey.includes(',')) {
                 console.warn(`无效的 cellKey 格式: ${cellKey}`);
                 return [0, 0]; // 返回默认坐标
@@ -1965,8 +2117,9 @@ class MapEngine {
         this.ctx.restore();
 
         // 绘制方块ID（调试用）
-        if (block.occupiedCells.length > 0) {
-            const firstCell = block.occupiedCells[0].split(',').map(Number);
+        const debugOccupiedCells = this.calculateOccupiedCells(block.position, block.shapeData);
+        if (debugOccupiedCells.length > 0) {
+            const firstCell = debugOccupiedCells[0].split(',').map(Number);
             // 移除方块上的文字显示
         }
     }
@@ -2042,7 +2195,8 @@ class MapEngine {
         const blocks = this.getAllElementsByType('tetris');
 
         for (const block of blocks) {
-            if (block.occupiedCells.includes(`${gridPos.x},${gridPos.y}`)) {
+            const occupiedCells = this.calculateOccupiedCells(block.position, block.shapeData);
+            if (occupiedCells.includes(`${gridPos.x},${gridPos.y}`)) {
                 // 每次点击方块都是选中
                 this.selectElement(block.id);
                 console.log(`选择了方块: ${block.id}`);
@@ -2083,11 +2237,11 @@ class MapEngine {
         const path = this.calculateStepPath(startPosition, targetPosition, element);
         
         if (path.length === 0) {
-            console.log(`方块 ${elementId} 无法到达目标位置 (${targetPosition.x},${targetPosition.y})`);
+            this.debugLog(`方块 ${elementId} 无法到达目标位置 (${targetPosition.x},${targetPosition.y})`);
             return;
         }
 
-        console.log(`方块 ${elementId} 移动路径:`, {
+        this.debugLog(`方块 ${elementId} 移动路径:`, {
             from: startPosition,
             to: targetPosition,
             path: path,
@@ -2130,7 +2284,7 @@ class MapEngine {
             standUpAndExtendLimbs(element.blockElement);
         }
 
-        console.log(`方块 ${element.id} 使用BFS路径移动:`, {
+        this.debugLog(`方块 ${element.id} 使用BFS路径移动:`, {
             from: fromPosition,
             to: toPosition,
             path: path,
@@ -2139,7 +2293,7 @@ class MapEngine {
 
         if (path.length === 0) {
             // 没有有效路径，直接收起脚
-            console.log(`方块 ${element.id} 没有有效路径`);
+            this.debugLog(`方块 ${element.id} 没有有效路径`);
             if (typeof sitDownAndHideLimbs === 'function') {
                 sitDownAndHideLimbs(element.blockElement);
             }
@@ -2149,16 +2303,8 @@ class MapEngine {
         // 创建走路时间线
         const walkTimeline = gsap.timeline({
             onComplete: () => {
-                // 确保最终位置同步
-                element.position = toPosition;
-                element.occupiedCells = this.calculateOccupiedCells(toPosition, element.shapeData);
-                
-                // 确保渲染位置同步
-                blockElement.x = toPosition.x * this.cellSize;
-                blockElement.y = toPosition.y * this.cellSize;
-
-                // 更新空间索引到新位置
-                this.updateSpatialIndex(element, fromPosition, toPosition);
+                // 使用新的统一方法确保最终位置同步
+                this.updateElementPosition(element, toPosition);
 
                 // 清除移动状态
                 element.isMoving = false;
@@ -2167,8 +2313,11 @@ class MapEngine {
                 // 检查是否有下层方块显露
                 this.checkLayerReveal(element);
                 
+                // 清理缓存
+                this.cleanupCache();
+                
                 // 打印移动后的网格状态
-                console.log(`方块 ${element.id} 移动完成后的网格状态:`);
+                this.debugLog(`方块 ${element.id} 移动完成后的网格状态:`);
                 this.printGridState();
 
                 // 收起脚
@@ -2179,7 +2328,7 @@ class MapEngine {
                 // 清理动画
                 this.animations.delete(animationId);
 
-                console.log(`方块 ${element.id} 移动动画完成，最终位置: (${toPosition.x},${toPosition.y})`);
+                this.debugLog(`方块 ${element.id} 移动动画完成，最终位置: (${toPosition.x},${toPosition.y})`);
             }
         });
 
@@ -2195,11 +2344,10 @@ class MapEngine {
             const stepDuration = 0.6; // 每步持续时间
             const delay = index * stepDuration;
 
-            // 更新逻辑位置
+            // 更新逻辑位置（使用新的统一方法）
             walkTimeline.call(() => {
-                element.position = {x: step.x, y: step.y};
-                element.occupiedCells = this.calculateOccupiedCells(element.position, element.shapeData);
-                console.log(`方块 ${element.id} 移动到步骤: (${step.x},${step.y})`);
+                this.updateElementPosition(element, {x: step.x, y: step.y});
+                this.debugLog(`方块 ${element.id} 移动到步骤: (${step.x},${step.y})`);
             }, [], delay);
 
             // 使用更自然的缓动函数和物理效果
@@ -2269,6 +2417,90 @@ class MapEngine {
     }
 
     /**
+     * 计算门占据的所有格子
+     * @param {Object} gate - 门元素
+     * @returns {Array<string>} 格子键数组
+     */
+    calculateGateCells(gate) {
+        const cells = [];
+        const size = gate.size || { width: 1, height: 1 };
+        
+        for (let x = gate.position.x; x < gate.position.x + size.width; x++) {
+            for (let y = gate.position.y; y < gate.position.y + size.height; y++) {
+                cells.push(`${x},${y}`);
+            }
+        }
+        
+        return cells;
+    }
+
+    /**
+     * 计算岩石占据的所有格子
+     * @param {Object} rock - 岩石元素
+     * @returns {Array<string>} 格子键数组
+     */
+    calculateRockCells(rock) {
+        const cells = [];
+        const size = rock.size || { width: 1, height: 1 };
+        
+        for (let x = rock.position.x; x < rock.position.x + size.width; x++) {
+            for (let y = rock.position.y; y < rock.position.y + size.height; y++) {
+                cells.push(`${x},${y}`);
+            }
+        }
+        
+        return cells;
+    }
+
+    /**
+     * 清理空间索引 - 移除所有非layer 0的元素
+     */
+    cleanupSpatialIndex() {
+        console.log('开始清理空间索引...');
+        let removedCount = 0;
+        
+        // 遍历空间索引，移除非layer 0的元素
+        for (const [cellKey, elementIds] of this.spatialIndex.entries()) {
+            const validElementIds = new Set();
+            
+            for (const elementId of elementIds) {
+                const element = this.elementRegistry.get(elementId);
+                if (element && element.layer === 0) {
+                    validElementIds.add(elementId);
+                } else {
+                    removedCount++;
+                    console.log(`移除非layer 0元素: ${elementId} (layer: ${element?.layer})`);
+                }
+            }
+            
+            if (validElementIds.size === 0) {
+                this.spatialIndex.delete(cellKey);
+            } else {
+                this.spatialIndex.set(cellKey, validElementIds);
+            }
+        }
+        
+        console.log(`空间索引清理完成，移除了 ${removedCount} 个非layer 0元素`);
+    }
+
+    /**
+     * 清理缓存 - 避免内存泄漏
+     */
+    cleanupCache() {
+        // 清理碰撞检测缓存
+        if (this.collisionCache.size > 1000) {
+            this.collisionCache.clear();
+            this.debugLog('清理碰撞检测缓存');
+        }
+        
+        // 清理路径计算缓存
+        if (this.pathCache.size > 1000) {
+            this.pathCache.clear();
+            this.debugLog('清理路径计算缓存');
+        }
+    }
+
+    /**
      * 打印完整的网格状态 - 调试用
      */
     printGridState() {
@@ -2300,13 +2532,32 @@ class MapEngine {
                 layer: element.layer,
                 movable: element.movable,
                 isMoving: element.isMoving,
-                occupiedCells: element.occupiedCells
+                occupiedCells: element.type === 'tetris' ? this.calculateOccupiedCells(element.position, element.shapeData) : 'N/A'
             });
         });
         console.log('=== 网格状态结束 ===');
     }
     isWithinBounds(x, y) {
         return x >= 0 && x < this.GRID_SIZE && y >= 0 && y < this.GRID_SIZE;
+    }
+
+    /**
+     * 检查位置是否在边界内（检查整个方块）
+     * @param {Object} position - 位置 {x, y}
+     * @param {Object} shapeData - 形状数据
+     * @returns {boolean} 是否在边界内
+     */
+    isPositionWithinBounds(position, shapeData) {
+        const occupiedCells = this.calculateOccupiedCells(position, shapeData);
+        
+        for (const cellKey of occupiedCells) {
+            const [x, y] = cellKey.split(',').map(Number);
+            if (!this.isWithinBounds(x, y)) {
+                return false;
+            }
+        }
+        
+        return true;
     }
 
     /**
@@ -2317,35 +2568,35 @@ class MapEngine {
      * @returns {boolean} 是否碰撞
      */
     checkCollisionAtPosition(element, position, excludeId) {
-        console.log(`碰撞检测: 开始检查方块 ${element.id} 在位置 (${position.x},${position.y}), 排除ID: ${excludeId}`);
+        this.debugLog(`碰撞检测: 开始检查方块 ${element.id} 在位置 (${position.x},${position.y}), 排除ID: ${excludeId}`);
         if (element.type !== 'tetris') return false;
 
         // 计算方块在目标位置占据的所有格子
         const occupiedCells = this.calculateOccupiedCells(position, element.shapeData);
         
-        console.log(`碰撞检测: 方块 ${element.id} 在位置 (${position.x},${position.y}) 占据格子:`, occupiedCells);
+        this.debugLog(`碰撞检测: 方块 ${element.id} 在位置 (${position.x},${position.y}) 占据格子:`, occupiedCells);
+        
+        // 首先检查整个方块是否在边界内
+        if (!this.isPositionWithinBounds(position, element.shapeData)) {
+            this.debugLog(`碰撞检测: 方块 ${element.id} 在位置 (${position.x},${position.y}) 超出边界`);
+            return true; // 超出边界
+        }
         
         // 检查每个格子是否碰撞
         for (const cellKey of occupiedCells) {
             const [x, y] = cellKey.split(',').map(Number);
             
-            // 检查边界
-            if (!this.isWithinBounds(x, y)) {
-                console.log(`碰撞检测: 位置 (${x},${y}) 超出边界`);
-                return true; // 超出边界
-            }
-            
             // 检查第0层的碰撞（只检测可见的方块）
             const elementsAtCell = this.spatialIndex.get(cellKey);
-            console.log(`碰撞检测: 格子 (${x},${y}) 中的元素:`, elementsAtCell ? Array.from(elementsAtCell) : '无');
+            this.debugLog(`碰撞检测: 格子 (${x},${y}) 中的元素:`, elementsAtCell ? Array.from(elementsAtCell) : '无');
             
             if (elementsAtCell) {
                 for (const elementId of elementsAtCell) {
-                    console.log(`碰撞检测: 检查元素 ${elementId} (类型: ${typeof elementId}), 排除ID: ${excludeId} (类型: ${typeof excludeId}), 是否跳过: ${elementId === excludeId}`);
+                    this.debugLog(`碰撞检测: 检查元素 ${elementId} (类型: ${typeof elementId}), 排除ID: ${excludeId} (类型: ${typeof excludeId}), 是否跳过: ${elementId === excludeId}`);
                     if (elementId === excludeId) continue;
                     
                     const otherElement = this.elementRegistry.get(elementId);
-                    console.log(`碰撞检测: 检查元素 ${elementId}:`, otherElement ? {
+                    this.debugLog(`碰撞检测: 检查元素 ${elementId}:`, otherElement ? {
                         type: otherElement.type,
                         layer: otherElement.layer,
                         movable: otherElement.movable,
@@ -2355,21 +2606,21 @@ class MapEngine {
                     // 只检查第0层的方块和障碍物
                     if (otherElement && otherElement.layer === 0) {
                         if (otherElement.type === 'rock') {
-                            console.log(`碰撞检测: 与岩石 ${elementId} 碰撞`);
+                            this.debugLog(`碰撞检测: 与岩石 ${elementId} 碰撞`);
                             return true; // 与岩石碰撞
                         }
                         if (otherElement.type === 'gate') {
-                            console.log(`碰撞检测: 与门 ${elementId} 碰撞`);
+                            this.debugLog(`碰撞检测: 与门 ${elementId} 碰撞`);
                             return true; // 与门碰撞
                         }
                         if (otherElement.type === 'tetris' && otherElement.movable) {
                             // 排除移动中的方块，避免自己与自己碰撞
                             // 确保 isMoving 属性存在且为 false
                             if (otherElement.isMoving !== true) {
-                                console.log(`碰撞检测: 与可移动方块 ${elementId} 碰撞`);
+                                this.debugLog(`碰撞检测: 与可移动方块 ${elementId} 碰撞`);
                                 return true; // 与其他可移动方块碰撞
                             } else {
-                                console.log(`碰撞检测: 方块 ${elementId} 正在移动，跳过碰撞检测`);
+                                this.debugLog(`碰撞检测: 方块 ${elementId} 正在移动，跳过碰撞检测`);
                             }
                         }
                     }
@@ -2377,7 +2628,7 @@ class MapEngine {
             }
         }
         
-        console.log(`碰撞检测: 方块 ${element.id} 在位置 (${position.x},${position.y}) 无碰撞`);
+        this.debugLog(`碰撞检测: 方块 ${element.id} 在位置 (${position.x},${position.y}) 无碰撞`);
         return false;
     }
 
@@ -2423,18 +2674,7 @@ class MapEngine {
                 }
 
                 // 检查新位置是否有效（检查整个方块的边界）
-                const occupiedCells = this.calculateOccupiedCells(newPos, element.shapeData);
-                let isValidPosition = true;
-                
-                for (const cellKey of occupiedCells) {
-                    const [cellX, cellY] = cellKey.split(',').map(Number);
-                    if (!this.isWithinBounds(cellX, cellY)) {
-                        isValidPosition = false;
-                        break;
-                    }
-                }
-                
-                if (!isValidPosition) {
+                if (!this.isPositionWithinBounds(newPos, element.shapeData)) {
                     continue;
                 }
 
@@ -2500,18 +2740,7 @@ class MapEngine {
                 }
 
                 // 检查新位置是否有效（检查整个方块的边界）
-                const occupiedCells = this.calculateOccupiedCells(newPos, element.shapeData);
-                let isValidPosition = true;
-                
-                for (const cellKey of occupiedCells) {
-                    const [cellX, cellY] = cellKey.split(',').map(Number);
-                    if (!this.isWithinBounds(cellX, cellY)) {
-                        isValidPosition = false;
-                        break;
-                    }
-                }
-                
-                if (!isValidPosition) {
+                if (!this.isPositionWithinBounds(newPos, element.shapeData)) {
                     continue;
                 }
 
@@ -2561,19 +2790,24 @@ class MapEngine {
 
 
     /**
-     * 更新空间索引
+     * 为单个元素更新空间索引（新的统一方法）
      * @param {Object} element - 元素对象
      * @param {Object} oldPosition - 旧位置
      * @param {Object} newPosition - 新位置
      */
-    updateSpatialIndex(element, oldPosition, newPosition) {
+    updateSpatialIndexForElement(element, oldPosition, newPosition) {
+        // 只对layer 0的元素更新空间索引
+        if (element.layer !== 0) {
+            return;
+        }
+
         // 移除旧位置的空间索引
         const oldCells = this.calculateOccupiedCells(oldPosition, element.shapeData);
         oldCells.forEach(cell => {
             const elementsAtCell = this.spatialIndex.get(cell);
             if (elementsAtCell) {
-                elementsAtCell.delete(element.id); // 使用Set.delete
-                if (elementsAtCell.size === 0) { // 使用Set.size
+                elementsAtCell.delete(element.id);
+                if (elementsAtCell.size === 0) {
                     this.spatialIndex.delete(cell);
                 }
             }
@@ -2583,11 +2817,12 @@ class MapEngine {
         const newCells = this.calculateOccupiedCells(newPosition, element.shapeData);
         newCells.forEach(cell => {
             if (!this.spatialIndex.has(cell)) {
-                this.spatialIndex.set(cell, new Set()); // 初始化新的Set
+                this.spatialIndex.set(cell, new Set());
             }
-            this.spatialIndex.get(cell).add(element.id); // 使用Set.add，存储element.id
+            this.spatialIndex.get(cell).add(element.id);
         });
     }
+
 
 }
 
