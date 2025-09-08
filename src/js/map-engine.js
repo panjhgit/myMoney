@@ -20,6 +20,7 @@ class MapEngine {
         this.gameState = 'ready'; // ready, playing, completed
         this.selectedElement = null;
         this.moveHistory = [];
+        this.currentLevel = 1; // 当前关卡
 
         // 性能优化缓存
         this.collisionCache = new Map(); // 碰撞检测缓存
@@ -63,6 +64,9 @@ class MapEngine {
      */
     loadMap(mapData) {
         this.clearMap();
+        
+        // 设置当前关卡
+        this.currentLevel = mapData.level || 1;
 
         // 加载门
         if (mapData.gates) {
@@ -604,7 +608,7 @@ class MapEngine {
         this.removeElement(iceElement.id);
 
         // 检查下层是否有新元素露出
-        this.checkLayerReveal(iceElement.layer + 1, iceElement.position);
+        this.checkCellReveal(iceElement.position.x, iceElement.position.y);
     }
 
     /**
@@ -794,29 +798,173 @@ class MapEngine {
     }
 
     /**
-     * 检查层级揭示
-     * @param {number} layer - 层级
-     * @param {Object} position - 位置
+     * 检查是否有下层方块显露（移动后调用）
+     * @param {Object} movedElement - 移动的方块元素
      */
-    checkLayerReveal(layer, position) {
-        // 检查下层是否有新元素露出
-        const lowerLayer = this.layers.get(layer);
-        if (!lowerLayer) return;
+    checkLayerReveal(movedElement) {
+        // 获取移动方块占据的所有位置
+        const occupiedCells = movedElement.occupiedCells;
+        
+        // 检查每个位置的下层是否有方块显露
+        occupiedCells.forEach(cellKey => {
+            const [x, y] = cellKey.split(',').map(Number);
+            this.checkCellReveal(x, y);
+        });
+    }
 
-        const cellKey = `${position.x},${position.y}`;
-        const elementsAtCell = this.spatialIndex.get(cellKey);
-        if (!elementsAtCell) return;
+    /**
+     * 检查指定位置是否有下层方块显露
+     * @param {number} x - 网格X坐标
+     * @param {number} y - 网格Y坐标
+     */
+    checkCellReveal(x, y) {
+        // 检查所有层级，从第1层开始
+        for (let layer = 1; layer < this.MAX_LAYERS; layer++) {
+            const layerData = this.layers.get(layer);
+            if (!layerData) continue;
 
-        // 检查是否有新的方块可以移动
-        for (const elementId of elementsAtCell) {
-            const element = this.elementRegistry.get(elementId);
-            if (element.type === 'tetris' && element.layer === layer) {
-                // 将第2层方块移动到第0层，使其可移动
-                element.layer = 0;
-                element.movable = true;
-                console.log(`方块 ${element.id} 从第${layer}层移动到第0层，现在可以移动`);
+            // 查找该位置是否有隐藏的方块
+            const cellKey = `${x},${y}`;
+            const hiddenElement = this.findHiddenElementAtCell(cellKey, layer);
+            
+            if (hiddenElement) {
+                // 检查该位置上方是否还有遮挡
+                const isCovered = this.isPositionCovered(x, y, layer);
+                
+                if (!isCovered) {
+                    // 没有遮挡，显露方块
+                    this.revealHiddenElement(hiddenElement, layer);
+                }
             }
         }
+    }
+
+    /**
+     * 查找指定位置和层级的隐藏方块
+     * @param {string} cellKey - 格子键
+     * @param {number} layer - 层级
+     * @returns {Object|null} 隐藏的方块元素
+     */
+    findHiddenElementAtCell(cellKey, layer) {
+        const layerData = this.layers.get(layer);
+        if (!layerData) return null;
+
+        // 遍历该层级的所有元素
+        for (const element of layerData.elements.values()) {
+            if (element.type === 'tetris' && element.layer === layer) {
+                // 检查该方块的占据位置是否包含目标格子
+                if (element.occupiedCells && element.occupiedCells.includes(cellKey)) {
+                    return element;
+                }
+            }
+        }
+        return null;
+    }
+
+    /**
+     * 检查指定位置是否被遮挡
+     * @param {number} x - 网格X坐标
+     * @param {number} y - 网格Y坐标
+     * @param {number} layer - 层级
+     * @returns {boolean} 是否被遮挡
+     */
+    isPositionCovered(x, y, layer) {
+        const cellKey = `${x},${y}`;
+        
+        // 检查上层（layer-1）是否有遮挡
+        for (let upperLayer = layer - 1; upperLayer >= 0; upperLayer--) {
+            const upperLayerData = this.layers.get(upperLayer);
+            if (!upperLayerData) continue;
+
+            // 检查该位置是否有上层元素
+            const elementsAtCell = this.spatialIndex.get(cellKey);
+            if (elementsAtCell) {
+                for (const elementId of elementsAtCell) {
+                    const element = this.elementRegistry.get(elementId);
+                    if (element && element.layer === upperLayer && element.type === 'tetris') {
+                        return true; // 被遮挡
+                    }
+                }
+            }
+        }
+        
+        return false; // 没有被遮挡
+    }
+
+    /**
+     * 显露隐藏的方块
+     * @param {Object} hiddenElement - 隐藏的方块元素
+     * @param {number} fromLayer - 原层级
+     */
+    revealHiddenElement(hiddenElement, fromLayer) {
+        console.log(`显露隐藏方块: ${hiddenElement.id} 从第${fromLayer}层移动到第0层`);
+        
+        // 将方块移动到第0层
+        hiddenElement.layer = 0;
+        hiddenElement.movable = true;
+        
+        // 从原层级移除
+        const oldLayerData = this.layers.get(fromLayer);
+        if (oldLayerData) {
+            oldLayerData.elements.delete(hiddenElement.id);
+        }
+        
+        // 添加到第0层
+        const newLayerData = this.layers.get(0);
+        if (newLayerData) {
+            newLayerData.elements.set(hiddenElement.id, hiddenElement);
+        }
+        
+        // 更新空间索引
+        hiddenElement.occupiedCells.forEach(cellKey => {
+            if (!this.spatialIndex.has(cellKey)) {
+                this.spatialIndex.set(cellKey, new Set());
+            }
+            this.spatialIndex.get(cellKey).add(hiddenElement.id);
+        });
+        
+        // 触发显露动画
+        this.animateElementReveal(hiddenElement);
+    }
+
+    /**
+     * 播放方块显露动画
+     * @param {Object} element - 显露的方块元素
+     */
+    animateElementReveal(element) {
+        if (!element.blockElement || !element.blockElement.element) {
+            return;
+        }
+
+        const blockElement = element.blockElement.element;
+        
+        // 创建显露动画
+        const revealAnimation = gsap.timeline();
+        
+        // 初始状态：透明且缩小
+        gsap.set(blockElement, {
+            alpha: 0,
+            scale: 0.5
+        });
+        
+        // 显露动画：淡入并放大
+        revealAnimation.to(blockElement, {
+            alpha: 1,
+            scale: 1,
+            duration: 0.8,
+            ease: "back.out(1.7)"
+        });
+        
+        // 添加闪烁效果
+        revealAnimation.to(blockElement, {
+            alpha: 0.7,
+            duration: 0.1,
+            yoyo: true,
+            repeat: 3,
+            ease: "power2.inOut"
+        });
+        
+        console.log(`方块 ${element.id} 显露动画完成`);
     }
 
     /**
@@ -835,8 +983,19 @@ class MapEngine {
      * 游戏完成回调
      */
     onGameComplete() {
-        // 子类可以重写此方法
         console.log('游戏完成！');
+        
+        // 触发关卡完成回调
+        if (window.onLevelComplete) {
+            window.onLevelComplete(this.currentLevel || 1);
+        }
+        
+        // 延迟返回主菜单，让玩家看到完成效果
+        setTimeout(() => {
+            if (window.initMainMenu) {
+                window.initMainMenu();
+            }
+        }, 2000);
     }
 
     /**
@@ -1836,15 +1995,15 @@ class MapEngine {
             return;
         }
 
-        // 计算网格坐标
-        const gridX = Math.floor((x - this.gridOffsetX) / this.cellSize);
-        const gridY = Math.floor((y - this.gridOffsetY) / this.cellSize);
+        // 使用新的网格坐标系统
+        const gridPos = this.screenToGrid(x, y);
+        console.log(`点击位置: 屏幕(${x}, ${y}) -> 网格(${gridPos.x}, ${gridPos.y})`);
 
         // 检查是否点击了方块
         const blocks = this.getAllElementsByType('tetris');
 
         for (const block of blocks) {
-            if (block.occupiedCells.includes(`${gridX},${gridY}`)) {
+            if (block.occupiedCells.includes(`${gridPos.x},${gridPos.y}`)) {
                 // 每次点击方块都是选中
                 this.selectElement(block.id);
                 console.log(`选择了方块: ${block.id}`);
@@ -1862,8 +2021,8 @@ class MapEngine {
 
         // 如果点击了空白区域且有选中的方块，尝试移动
         if (this.selectedElement) {
-            const targetPosition = {x: gridX, y: gridY};
-            this.moveElementToPosition(this.selectedElement.id, targetPosition);
+            console.log(`尝试移动方块 ${this.selectedElement.id} 到位置 (${gridPos.x}, ${gridPos.y})`);
+            this.moveElementToPosition(this.selectedElement.id, gridPos);
         }
     }
 
@@ -1879,28 +2038,35 @@ class MapEngine {
             return;
         }
 
-        // 检查目标位置是否有效
-        if (!this.isValidPosition(targetPosition, element)) {
-            console.log(`位置 ${targetPosition.x},${targetPosition.y} 无效`);
-            console.log(`方块 ${elementId} 形状:`, element.shapeData.blocks);
-            console.log(`尝试移动到的格子:`, this.calculateOccupiedCells(targetPosition, element.shapeData));
+        const startPosition = {...element.position};
+        
+        // 使用BFS计算移动路径
+        const path = this.calculateStepPath(startPosition, targetPosition, element);
+        
+        if (path.length === 0) {
+            console.log(`方块 ${elementId} 无法到达目标位置 (${targetPosition.x},${targetPosition.y})`);
             return;
         }
 
-        // 执行移动动画
-        const oldPosition = {...element.position};
-        this.animateBlockMove(element, oldPosition, targetPosition);
+        console.log(`方块 ${elementId} 移动路径:`, {
+            from: startPosition,
+            to: targetPosition,
+            path: path,
+            pathLength: path.length
+        });
 
-        console.log(`移动方块 ${elementId} 从 (${oldPosition.x},${oldPosition.y}) 到 (${targetPosition.x},${targetPosition.y})`);
+        // 执行移动动画
+        this.animateBlockMove(element, startPosition, targetPosition, path);
     }
 
     /**
-     * 动画移动方块（一格一格移动，参考old实现）
+     * 动画移动方块（使用BFS计算的路径）
      * @param {Object} element - 方块元素
      * @param {Object} fromPosition - 起始位置
      * @param {Object} toPosition - 目标位置
+     * @param {Array} path - BFS计算的路径
      */
-    animateBlockMove(element, fromPosition, toPosition) {
+    animateBlockMove(element, fromPosition, toPosition, path) {
         if (!element.blockElement || !element.blockElement.element) {
             // 如果没有 blockElement，直接更新位置
             this.executeMove(element, toPosition);
@@ -1925,11 +2091,11 @@ class MapEngine {
             standUpAndExtendLimbs(element.blockElement);
         }
 
-        // 计算移动路径（只能上下左右移动，不能斜着移动）
-        const path = this.calculateStepPath(fromPosition, toPosition);
-
-        console.log(`方块 ${element.id} 移动路径:`, {
-            from: fromPosition, to: toPosition, path: path, pathLength: path.length
+        console.log(`方块 ${element.id} 使用BFS路径移动:`, {
+            from: fromPosition,
+            to: toPosition,
+            path: path,
+            pathLength: path.length
         });
 
         if (path.length === 0) {
@@ -1955,6 +2121,9 @@ class MapEngine {
                 // 更新空间索引
                 this.updateSpatialIndex(element, fromPosition, toPosition);
 
+                // 检查是否有下层方块显露
+                this.checkLayerReveal(element);
+
                 // 收起脚
                 if (typeof sitDownAndHideLimbs === 'function') {
                     sitDownAndHideLimbs(element.blockElement);
@@ -1970,16 +2139,16 @@ class MapEngine {
         // 注册动画
         this.animations.set(animationId, walkTimeline);
 
-        // 一格一格移动 - 使用更自然的动画效果
+        // 按照BFS路径一格一格移动
         path.forEach((step, index) => {
-            const stepDuration = 0.6; // 增加每步持续时间，让动画更流畅
+            const stepDuration = 0.6; // 每步持续时间
             const delay = index * stepDuration;
 
             // 立即更新逻辑位置，避免闪烁
             walkTimeline.call(() => {
                 element.position = {x: step.x, y: step.y};
                 element.occupiedCells = this.calculateOccupiedCells(element.position, element.shapeData);
-                console.log(`方块 ${element.id} 开始移动到步骤: (${step.x},${step.y})`);
+                console.log(`方块 ${element.id} 移动到步骤: (${step.x},${step.y})`);
             }, [], delay);
 
             // 使用更自然的缓动函数和物理效果
@@ -2025,72 +2194,236 @@ class MapEngine {
     }
 
     /**
-     * 计算移动路径（只能上下左右移动，参考old实现）
-     * @param {Object} fromPosition - 起始位置
-     * @param {Object} toPosition - 目标位置
+     * 网格坐标系统 - 将屏幕坐标转换为网格坐标
+     * @param {number} screenX - 屏幕X坐标
+     * @param {number} screenY - 屏幕Y坐标
+     * @returns {Object} 网格坐标 {x, y}
      */
-    calculateStepPath(fromPosition, toPosition) {
-        const path = [];
-        let currentX = fromPosition.x;
-        let currentY = fromPosition.y;
-
-        // 先移动行（上下）
-        while (currentY !== toPosition.y) {
-            if (currentY < toPosition.y) {
-                currentY++;
-            } else {
-                currentY--;
-            }
-            path.push({x: currentX, y: currentY});
-        }
-
-        // 再移动列（左右）
-        while (currentX !== toPosition.x) {
-            if (currentX < toPosition.x) {
-                currentX++;
-            } else {
-                currentX--;
-            }
-            path.push({x: currentX, y: currentY});
-        }
-
-        return path;
+    screenToGrid(screenX, screenY) {
+        const gridX = Math.floor((screenX - this.gridOffsetX) / this.cellSize);
+        const gridY = Math.floor((screenY - this.gridOffsetY) / this.cellSize);
+        return { x: gridX, y: gridY };
     }
 
+    /**
+     * 网格坐标转换为屏幕坐标
+     * @param {number} gridX - 网格X坐标
+     * @param {number} gridY - 网格Y坐标
+     * @returns {Object} 屏幕坐标 {x, y}
+     */
+    gridToScreen(gridX, gridY) {
+        const screenX = this.gridOffsetX + gridX * this.cellSize;
+        const screenY = this.gridOffsetY + gridY * this.cellSize;
+        return { x: screenX, y: screenY };
+    }
 
     /**
-     * 检查位置是否有效
-     * @param {Object} position - 位置 {x, y}
-     * @param {Object} element - 元素对象
-     * @returns {boolean} 是否有效
+     * 检查网格位置是否在边界内
+     * @param {number} x - 网格X坐标
+     * @param {number} y - 网格Y坐标
+     * @returns {boolean} 是否在边界内
      */
-    isValidPosition(position, element) {
-        if (element.type !== 'tetris') return true;
+    isWithinBounds(x, y) {
+        return x >= 0 && x < this.GRID_SIZE && y >= 0 && y < this.GRID_SIZE;
+    }
 
-        // 检查边界
-        const maxX = Math.max(...element.shapeData.blocks.map(block => block[0]));
-        const maxY = Math.max(...element.shapeData.blocks.map(block => block[1]));
+    /**
+     * 检查方块在指定位置是否会碰撞（只检测第0层）
+     * @param {Object} element - 方块元素
+     * @param {Object} position - 目标位置 {x, y}
+     * @param {string} excludeId - 排除的元素ID（移动的方块）
+     * @returns {boolean} 是否碰撞
+     */
+    checkCollisionAtPosition(element, position, excludeId) {
+        if (element.type !== 'tetris') return false;
 
-        if (position.x < 0 || position.y < 0 || position.x + maxX >= this.GRID_SIZE || position.y + maxY >= this.GRID_SIZE) {
-            return false;
-        }
-
-        // 检查是否与其他元素冲突
-        const newCells = this.calculateOccupiedCells(position, element.shapeData);
-
-        for (const cell of newCells) {
-            const elementsAtCell = this.spatialIndex.get(cell);
+        // 计算方块在目标位置占据的所有格子
+        const occupiedCells = this.calculateOccupiedCells(position, element.shapeData);
+        
+        // 检查每个格子是否碰撞
+        for (const cellKey of occupiedCells) {
+            const [x, y] = cellKey.split(',').map(Number);
+            
+            // 检查边界
+            if (!this.isWithinBounds(x, y)) {
+                return true; // 超出边界
+            }
+            
+            // 检查第0层的碰撞（只检测可见的方块）
+            const elementsAtCell = this.spatialIndex.get(cellKey);
             if (elementsAtCell) {
-                for (const otherElementId of elementsAtCell) {
-                    if (otherElementId !== element.id) {
-                        return false; // 有冲突
+                for (const elementId of elementsAtCell) {
+                    if (elementId === excludeId) continue;
+                    
+                    const otherElement = this.elementRegistry.get(elementId);
+                    
+                    // 只检查第0层的方块和障碍物
+                    if (otherElement && otherElement.layer === 0) {
+                        if (otherElement.type === 'rock') {
+                            return true; // 与岩石碰撞
+                        }
+                        if (otherElement.type === 'tetris' && otherElement.movable) {
+                            return true; // 与其他可移动方块碰撞
+                        }
                     }
                 }
             }
         }
-
-        return true;
+        
+        return false;
     }
+
+    /**
+     * BFS路径计算 - 计算从起始位置到目标位置的最短路径
+     * @param {Object} element - 方块元素
+     * @param {Object} startPos - 起始位置 {x, y}
+     * @param {Object} targetPos - 目标位置 {x, y}
+     * @returns {Array} 路径数组，如果不可达返回空数组
+     */
+    calculateBFSPath(element, startPos, targetPos) {
+        // 如果起始位置就是目标位置
+        if (startPos.x === targetPos.x && startPos.y === targetPos.y) {
+            return [];
+        }
+
+        // BFS队列：存储 {position, path}
+        const queue = [{ position: startPos, path: [] }];
+        const visited = new Set();
+        visited.add(`${startPos.x},${startPos.y}`);
+
+        // 四个方向：上下左右
+        const directions = [
+            { dx: 0, dy: -1 }, // 上
+            { dx: 0, dy: 1 },  // 下
+            { dx: -1, dy: 0 }, // 左
+            { dx: 1, dy: 0 }   // 右
+        ];
+
+        while (queue.length > 0) {
+            const { position, path } = queue.shift();
+
+            // 尝试四个方向
+            for (const dir of directions) {
+                const newX = position.x + dir.dx;
+                const newY = position.y + dir.dy;
+                const newPos = { x: newX, y: newY };
+                const newPosKey = `${newX},${newY}`;
+
+                // 如果已经访问过，跳过
+                if (visited.has(newPosKey)) {
+                    continue;
+                }
+
+                // 检查新位置是否有效
+                if (!this.isWithinBounds(newX, newY)) {
+                    continue;
+                }
+
+                // 检查是否碰撞
+                if (this.checkCollisionAtPosition(element, newPos, element.id)) {
+                    continue;
+                }
+
+                // 标记为已访问
+                visited.add(newPosKey);
+
+                // 创建新路径
+                const newPath = [...path, newPos];
+
+                // 如果到达目标位置
+                if (newX === targetPos.x && newY === targetPos.y) {
+                    return newPath;
+                }
+
+                // 添加到队列
+                queue.push({ position: newPos, path: newPath });
+            }
+        }
+
+        // 没有找到路径
+        return [];
+    }
+
+    /**
+     * 寻找距离目标最近的可达位置
+     * @param {Object} element - 方块元素
+     * @param {Object} startPos - 起始位置
+     * @param {Object} targetPos - 目标位置
+     * @returns {Object} 最近的可达位置
+     */
+    findNearestReachablePosition(element, startPos, targetPos) {
+        // 如果目标位置可达，直接返回
+        if (!this.checkCollisionAtPosition(element, targetPos, element.id)) {
+            return targetPos;
+        }
+
+        // 使用BFS寻找最近的可达位置
+        const queue = [{ position: startPos, distance: 0 }];
+        const visited = new Set();
+        visited.add(`${startPos.x},${startPos.y}`);
+
+        const directions = [
+            { dx: 0, dy: -1 }, { dx: 0, dy: 1 },
+            { dx: -1, dy: 0 }, { dx: 1, dy: 0 }
+        ];
+
+        while (queue.length > 0) {
+            const { position, distance } = queue.shift();
+
+            for (const dir of directions) {
+                const newX = position.x + dir.dx;
+                const newY = position.y + dir.dy;
+                const newPos = { x: newX, y: newY };
+                const newPosKey = `${newX},${newY}`;
+
+                if (visited.has(newPosKey) || !this.isWithinBounds(newX, newY)) {
+                    continue;
+                }
+
+                visited.add(newPosKey);
+
+                // 检查是否可达
+                if (!this.checkCollisionAtPosition(element, newPos, element.id)) {
+                    // 计算到目标的距离
+                    const distanceToTarget = Math.abs(newX - targetPos.x) + Math.abs(newY - targetPos.y);
+                    
+                    // 如果这个位置比目标位置更近，返回它
+                    if (distanceToTarget < (Math.abs(startPos.x - targetPos.x) + Math.abs(startPos.y - targetPos.y))) {
+                        return newPos;
+                    }
+                }
+
+                queue.push({ position: newPos, distance: distance + 1 });
+            }
+        }
+
+        // 如果找不到更近的位置，返回起始位置
+        return startPos;
+    }
+
+    /**
+     * 计算移动路径（使用BFS算法）
+     * @param {Object} fromPosition - 起始位置
+     * @param {Object} toPosition - 目标位置
+     * @param {Object} element - 方块元素
+     * @returns {Array} 路径数组
+     */
+    calculateStepPath(fromPosition, toPosition, element) {
+        // 使用BFS计算最短路径
+        const path = this.calculateBFSPath(element, fromPosition, toPosition);
+        
+        if (path.length === 0) {
+            // 如果目标位置不可达，寻找最近的可达位置
+            const nearestPos = this.findNearestReachablePosition(element, fromPosition, toPosition);
+            if (nearestPos.x !== fromPosition.x || nearestPos.y !== fromPosition.y) {
+                return this.calculateBFSPath(element, fromPosition, nearestPos);
+            }
+        }
+        
+        return path;
+    }
+
+
 
     /**
      * 更新空间索引

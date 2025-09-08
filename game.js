@@ -110,6 +110,21 @@ function startGame(levelId) {
   // 设置渲染上下文
   mapEngine.setRenderContext(ctx, systemInfo);
   
+  // 设置关卡完成回调
+  window.onLevelComplete = (completedLevelId) => {
+    console.log(`关卡 ${completedLevelId} 完成！`);
+    
+    // 更新主菜单的进度
+    if (mainMenu && typeof mainMenu.completeLevel === 'function') {
+      mainMenu.completeLevel(completedLevelId);
+    }
+    
+    // 延迟返回主菜单
+    setTimeout(() => {
+      initMainMenu();
+    }, 2000);
+  };
+  
   // 加载地图数据
   mapEngine.loadMap(mapData);
   

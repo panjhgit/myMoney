@@ -6,6 +6,7 @@
  */
 
 const map1 = {
+  level: 1,
   name: "完整俄罗斯方块",
   description: "包含所有俄罗斯方块形状的挑战关卡",
   difficulty: "中等",
@@ -99,7 +100,7 @@ const map1 = {
       layer: 0
     },
     
-    // 第1层 - 被冰块包裹的方块（显示冰块效果）
+    // 第1层 - 隐藏的方块（被上层遮挡）
     {
       id: "big_L",
       color: "magenta",
@@ -113,6 +114,22 @@ const map1 = {
       position: { x: 4, y: 5 },
       shape: "cross",
       layer: 1
+    },
+    
+    // 第2层 - 更深层的隐藏方块
+    {
+      id: "hidden_square",
+      color: "green",
+      position: { x: 1, y: 6 },
+      shape: "square",
+      layer: 2
+    },
+    {
+      id: "hidden_line",
+      color: "blue",
+      position: { x: 5, y: 6 },
+      shape: "line2",
+      layer: 2
     }
   ],
   
@@ -140,11 +157,13 @@ const map1 = {
   
   // 提示信息
   hints: [
-    "点击方块选择，然后使用方向键移动",
+    "点击方块选择，然后点击目标位置移动",
+    "方块会使用智能路径规划自动避开障碍物",
+    "移动上层方块后，下层的隐藏方块会显露出来",
     "方块必须通过对应颜色的门才能离开",
     "方块的尺寸必须小于门的尺寸",
-    "冰层会在上方方块移走后开始融化",
-    "石块是不可移动的障碍物"
+    "石块是不可移动的障碍物",
+    "尝试移动方块来\"挖出\"被隐藏的方块"
   ]
 };
 
