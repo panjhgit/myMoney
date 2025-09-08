@@ -427,8 +427,21 @@ var destroyBlock = function(block) {
 };
 
 // 创建冰块
-var createIce = function(id, position, layer) {
-  layer = layer || 1;
+var createIce = function(iceConfig) {
+  // 支持两种调用方式：createIce(id, position, layer) 或 createIce({id, position, layer})
+  let id, position, layer;
+  if (typeof iceConfig === 'object' && iceConfig.id) {
+    // 新格式：传入配置对象
+    id = iceConfig.id;
+    position = iceConfig.position;
+    layer = iceConfig.layer || 1;
+  } else {
+    // 旧格式：分别传入参数
+    id = iceConfig;
+    position = arguments[1];
+    layer = arguments[2] || 1;
+  }
+  
   var ice = {
     id: id,
     position: position,
@@ -439,6 +452,12 @@ var createIce = function(id, position, layer) {
       width: BLOCK_CONFIG.CELL_SIZE,
       height: BLOCK_CONFIG.CELL_SIZE,
       alpha: 0.7
+    },
+    // 添加 shapeData 属性，冰块是单个格子
+    shapeData: {
+      blocks: [[0, 0]],
+      width: 1,
+      height: 1
     }
   };
   

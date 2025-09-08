@@ -25,6 +25,8 @@ class MapEngine {
         // 性能优化缓存
         this.collisionCache = new Map(); // 碰撞检测缓存
         this.pathCache = new Map(); // 路径计算缓存
+        this.cacheCleanupInterval = 10000; // 缓存清理间隔（毫秒）
+        this.lastCacheCleanup = 0; // 上次清理时间
         
         // 调试开关
         this.debugMode = true; // 设置为false关闭调试日志
@@ -66,6 +68,19 @@ class MapEngine {
         }
 
         console.log('MapEngine 初始化完成');
+    }
+
+    /**
+     * 清理缓存以防止内存泄漏
+     */
+    cleanupCache() {
+        const now = Date.now();
+        if (now - this.lastCacheCleanup > this.cacheCleanupInterval) {
+            this.collisionCache.clear();
+            this.pathCache.clear();
+            this.lastCacheCleanup = now;
+            console.log('缓存已清理');
+        }
     }
 
     /**
@@ -276,7 +291,12 @@ class MapEngine {
         }
 
         this.addElement(iceElement);
-        this.layers.get(iceElement.layer).iceCells.add(`${ice.position.x},${ice.position.y}`);
+        
+        // 使用 calculateOccupiedCells 计算冰块占据的所有格子
+        const occupiedCells = this.calculateOccupiedCells(iceElement.position, iceElement.shapeData);
+        occupiedCells.forEach(cell => {
+            this.layers.get(iceElement.layer).iceCells.add(cell);
+        });
     }
 
     /**
@@ -285,11 +305,26 @@ class MapEngine {
      */
     addRock(rock) {
         const element = {
-            id: rock.id, type: 'rock', position: rock.position, layer: rock.layer || 0, movable: false
+            id: rock.id, 
+            type: 'rock', 
+            position: rock.position, 
+            layer: rock.layer || 0, 
+            movable: false,
+            // 添加 shapeData 属性，石块是单个格子
+            shapeData: {
+                blocks: [[0, 0]],
+                width: 1,
+                height: 1
+            }
         };
 
         this.addElement(element);
-        this.layers.get(element.layer).rockCells.add(`${rock.position.x},${rock.position.y}`);
+        
+        // 使用 calculateOccupiedCells 计算石块占据的所有格子
+        const occupiedCells = this.calculateOccupiedCells(element.position, element.shapeData);
+        occupiedCells.forEach(cell => {
+            this.layers.get(element.layer).rockCells.add(cell);
+        });
     }
 
     /**
@@ -663,17 +698,21 @@ class MapEngine {
      * @returns {boolean} 是否被覆盖
      */
     isIceCovered(iceElement) {
-        const cellKey = `${iceElement.position.x},${iceElement.position.y}`;
-        const elementsAtCell = this.spatialIndex.get(cellKey);
-        if (!elementsAtCell) return false;
+        // 使用 calculateOccupiedCells 计算冰块占据的所有格子
+        const occupiedCells = this.calculateOccupiedCells(iceElement.position, iceElement.shapeData);
+        
+        for (const cellKey of occupiedCells) {
+            const elementsAtCell = this.spatialIndex.get(cellKey);
+            if (!elementsAtCell) continue;
 
-        for (const elementId of elementsAtCell) {
-            const element = this.elementRegistry.get(elementId);
-            if (element.type === 'tetris' && element.layer > iceElement.layer) {
-                return true;
+            for (const elementId of elementsAtCell) {
+                const element = this.elementRegistry.get(elementId);
+                if (element && element.type === 'tetris' && element.layer > iceElement.layer) {
+                    return true; // 被上层方块覆盖
+                }
             }
         }
-
+        
         return false;
     }
 
@@ -945,8 +984,12 @@ class MapEngine {
     findIceAtCell(cellKey, layer) {
         const layerData = this.layers.get(layer);
         for (const element of layerData.elements.values()) {
-            if (element.type === 'ice' && `${element.position.x},${element.position.y}` === cellKey) {
-                return element;
+            if (element.type === 'ice') {
+                // 使用 calculateOccupiedCells 计算冰块占据的所有格子
+                const occupiedCells = this.calculateOccupiedCells(element.position, element.shapeData);
+                if (occupiedCells.includes(cellKey)) {
+                    return element;
+                }
             }
         }
         return null;
@@ -2225,6 +2268,10 @@ class MapEngine {
      * @param {Object} targetPosition - 目标位置 {x, y}
      */
     moveElementToPosition(elementId, targetPosition) {
+        // 强制清理所有缓存以确保最新计算结果
+        this.collisionCache.clear();
+        this.pathCache.clear();
+        
         const element = this.elementRegistry.get(elementId);
         if (!element) {
             console.warn(`元素 ${elementId} 不存在`);
@@ -2238,6 +2285,16 @@ class MapEngine {
         
         if (path.length === 0) {
             this.debugLog(`方块 ${elementId} 无法到达目标位置 (${targetPosition.x},${targetPosition.y})`);
+            // 添加详细的诊断信息
+            this.debugLog(`起始位置: (${startPosition.x},${startPosition.y})`);
+            this.debugLog(`目标位置碰撞检测:`, this.checkCollisionAtPosition(element, targetPosition, element.id));
+            this.debugLog(`当前方块信息:`, {
+                id: element.id,
+                position: element.position,
+                shapeData: element.shapeData,
+                movable: element.movable,
+                isMoving: element.isMoving
+            });
             return;
         }
 
@@ -2568,67 +2625,51 @@ class MapEngine {
      * @returns {boolean} 是否碰撞
      */
     checkCollisionAtPosition(element, position, excludeId) {
-        this.debugLog(`碰撞检测: 开始检查方块 ${element.id} 在位置 (${position.x},${position.y}), 排除ID: ${excludeId}`);
         if (element.type !== 'tetris') return false;
+
+        // 使用缓存提高性能
+        const cacheKey = `collision-${element.id}-${position.x}-${position.y}-${excludeId}`;
+        if (this.collisionCache.has(cacheKey)) {
+            return this.collisionCache.get(cacheKey);
+        }
+
+        // 首先检查整个方块是否在边界内
+        if (!this.isPositionWithinBounds(position, element.shapeData)) {
+            this.collisionCache.set(cacheKey, true);
+            return true; // 超出边界
+        }
 
         // 计算方块在目标位置占据的所有格子
         const occupiedCells = this.calculateOccupiedCells(position, element.shapeData);
         
-        this.debugLog(`碰撞检测: 方块 ${element.id} 在位置 (${position.x},${position.y}) 占据格子:`, occupiedCells);
-        
-        // 首先检查整个方块是否在边界内
-        if (!this.isPositionWithinBounds(position, element.shapeData)) {
-            this.debugLog(`碰撞检测: 方块 ${element.id} 在位置 (${position.x},${position.y}) 超出边界`);
-            return true; // 超出边界
-        }
-        
         // 检查每个格子是否碰撞
         for (const cellKey of occupiedCells) {
-            const [x, y] = cellKey.split(',').map(Number);
-            
-            // 检查第0层的碰撞（只检测可见的方块）
             const elementsAtCell = this.spatialIndex.get(cellKey);
-            this.debugLog(`碰撞检测: 格子 (${x},${y}) 中的元素:`, elementsAtCell ? Array.from(elementsAtCell) : '无');
             
             if (elementsAtCell) {
                 for (const elementId of elementsAtCell) {
-                    this.debugLog(`碰撞检测: 检查元素 ${elementId} (类型: ${typeof elementId}), 排除ID: ${excludeId} (类型: ${typeof excludeId}), 是否跳过: ${elementId === excludeId}`);
                     if (elementId === excludeId) continue;
                     
                     const otherElement = this.elementRegistry.get(elementId);
-                    this.debugLog(`碰撞检测: 检查元素 ${elementId}:`, otherElement ? {
-                        type: otherElement.type,
-                        layer: otherElement.layer,
-                        movable: otherElement.movable,
-                        isMoving: otherElement.isMoving
-                    } : '元素不存在');
                     
                     // 只检查第0层的方块和障碍物
                     if (otherElement && otherElement.layer === 0) {
-                        if (otherElement.type === 'rock') {
-                            this.debugLog(`碰撞检测: 与岩石 ${elementId} 碰撞`);
-                            return true; // 与岩石碰撞
+                        // 检查岩石和门碰撞
+                        if (otherElement.type === 'rock' || otherElement.type === 'gate') {
+                            this.collisionCache.set(cacheKey, true);
+                            return true;
                         }
-                        if (otherElement.type === 'gate') {
-                            this.debugLog(`碰撞检测: 与门 ${elementId} 碰撞`);
-                            return true; // 与门碰撞
-                        }
-                        if (otherElement.type === 'tetris' && otherElement.movable) {
-                            // 排除移动中的方块，避免自己与自己碰撞
-                            // 确保 isMoving 属性存在且为 false
-                            if (otherElement.isMoving !== true) {
-                                this.debugLog(`碰撞检测: 与可移动方块 ${elementId} 碰撞`);
-                                return true; // 与其他可移动方块碰撞
-                            } else {
-                                this.debugLog(`碰撞检测: 方块 ${elementId} 正在移动，跳过碰撞检测`);
-                            }
+                        // 检查其他可移动方块碰撞
+                        if (otherElement.type === 'tetris' && otherElement.movable && otherElement.isMoving !== true) {
+                            this.collisionCache.set(cacheKey, true);
+                            return true;
                         }
                     }
                 }
             }
         }
         
-        this.debugLog(`碰撞检测: 方块 ${element.id} 在位置 (${position.x},${position.y}) 无碰撞`);
+        this.collisionCache.set(cacheKey, false);
         return false;
     }
 
@@ -2645,12 +2686,24 @@ class MapEngine {
             return [];
         }
 
+        // 使用路径缓存优化性能
+        const pathCacheKey = `path-${element.id}-${startPos.x}-${startPos.y}-${targetPos.x}-${targetPos.y}`;
+        if (this.pathCache.has(pathCacheKey)) {
+            return this.pathCache.get(pathCacheKey);
+        }
+
+        // 注释掉过于激进的快速检查，因为目标位置可能通过移动其他方块变得可达
+        // if (this.checkCollisionAtPosition(element, targetPos, element.id)) {
+        //     this.pathCache.set(pathCacheKey, []);
+        //     return [];
+        // }
+
         // BFS队列：存储 {position, path}
         const queue = [{ position: startPos, path: [] }];
         const visited = new Set();
         visited.add(`${startPos.x},${startPos.y}`);
 
-        // 四个方向：上下左右
+        // 四个方向：上下左右（优化：按距离目标的方向排序）
         const directions = [
             { dx: 0, dy: -1 }, // 上
             { dx: 0, dy: 1 },  // 下
@@ -2658,8 +2711,18 @@ class MapEngine {
             { dx: 1, dy: 0 }   // 右
         ];
 
+        // 限制搜索深度，避免无限搜索（增加深度限制以应对复杂路径）
+        const maxDepth = this.GRID_SIZE * 3; // 从 *2 增加到 *3
+        let currentDepth = 0;
+
         while (queue.length > 0) {
             const { position, path } = queue.shift();
+            const currentPathLength = path.length;
+
+            // 检查路径长度限制
+            if (currentPathLength >= maxDepth) {
+                continue;
+            }
 
             // 尝试四个方向
             for (const dir of directions) {
@@ -2680,10 +2743,11 @@ class MapEngine {
 
                 // 检查是否碰撞
                 if (this.checkCollisionAtPosition(element, newPos, element.id)) {
+                    this.debugLog(`BFS: 位置(${newX},${newY})有碰撞，跳过`);
                     continue;
                 }
 
-                // 标记为已访问
+                // 只有通过所有检查后才标记为已访问
                 visited.add(newPosKey);
 
                 // 创建新路径
@@ -2691,15 +2755,19 @@ class MapEngine {
 
                 // 如果到达目标位置
                 if (newX === targetPos.x && newY === targetPos.y) {
+                    this.pathCache.set(pathCacheKey, newPath);
                     return newPath;
                 }
 
                 // 添加到队列
+                this.debugLog(`BFS: 添加位置(${newX},${newY})到队列，路径长度: ${newPath.length}`);
                 queue.push({ position: newPos, path: newPath });
             }
         }
 
         // 没有找到路径
+        this.debugLog(`BFS搜索失败: 从(${startPos.x},${startPos.y})到(${targetPos.x},${targetPos.y}), 最大深度: ${maxDepth}, 已访问位置数: ${visited.size}`);
+        this.pathCache.set(pathCacheKey, []);
         return [];
     }
 

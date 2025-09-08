@@ -72,7 +72,7 @@ const map1 = {
     {
       id: "square_2x2",
       color: "yellow",
-      position: { x: 6, y: 0 },
+      position: { x: 0, y: 6 },
       shape: "square",
       layer: 0
     },
