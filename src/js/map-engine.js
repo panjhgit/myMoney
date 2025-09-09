@@ -28,6 +28,37 @@ class MapEngine {
         this.cacheCleanupInterval = 10000; // 缓存清理间隔（毫秒）
         this.lastCacheCleanup = 0; // 上次清理时间
         
+        // 元素类型碰撞规则配置（新增 - 修复元素类型区分问题）
+        this.collisionRules = {
+            'tetris': {
+                canCollideWith: ['tetris', 'rock'],
+                canPassThrough: ['gate'], // 同色门可以通过
+                canMelt: ['ice'], // 可以融化冰块
+                blocksMovement: true
+            },
+            'ice': {
+                canCollideWith: ['tetris'],
+                canPassThrough: [],
+                canMelt: [],
+                blocksMovement: false, // 冰块不阻止移动，会被融化
+                canBeMelted: true
+            },
+            'rock': {
+                canCollideWith: ['tetris'],
+                canPassThrough: [],
+                canMelt: [],
+                blocksMovement: true,
+                canBeMelted: false
+            },
+            'gate': {
+                canCollideWith: ['tetris'],
+                canPassThrough: [],
+                canMelt: [],
+                blocksMovement: true, // 默认阻止，除非颜色匹配
+                requiresColorMatch: true // 需要颜色匹配才能通过
+            }
+        };
+        
         // 调试开关
         this.debugMode = true; // 设置为false关闭调试日志
         
@@ -479,23 +510,35 @@ class MapEngine {
     }
 
     /**
-     * 统一的位置更新方法（新的数据流核心）
+     * 统一的位置更新方法（增强一致性保证）
      * @param {Object} element - 元素对象
      * @param {Object} newPosition - 新位置 {x, y}
      */
     updateElementPosition(element, newPosition) {
-        const oldPosition = element.position;
+        const oldPosition = { ...element.position }; // 深拷贝防止引用问题
+        
+        // 验证新位置的有效性
+        if (!this.isValidPosition(newPosition)) {
+            this.debugLog(`无效位置更新请求: ${element.id} to (${newPosition.x},${newPosition.y})`);
+            return false;
+        }
+        
+        // 0. 清理相关缓存（确保数据一致性）
+        this.clearCacheForElement(element.id, oldPosition);
         
         // 1. 更新逻辑位置（唯一数据源）
-        element.position = newPosition;
+        element.position = { ...newPosition }; // 深拷贝防止意外修改
         
         // 2. 更新空间索引
         this.updateSpatialIndexForElement(element, oldPosition, newPosition);
         
-        // 3. 更新渲染位置（如果存在）
+        // 3. 更新层级数据的占用格子信息
+        this.updateLayerOccupiedCells(element, oldPosition, newPosition);
+        
+        // 4. 更新渲染位置（如果存在）
         if (element.blockElement && element.blockElement.element) {
-            element.blockElement.element.x = newPosition.x * this.cellSize;
-            element.blockElement.element.y = newPosition.y * this.cellSize;
+            element.blockElement.element.x = newPosition.x * this.CELL_SIZE;
+            element.blockElement.element.y = newPosition.y * this.CELL_SIZE;
             
             // 同步 creature.js 的位置
             if (element.blockElement.row !== undefined) {
@@ -506,7 +549,88 @@ class MapEngine {
             }
         }
         
-        this.debugLog(`位置更新: ${element.id} 从 (${oldPosition.x},${oldPosition.y}) 到 (${newPosition.x},${newPosition.y})`);
+        // 5. 触发相关的游戏逻辑检查
+        this.triggerPositionChangeEffects(element, oldPosition, newPosition);
+        
+        this.debugLog(`位置更新完成: ${element.id} 从 (${oldPosition.x},${oldPosition.y}) 到 (${newPosition.x},${newPosition.y})`);
+        return true;
+    }
+
+    /**
+     * 验证位置有效性（新增）
+     * @param {Object} position - 位置对象 {x, y}
+     * @returns {boolean} 是否有效
+     */
+    isValidPosition(position) {
+        return position && 
+               typeof position.x === 'number' && 
+               typeof position.y === 'number' &&
+               position.x >= 0 && position.x < this.GRID_SIZE &&
+               position.y >= 0 && position.y < this.GRID_SIZE;
+    }
+
+    /**
+     * 更新层级占用格子信息（新增 - 确保数据一致性）
+     * @param {Object} element - 元素对象
+     * @param {Object} oldPosition - 旧位置
+     * @param {Object} newPosition - 新位置
+     */
+    updateLayerOccupiedCells(element, oldPosition, newPosition) {
+        const layerData = this.layers.get(element.layer);
+        if (!layerData) return;
+
+        // 移除旧位置的占用格子
+        const oldCells = this.calculateOccupiedCells(oldPosition, element.shapeData);
+        oldCells.forEach(cell => {
+            layerData.occupiedCells.delete(cell);
+        });
+
+        // 添加新位置的占用格子
+        const newCells = this.calculateOccupiedCells(newPosition, element.shapeData);
+        newCells.forEach(cell => {
+            layerData.occupiedCells.add(cell);
+        });
+    }
+
+    /**
+     * 触发位置变化的相关效果（新增 - 统一处理位置变化的副作用）
+     * @param {Object} element - 元素对象
+     * @param {Object} oldPosition - 旧位置
+     * @param {Object} newPosition - 新位置
+     */
+    triggerPositionChangeEffects(element, oldPosition, newPosition) {
+        // 检查冰块融化
+        if (element.type === 'tetris') {
+            this.checkIceMelting();
+        }
+        
+        // 检查出门条件
+        if (element.type === 'tetris' && element.movable) {
+            this.checkElementGateExit(element);
+        }
+        
+        // 检查层级显露（已在updateSpatialIndexForElement中处理）
+        
+        // 清理相关的路径缓存
+        this.clearPathCacheForPosition(oldPosition);
+        this.clearPathCacheForPosition(newPosition);
+    }
+
+    /**
+     * 清理位置相关的路径缓存（新增）
+     * @param {Object} position - 位置对象
+     */
+    clearPathCacheForPosition(position) {
+        const keysToDelete = [];
+        const positionStr = `${position.x},${position.y}`;
+        
+        for (const [key, value] of this.pathCache.entries()) {
+            if (key.includes(positionStr)) {
+                keysToDelete.push(key);
+            }
+        }
+        
+        keysToDelete.forEach(key => this.pathCache.delete(key));
     }
 
     /**
@@ -649,12 +773,12 @@ class MapEngine {
             moveBlock(element.blockElement, newPosition, () => {
                 // 移动完成后的回调
                 this.checkIceMelting();
-                this.checkForExit(element);
+                this.checkGateExit();
             });
         } else {
             // 否则直接检查
             this.checkIceMelting();
-            this.checkForExit(element);
+            this.checkGateExit();
         }
 
         // 记录移动历史
@@ -665,8 +789,10 @@ class MapEngine {
             timestamp: Date.now()
         });
 
-        // 清除相关缓存
-        this.clearCacheForElement(element.id);
+        // 清除相关缓存（包括位置相关的级联缓存）
+        this.clearCacheForElement(element.id, oldPosition);
+        this.clearCacheForCells(this.calculateOccupiedCells(oldPosition, element.shapeData));
+        this.clearCacheForCells(this.calculateOccupiedCells(newPosition, element.shapeData));
     }
 
     /**
@@ -731,7 +857,7 @@ class MapEngine {
     }
 
     /**
-     * 检查出门条件
+     * 检查出门条件（选中元素）
      */
     checkGateExit() {
         if (!this.selectedElement) return;
@@ -741,6 +867,23 @@ class MapEngine {
         for (const gate of gates) {
             if (this.canExitThroughGate(this.selectedElement, gate)) {
                 this.exitThroughGate(this.selectedElement, gate);
+                break;
+            }
+        }
+    }
+
+    /**
+     * 检查指定元素的出门条件（新增 - 修复方法调用错误）
+     * @param {Object} element - 要检查的元素
+     */
+    checkElementGateExit(element) {
+        if (!element || element.type !== 'tetris' || !element.movable) return;
+
+        const gates = this.getAllElementsByType('gate');
+
+        for (const gate of gates) {
+            if (this.canExitThroughGate(element, gate)) {
+                this.exitThroughGate(element, gate);
                 break;
             }
         }
@@ -1200,15 +1343,100 @@ class MapEngine {
     }
 
     /**
-     * 清除元素相关缓存
+     * 清理元素相关的缓存（增强版 - 修复级联失效问题）
      * @param {string} elementId - 元素ID
+     * @param {Object} position - 元素位置（可选，用于清理位置相关缓存）
      */
-    clearCacheForElement(elementId) {
+    clearCacheForElement(elementId, position = null) {
+        const keysToDelete = [];
+        
         for (const [key, value] of this.collisionCache.entries()) {
+            // 清理包含该元素ID的所有缓存
             if (key.includes(elementId)) {
-                this.collisionCache.delete(key);
+                keysToDelete.push(key);
+            }
+            
+            // 如果提供了位置，清理可能受该位置影响的其他元素缓存
+            if (position !== null) {
+                const positionStr = `${position.x}-${position.y}`;
+                if (key.includes(positionStr)) {
+                    keysToDelete.push(key);
+                }
             }
         }
+        
+        // 批量删除，避免迭代过程中修改Map
+        keysToDelete.forEach(key => this.collisionCache.delete(key));
+        
+        this.debugLog(`清理缓存: 删除了 ${keysToDelete.length} 个缓存项 for element ${elementId}`);
+    }
+
+    /**
+     * 清理区域相关的缓存（新增 - 修复级联失效）
+     * @param {Array} cells - 受影响的格子列表
+     */
+    clearCacheForCells(cells) {
+        const keysToDelete = [];
+        
+        for (const [key, value] of this.collisionCache.entries()) {
+            // 检查缓存键是否包含任何受影响的格子坐标
+            for (const cell of cells) {
+                const [x, y] = cell.split(',').map(Number);
+                const positionStr = `${x}-${y}`;
+                if (key.includes(positionStr)) {
+                    keysToDelete.push(key);
+                    break; // 找到一个匹配就够了
+                }
+            }
+        }
+        
+        keysToDelete.forEach(key => this.collisionCache.delete(key));
+        
+        if (keysToDelete.length > 0) {
+            this.debugLog(`清理区域缓存: 删除了 ${keysToDelete.length} 个缓存项`);
+        }
+    }
+
+    /**
+     * 智能碰撞检测（新增 - 基于元素类型规则）
+     * @param {Object} movingElement - 移动的元素
+     * @param {Object} targetElement - 目标位置的元素
+     * @returns {Object} 碰撞检测结果 {collision: boolean, action: string, reason: string}
+     */
+    checkSmartCollision(movingElement, targetElement) {
+        if (!movingElement || !targetElement) {
+            return { collision: false, action: 'none', reason: 'no_elements' };
+        }
+
+        const movingRules = this.collisionRules[movingElement.type] || {};
+        const targetRules = this.collisionRules[targetElement.type] || {};
+
+        // 检查冰块融化
+        if (targetElement.type === 'ice' && movingRules.canMelt && movingRules.canMelt.includes('ice')) {
+            return { collision: false, action: 'melt_ice', reason: 'ice_melted' };
+        }
+
+        // 检查门的通过逻辑
+        if (targetElement.type === 'gate') {
+            if (targetRules.requiresColorMatch) {
+                // 检查颜色匹配
+                if (movingElement.color === targetElement.color) {
+                    return { collision: false, action: 'pass_through_gate', reason: 'color_match' };
+                } else {
+                    return { collision: true, action: 'block', reason: 'color_mismatch' };
+                }
+            }
+        }
+
+        // 检查普通碰撞
+        if (movingRules.canCollideWith && movingRules.canCollideWith.includes(targetElement.type)) {
+            if (targetRules.blocksMovement) {
+                return { collision: true, action: 'block', reason: 'normal_collision' };
+            }
+        }
+
+        // 默认无碰撞
+        return { collision: false, action: 'none', reason: 'no_collision' };
     }
 
     /**
@@ -2654,15 +2882,17 @@ class MapEngine {
                     
                     // 只检查第0层的方块和障碍物
                     if (otherElement && otherElement.layer === 0) {
-                        // 检查岩石和门碰撞
-                        if (otherElement.type === 'rock' || otherElement.type === 'gate') {
+                        // 使用智能碰撞检测替代简单的类型检查
+                        const collisionResult = this.checkSmartCollision(element, otherElement);
+                        
+                        if (collisionResult.collision) {
+                            this.debugLog(`碰撞检测: ${collisionResult.reason} - ${element.id} vs ${otherElement.id}`);
                             this.collisionCache.set(cacheKey, true);
                             return true;
-                        }
-                        // 检查其他可移动方块碰撞
-                        if (otherElement.type === 'tetris' && otherElement.movable && otherElement.isMoving !== true) {
-                            this.collisionCache.set(cacheKey, true);
-                            return true;
+                        } else if (collisionResult.action !== 'none') {
+                            // 记录特殊动作（如融化冰块、通过门）
+                            this.debugLog(`特殊动作: ${collisionResult.action} - ${collisionResult.reason}`);
+                            // 这些情况不阻止移动，但可能触发特殊效果
                         }
                     }
                 }
@@ -3059,7 +3289,7 @@ class MapEngine {
 
 
     /**
-     * 为单个元素更新空间索引（新的统一方法）
+     * 为单个元素更新空间索引（增强多层处理）
      * @param {Object} element - 元素对象
      * @param {Object} oldPosition - 旧位置
      * @param {Object} newPosition - 新位置
@@ -3067,6 +3297,7 @@ class MapEngine {
     updateSpatialIndexForElement(element, oldPosition, newPosition) {
         // 只对layer 0的元素更新空间索引
         if (element.layer !== 0) {
+            this.debugLog(`跳过非第0层元素的空间索引更新: ${element.id} (layer: ${element.layer})`);
             return;
         }
 
@@ -3090,6 +3321,42 @@ class MapEngine {
             }
             this.spatialIndex.get(cell).add(element.id);
         });
+
+        // 检查是否有隐藏层元素因为此次移动而需要显露
+        this.checkForLayerReveal(oldCells.concat(newCells));
+    }
+
+    /**
+     * 检查层级显露（新增 - 修复多层边缘情况）
+     * @param {Array} affectedCells - 受影响的格子
+     */
+    checkForLayerReveal(affectedCells) {
+        // 遍历所有下层元素，检查是否需要显露
+        for (let layer = 1; layer < this.MAX_LAYERS; layer++) {
+            const layerData = this.layers.get(layer);
+            if (!layerData) continue;
+
+            const elementsToReveal = [];
+            
+            layerData.elements.forEach(element => {
+                if (element.type === 'tetris' && !element.movable) {
+                    // 检查这个隐藏元素是否完全显露
+                    const elementCells = this.calculateOccupiedCells(element.position, element.shapeData);
+                    
+                    // 检查是否有任何格子与受影响的格子重叠
+                    const hasOverlap = elementCells.some(cell => affectedCells.includes(cell));
+                    
+                    if (hasOverlap && this.isElementFullyRevealed(element, layer)) {
+                        elementsToReveal.push(element);
+                    }
+                }
+            });
+
+            // 显露所有完全暴露的元素
+            elementsToReveal.forEach(element => {
+                this.revealHiddenElement(element, layer);
+            });
+        }
     }
 
 
