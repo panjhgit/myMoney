@@ -99,8 +99,43 @@ class MapEngine {
     }
 
     /**
+     * 根据关卡ID直接加载地图
+     * @param {number} levelId - 关卡ID
+     * @returns {boolean} 是否加载成功
+     */
+    loadMapByLevel(levelId) {
+        console.log(`MapEngine: 开始加载关卡 ${levelId}`);
+        
+        // 根据关卡ID获取地图数据
+        let mapData;
+        switch(levelId) {
+            case 1:
+                if (typeof map1 === 'undefined') {
+                    console.error(`地图文件 map1.js 未加载`);
+                    return false;
+                }
+                mapData = map1;
+                break;
+            case 2:
+                if (typeof map2 === 'undefined') {
+                    console.error(`地图文件 map2.js 未加载`);
+                    return false;
+                }
+                mapData = map2;
+                break;
+            default:
+                console.error(`关卡 ${levelId} 不存在`);
+                return false;
+        }
+        
+        // 加载地图数据
+        return this.loadMap(mapData);
+    }
+
+    /**
      * 加载地图数据
      * @param {Object} mapData - 地图配置数据
+     * @returns {boolean} 是否加载成功
      */
     loadMap(mapData) {
         this.clearMap();
@@ -140,6 +175,8 @@ class MapEngine {
 
         // 打印完整的网格状态
         this.printGridState();
+        
+        return true; // 返回加载成功状态
     }
 
     /**
@@ -436,8 +473,8 @@ class MapEngine {
 
         // 4. 更新渲染位置（如果存在）
         if (element.blockElement && element.blockElement.element) {
-            element.blockElement.element.x = newPosition.x * this.CELL_SIZE;
-            element.blockElement.element.y = newPosition.y * this.CELL_SIZE;
+            element.blockElement.element.x = newPosition.x * this.cellSize;
+            element.blockElement.element.y = newPosition.y * this.cellSize;
 
             // 同步 creature.js 的位置
             if (element.blockElement.row !== undefined) {
@@ -622,8 +659,8 @@ class MapEngine {
 
                 const element = this.elementRegistry.get(elementId);
 
-                // 只检查layer 0的元素
-                if (element && element.layer === 0) {
+                // 只检查layer 0的元素，且不是部分显露的冰块
+                if (element && element.layer === 0 && !element.partiallyRevealed) {
                     // 检查石块碰撞
                     if (element.type === 'rock') {
                         hasCollision = true;
@@ -1014,6 +1051,87 @@ class MapEngine {
     }
 
     /**
+     * 获取所有可见元素（第0层）
+     * @returns {Array} 可见元素数组
+     */
+    getAllVisibleElements() {
+        const elements = [];
+        this.elementRegistry.forEach(element => {
+            if (element.layer === 0 && !element.partiallyRevealed) {
+                elements.push(element);
+            }
+        });
+        return elements;
+    }
+
+    /**
+     * 获取指定位置的所有元素
+     * @param {number} x - X坐标
+     * @param {number} y - Y坐标
+     * @returns {Array} 元素数组
+     */
+    getElementsAtPosition(x, y) {
+        const cellKey = `${x},${y}`;
+        const elementIds = this.spatialIndex.get(cellKey);
+        if (!elementIds) return [];
+
+        const elements = [];
+        elementIds.forEach(elementId => {
+            const element = this.elementRegistry.get(elementId);
+            if (element) {
+                elements.push(element);
+            }
+        });
+        return elements;
+    }
+
+    /**
+     * 检查关卡是否完成
+     * @returns {boolean} 是否完成
+     */
+    isLevelComplete() {
+        const creatures = this.getAllElementsByType('tetris');
+        return creatures.length === 0; // 所有方块都出去了
+    }
+
+    /**
+     * 获取游戏统计信息
+     * @returns {Object} 统计信息
+     */
+    getGameStats() {
+        return {
+            totalElements: this.elementRegistry.size,
+            visibleElements: this.getAllVisibleElements().length,
+            hiddenElements: this.getAllElementsByType('tetris').filter(e => e.layer > 0).length,
+            gates: this.getAllElementsByType('gate').length,
+            rocks: this.getAllElementsByType('rock').length,
+            iceCells: Array.from(this.layers.values()).reduce((total, layer) => total + layer.iceCells.size, 0)
+        };
+    }
+
+    /**
+     * 获取当前地图的配置数据
+     * @returns {Object} 地图配置数据
+     */
+    getMapData() {
+        // 根据当前关卡返回对应的地图配置
+        switch(this.currentLevel) {
+            case 1:
+                return map1;
+            case 2:
+                return map2;
+            default:
+                console.warn(`关卡 ${this.currentLevel} 的配置数据不存在`);
+                return {
+                    level: this.currentLevel,
+                    target: 5,
+                    timeLimit: 300,
+                    name: `关卡 ${this.currentLevel}`
+                };
+        }
+    }
+
+    /**
      * 查找指定位置的冰层
      * @param {string} cellKey - 格子键
      * @param {number} layer - 层级
@@ -1161,6 +1279,30 @@ class MapEngine {
     }
 
     /**
+     * 显示部分显露的冰块（不参与碰撞检测）
+     * @param {Object} hiddenElement - 隐藏的方块元素
+     * @param {number} layer - 层级
+     */
+    showPartialIce(hiddenElement, layer) {
+        console.log(`部分显露冰块: ${hiddenElement.id} 在第${layer}层`);
+        
+        // 标记为部分显露状态
+        hiddenElement.partiallyRevealed = true;
+        hiddenElement.movable = false; // 仍然不可移动
+        
+        // 更新冰块状态（用于渲染）
+        const occupiedCells = this.calculateOccupiedCells(hiddenElement.position, hiddenElement.shapeData);
+        occupiedCells.forEach(cellKey => {
+            const layerData = this.layers.get(layer);
+            if (layerData) {
+                layerData.iceCells.add(cellKey);
+            }
+        });
+        
+        console.log(`冰块 ${hiddenElement.id} 部分显露，不参与碰撞检测`);
+    }
+
+    /**
      * 显露隐藏的方块
      * @param {Object} hiddenElement - 隐藏的方块元素
      * @param {number} fromLayer - 原层级
@@ -1171,6 +1313,7 @@ class MapEngine {
         // 将方块移动到第0层
         hiddenElement.layer = 0;
         hiddenElement.movable = true;
+        hiddenElement.partiallyRevealed = false; // 清除部分显露状态
 
         // 从原层级移除
         const oldLayerData = this.layers.get(fromLayer);
@@ -1655,6 +1798,15 @@ class MapEngine {
     drawMapElements() {
         if (!this.ctx) return;
 
+        // 绘制背景
+        this.drawBackground();
+
+        // 绘制棋盘
+        this.drawBoard();
+
+        // 绘制冰块
+        this.drawIceBlocks();
+
         // 绘制门
         this.drawGates();
 
@@ -1666,6 +1818,201 @@ class MapEngine {
 
         // 绘制俄罗斯方块（包括被冰块包裹的方块）
         this.drawTetrisBlocks();
+
+        // 绘制UI
+        this.drawUI();
+    }
+
+    /**
+     * 绘制背景
+     */
+    drawBackground() {
+        if (!this.ctx) return;
+
+        // 渐变背景
+        const gradient = this.ctx.createLinearGradient(0, 0, 0, this.systemInfo.windowHeight);
+        gradient.addColorStop(0, '#87CEEB');
+        gradient.addColorStop(1, '#4682B4');
+
+        this.ctx.fillStyle = gradient;
+        this.ctx.fillRect(0, 0, this.systemInfo.windowWidth, this.systemInfo.windowHeight);
+    }
+
+    /**
+     * 绘制棋盘
+     */
+    drawBoard() {
+        if (!this.ctx) return;
+
+        // 使用与drawMapGrid相同的坐标系统
+        const boardWidth = this.GRID_SIZE * this.cellSize;
+        const boardHeight = this.GRID_SIZE * this.cellSize;
+        const startX = this.gridOffsetX;
+        const startY = this.gridOffsetY;
+
+        // 绘制棋盘背景
+        this.ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
+        this.ctx.fillRect(startX, startY, boardWidth, boardHeight);
+
+        // 绘制网格线
+        this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+        this.ctx.lineWidth = 1;
+
+        for (let row = 0; row <= this.GRID_SIZE; row++) {
+            const y = startY + row * this.cellSize;
+            this.ctx.beginPath();
+            this.ctx.moveTo(startX, y);
+            this.ctx.lineTo(startX + boardWidth, y);
+            this.ctx.stroke();
+        }
+
+        for (let col = 0; col <= this.GRID_SIZE; col++) {
+            const x = startX + col * this.cellSize;
+            this.ctx.beginPath();
+            this.ctx.moveTo(x, startY);
+            this.ctx.lineTo(x, startY + boardHeight);
+            this.ctx.stroke();
+        }
+    }
+
+    /**
+     * 绘制冰块（淡色渲染）
+     */
+    drawIceBlocks() {
+        if (!this.ctx) return;
+
+        // 使用与drawMapGrid相同的坐标系统
+        const startX = this.gridOffsetX;
+        const startY = this.gridOffsetY;
+
+        // 从所有层级获取冰块数据
+        for (let layer = 1; layer < this.MAX_LAYERS; layer++) {
+            const layerData = this.layers.get(layer);
+            if (!layerData) continue;
+
+            layerData.iceCells.forEach(cellKey => {
+                const [x, y] = cellKey.split(',').map(Number);
+                const screenX = startX + x * this.cellSize;
+                const screenY = startY + y * this.cellSize;
+
+                this.ctx.save();
+                this.ctx.fillStyle = 'rgba(173, 216, 230, 0.3)'; // 淡蓝色，30%透明度
+                this.ctx.strokeStyle = 'rgba(135, 206, 235, 0.5)'; // 稍深的蓝色边框，50%透明度
+                this.ctx.lineWidth = 1;
+                this.ctx.fillRect(screenX, screenY, this.cellSize, this.cellSize);
+                this.ctx.strokeRect(screenX, screenY, this.cellSize, this.cellSize);
+                this.ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
+                this.ctx.fillRect(screenX + 2, screenY + 2, this.cellSize - 4, this.cellSize - 4);
+                this.ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+                this.ctx.font = '12px Arial';
+                this.ctx.textAlign = 'center';
+                this.ctx.fillText('❄', screenX + this.cellSize / 2, screenY + this.cellSize / 2 + 4);
+                this.ctx.restore();
+            });
+        }
+    }
+
+    /**
+     * 绘制UI
+     */
+    drawUI() {
+        if (!this.ctx) return;
+
+        // 绘制顶部信息栏背景
+        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+        this.ctx.fillRect(15, 100, this.systemInfo.windowWidth - 30, 50);
+
+        // 绘制金币
+        this.drawCoinIcon(25, 110);
+        this.drawCurrencyText(55, 110);
+
+        // 绘制爱心
+        this.drawHeartIcon(this.systemInfo.windowWidth - 100, 110);
+        this.drawLivesText(this.systemInfo.windowWidth - 60, 110);
+
+        // 绘制当前关卡
+        this.drawCurrentLevelText(this.systemInfo.windowWidth / 2, 110);
+    }
+
+    /**
+     * 绘制金币图标
+     */
+    drawCoinIcon(x, y) {
+        this.ctx.fillStyle = '#FFD700';
+        this.ctx.beginPath();
+        this.ctx.arc(x + 15, y + 15, 15, 0, 2 * Math.PI);
+        this.ctx.fill();
+
+        this.ctx.fillStyle = '#FFFFFF';
+        this.ctx.font = 'bold 12px Arial';
+        this.ctx.textAlign = 'center';
+        this.ctx.fillText('$', x + 15, y + 20);
+    }
+
+    /**
+     * 绘制金币数量
+     */
+    drawCurrencyText(x, y) {
+        this.ctx.fillStyle = '#FFFFFF';
+        this.ctx.font = 'bold 14px Arial';
+        this.ctx.textAlign = 'left';
+        this.ctx.fillText('1905', x, y + 15);
+
+        // 加号按钮
+        this.ctx.fillStyle = '#4CAF50';
+        this.ctx.beginPath();
+        this.ctx.arc(x + 40, y + 15, 8, 0, 2 * Math.PI);
+        this.ctx.fill();
+
+        this.ctx.fillStyle = '#FFFFFF';
+        this.ctx.font = 'bold 12px Arial';
+        this.ctx.textAlign = 'center';
+        this.ctx.fillText('+', x + 40, y + 19);
+    }
+
+    /**
+     * 绘制爱心图标
+     */
+    drawHeartIcon(x, y) {
+        this.ctx.fillStyle = '#FF6B6B';
+        this.ctx.beginPath();
+        this.ctx.moveTo(x + 15, y + 5);
+        this.ctx.bezierCurveTo(x + 5, y - 5, x - 5, y - 5, x - 5, y + 10);
+        this.ctx.bezierCurveTo(x - 5, y + 20, x + 15, y + 30, x + 15, y + 30);
+        this.ctx.bezierCurveTo(x + 15, y + 30, x + 35, y + 20, x + 35, y + 10);
+        this.ctx.bezierCurveTo(x + 35, y - 5, x + 25, y - 5, x + 15, y + 5);
+        this.ctx.fill();
+    }
+
+    /**
+     * 绘制生命值
+     */
+    drawLivesText(x, y) {
+        this.ctx.fillStyle = '#FFFFFF';
+        this.ctx.font = 'bold 14px Arial';
+        this.ctx.textAlign = 'left';
+        this.ctx.fillText('5', x, y + 15);
+
+        // 加号按钮
+        this.ctx.fillStyle = '#4CAF50';
+        this.ctx.beginPath();
+        this.ctx.arc(x + 20, y + 15, 8, 0, 2 * Math.PI);
+        this.ctx.fill();
+
+        this.ctx.fillStyle = '#FFFFFF';
+        this.ctx.font = 'bold 12px Arial';
+        this.ctx.textAlign = 'center';
+        this.ctx.fillText('+', x + 20, y + 19);
+    }
+
+    /**
+     * 绘制当前关卡
+     */
+    drawCurrentLevelText(x, y) {
+        this.ctx.fillStyle = '#FFFFFF';
+        this.ctx.font = 'bold 14px Arial';
+        this.ctx.textAlign = 'center';
+        this.ctx.fillText(`关卡 ${this.currentLevel}`, x, y + 15);
     }
 
     /**
@@ -1974,211 +2321,12 @@ class MapEngine {
     }
 
     /**
-     * 绘制单个俄罗斯方块
+     * 绘制单个俄罗斯方块（已删除，使用统一的drawCreature函数）
      * @param {Object} block - 方块对象
      */
     drawTetrisBlock(block) {
-        const color = this.getBlockColor(block.color);
-        const isSelected = this.selectedElement === block;
-        const isIceWrapped = block.layer === 1; // 第1层方块被冰块包裹
-
-        // 获取GSAP方块动画属性
-        let blockScale = 1, blockRotation = 0, blockBounce = 0, blockGlow = 0;
-        try {
-            if (this.animationTargets && this.animationTargets.blocks) {
-                blockScale = this.animationTargets.blocks.scale || 1;
-                blockRotation = this.animationTargets.blocks.rotation || 0;
-                blockBounce = this.animationTargets.blocks.bounce || 0;
-                blockGlow = this.animationTargets.blocks.glow || 0;
-            }
-        } catch (error) {
-            console.warn('获取方块动画属性失败:', error);
-        }
-
-        // 根据形状的每个块分别绘制 - 实时计算占据格子
-        const drawOccupiedCells = this.calculateOccupiedCells(block.position, block.shapeData);
-
-        if (drawOccupiedCells.length === 0) {
-            console.warn(`方块 ${block.id} 没有有效的格子坐标，跳过绘制`);
-            return;
-        }
-
-        // 安全地解析坐标
-        const cells = drawOccupiedCells.map(cellKey => {
-            if (typeof cellKey !== 'string' || !cellKey.includes(',')) {
-                console.warn(`无效的 cellKey 格式: ${cellKey}`);
-                return [0, 0]; // 返回默认坐标
-            }
-            return cellKey.split(',').map(Number);
-        }).filter(cell => !isNaN(cell[0]) && !isNaN(cell[1])); // 过滤掉无效坐标
-
-        if (cells.length === 0) {
-            console.warn(`方块 ${block.id} 没有有效的格子坐标，跳过绘制`);
-            return;
-        }
-
-        // 为每个块分别绘制
-        cells.forEach(cell => {
-            const [cellX, cellY] = cell;
-            const x = this.gridOffsetX + cellX * this.cellSize;
-            const y = this.gridOffsetY + cellY * this.cellSize;
-
-            this.ctx.save();
-
-            // 应用变换
-            this.ctx.translate(x + this.cellSize / 2, y + this.cellSize / 2);
-            this.ctx.rotate(blockRotation * Math.PI / 180);
-            this.ctx.scale(blockScale, blockScale);
-            this.ctx.translate(-this.cellSize / 2, -this.cellSize / 2);
-
-            // 设置阴影
-            if (blockGlow > 0) {
-                this.ctx.shadowColor = color;
-                this.ctx.shadowBlur = blockGlow * 10;
-            }
-
-            // 绘制单个块
-            if (isIceWrapped) {
-                // 被冰块包裹的方块：使用冰块效果
-                this.drawIceWrappedBlock(block, this.cellSize, this.cellSize);
-            } else {
-                // 正常方块：原始颜色
-                try {
-                    const gradient = this.ctx.createLinearGradient(0, 0, this.cellSize, this.cellSize);
-                    gradient.addColorStop(0, color);
-                    gradient.addColorStop(1, this.darkenColor(color, 0.2));
-                    this.ctx.fillStyle = gradient;
-                    this.ctx.fillRect(0, 0, this.cellSize, this.cellSize);
-                } catch (error) {
-                    console.warn(`方块 ${block.id} 渐变创建失败:`, error);
-                    this.ctx.fillStyle = color;
-                    this.ctx.fillRect(0, 0, this.cellSize, this.cellSize);
-                }
-            }
-
-            // 选中效果 - 静态高亮
-            if (isSelected) {
-                this.ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
-                this.ctx.fillRect(0, 0, this.cellSize, this.cellSize);
-
-                const borderAlpha = 0.9;
-                this.ctx.strokeStyle = `rgba(255, 255, 0, ${borderAlpha})`;
-                this.ctx.lineWidth = 3;
-                this.ctx.strokeRect(0, 0, this.cellSize, this.cellSize);
-            }
-
-            // 绘制边框 - 静态效果
-            const borderAlpha = 0.9;
-            this.ctx.strokeStyle = `rgba(255, 255, 255, ${borderAlpha})`;
-            this.ctx.lineWidth = 2;
-            this.ctx.strokeRect(0, 0, this.cellSize, this.cellSize);
-
-            this.ctx.restore();
-        });
-
-        return; // 提前返回，不再执行下面的边界框绘制
-
-        // 确保尺寸值是有限的
-        if (!isFinite(blockWidth) || !isFinite(blockHeight) || blockWidth <= 0 || blockHeight <= 0) {
-            console.warn(`方块 ${block.id} 尺寸异常:`, {blockWidth, blockHeight, cellSize: this.cellSize});
-            return; // 跳过绘制
-        }
-        const blockScreenX = this.gridOffsetX + minX * this.cellSize;
-        const blockScreenY = this.gridOffsetY + minY * this.cellSize;
-
-        // 安全获取动画状态 - 使用GSAP动画对象
-        const animationId = `block_select_${block.id}`;
-        const selectAnimation = this.animations.get(animationId);
-        let scale = 1;
-
-        try {
-            if (selectAnimation && selectAnimation.targets && selectAnimation.targets()[0]) {
-                scale = selectAnimation.targets()[0].scale || 1;
-            }
-        } catch (error) {
-            console.warn(`获取方块 ${block.id} 动画状态失败:`, error);
-            scale = 1;
-        }
-
-        // 应用GSAP动画变换
-        this.ctx.save();
-        this.ctx.translate(blockScreenX + blockWidth / 2, blockScreenY + blockHeight / 2);
-
-        // 组合所有动画效果
-        const finalScale = scale * blockScale;
-        const finalRotation = blockRotation * Math.PI / 180; // 转换为弧度
-        const bounceOffset = blockBounce * 5; // 弹跳偏移
-
-        this.ctx.scale(finalScale, finalScale);
-        this.ctx.rotate(finalRotation);
-        this.ctx.translate(-blockWidth / 2, -blockHeight / 2 + bounceOffset);
-
-        // 绘制整个方块的阴影 - 使用GSAP发光效果
-        const shadowAlpha = 0.2 + blockGlow * 0.3;
-        this.ctx.fillStyle = `rgba(0, 0, 0, ${shadowAlpha})`;
-        this.ctx.fillRect(2, 2, blockWidth, blockHeight);
-
-        // 绘制发光效果（如果启用）
-        if (blockGlow > 0) {
-            this.ctx.shadowColor = color;
-            this.ctx.shadowBlur = blockGlow * 10;
-        }
-
-        // 绘制整个方块的背景 - 带渐变效果
-        if (isIceWrapped) {
-            // 🧊 被冰块包裹的方块：使用GSAP动画的冰块效果
-            this.drawIceWrappedBlock(block, blockWidth, blockHeight);
-        } else {
-            // 正常方块：原始颜色
-            try {
-                const gradient = this.ctx.createLinearGradient(0, 0, blockWidth, blockHeight);
-                gradient.addColorStop(0, color);
-                gradient.addColorStop(1, this.darkenColor(color, 0.2));
-                this.ctx.fillStyle = gradient;
-                this.ctx.fillRect(0, 0, blockWidth, blockHeight);
-            } catch (error) {
-                console.warn(`方块 ${block.id} 渐变创建失败:`, error);
-                // 使用纯色作为备用
-                this.ctx.fillStyle = color;
-                this.ctx.fillRect(0, 0, blockWidth, blockHeight);
-            }
-        }
-
-        // 选中效果 - 静态高亮
-        if (isSelected) {
-            this.ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
-            this.ctx.fillRect(0, 0, blockWidth, blockHeight);
-
-            // 选中边框 - 静态效果
-            this.ctx.strokeStyle = 'rgba(255, 255, 0, 0.9)';
-            this.ctx.lineWidth = 3;
-            this.ctx.strokeRect(0, 0, blockWidth, blockHeight);
-        }
-
-        // 绘制整个方块的外边框 - 静态效果
-        const borderAlpha = 0.9;
-        this.ctx.strokeStyle = `rgba(255, 255, 255, ${borderAlpha})`;
-        this.ctx.lineWidth = 2;
-        this.ctx.strokeRect(0, 0, blockWidth, blockHeight);
-
-        // 绘制整个方块的高光 - 静态效果
-        const highlightAlpha = 0.3;
-        this.ctx.fillStyle = `rgba(255, 255, 255, ${highlightAlpha})`;
-        this.ctx.fillRect(2, 2, blockWidth - 4, 3);
-
-        // 绘制整个方块的内阴影 - 静态效果
-        const shadowAlpha2 = 0.1;
-        this.ctx.fillStyle = `rgba(0, 0, 0, ${shadowAlpha2})`;
-        this.ctx.fillRect(2, blockHeight - 2, blockWidth - 4, 2);
-
-        this.ctx.restore();
-
-        // 绘制方块ID（调试用）
-        const debugOccupiedCells = this.calculateOccupiedCells(block.position, block.shapeData);
-        if (debugOccupiedCells.length > 0) {
-            const firstCell = debugOccupiedCells[0].split(',').map(Number);
-            // 移除方块上的文字显示
-        }
+        // 已删除重复的绘制函数，统一使用 drawCreature
+        console.warn('drawTetrisBlock 已废弃，请使用 drawCreature');
     }
 
     /**
@@ -3081,14 +3229,21 @@ class MapEngine {
 
             layerData.elements.forEach(element => {
                 if (element.type === 'tetris' && !element.movable) {
-                    // 检查这个隐藏元素是否完全显露
+                    // 检查这个隐藏元素是否与空出来的格子重叠
                     const elementCells = this.calculateOccupiedCells(element.position, element.shapeData);
 
-                    // 检查是否有任何格子与受影响的格子重叠
+                    // 检查是否有任何格子与受影响的格子重叠（空出来的格子）
                     const hasOverlap = elementCells.some(cell => affectedCells.includes(cell));
 
-                    if (hasOverlap && this.isElementFullyRevealed(element, layer)) {
-                        elementsToReveal.push(element);
+                    if (hasOverlap) {
+                        // 检查是否完全显露
+                        if (this.isElementFullyRevealed(element, layer)) {
+                            // 完全显露，冰块融化，方块变为可移动
+                            elementsToReveal.push(element);
+                        } else {
+                            // 部分显露，显示冰块但不参与碰撞检测
+                            this.showPartialIce(element, layer);
+                        }
                     }
                 }
             });

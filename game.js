@@ -8,7 +8,7 @@ require('./src/js/config.js'); // 加载统一配置
 require('./src/js/gsap.min.js');
 require('./src/js/block.js'); // 需要先加载，因为包含EYE_TYPES等常量
 require('./src/js/creature.js');
-require('./src/js/game-engine.js'); // 加载游戏引擎
+// GameEngine已删除，现在直接使用MapEngine
 require('./src/js/menu.js');
 require('./src/js/map-engine.js');
 require('./src/map/map1.js');

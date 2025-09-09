@@ -8,18 +8,8 @@ var BlockStates = {
     idle: 'idle', moving: 'moving', selected: 'selected', exiting: 'exiting', eliminated: 'eliminated'
 };
 
-// 方块配置常量 - 使用统一配置
-var BLOCK_CONFIG = {
-    CELL_SIZE: GAME_CONFIG.CELL_SIZE, // 使用统一格子大小
-    EYE_SIZE: GAME_CONFIG.CREATURE_CONFIG.EYE_SIZE, // 使用统一眼睛大小
-    EYE_SPACING: 12, // 眼睛间距
-    EYE_OFFSET: 6, // 眼睛偏移
-    ANIMATION_DURATION: GAME_CONFIG.ANIMATION_DURATION, // 使用统一动画持续时间
-    BREATHING_DURATION: 2, // 呼吸动画持续时间
-    MOVE_DURATION: GAME_CONFIG.STEP_DURATION, // 使用统一移动持续时间
-    SELECT_SCALE: 1.2, // 选中时的缩放
-    GLOW_INTENSITY: 0.8 // 发光强度
-};
+// 方块配置常量 - 直接使用统一配置，避免重复定义
+// var BLOCK_CONFIG = { ... }; // 已删除，直接使用 GAME_CONFIG 中的配置
 
 // 颜色配置
 var BLOCK_COLORS = {
@@ -219,8 +209,8 @@ var createBlock = function (id, color, position, shape, layer) {
 
     // 创建Canvas元素
     block.element = {
-        x: position.x * BLOCK_CONFIG.CELL_SIZE,
-        y: position.y * BLOCK_CONFIG.CELL_SIZE,
+        x: position.x * GAME_CONFIG.CELL_SIZE,
+        y: position.y * GAME_CONFIG.CELL_SIZE,
         width: Math.max.apply(Math, shapeData.blocks.map(function (block) {
             return block[0];
         })) + 1,
@@ -247,30 +237,30 @@ var drawBlock = function (ctx, block, startX, startY) {
     var y = startY + element.y;
 
     ctx.save();
-    ctx.translate(x + element.width * BLOCK_CONFIG.CELL_SIZE / 2, y + element.height * BLOCK_CONFIG.CELL_SIZE / 2);
+    ctx.translate(x + element.width * GAME_CONFIG.CELL_SIZE / 2, y + element.height * GAME_CONFIG.CELL_SIZE / 2);
     ctx.scale(element.scale, element.scale);
-    ctx.translate(-element.width * BLOCK_CONFIG.CELL_SIZE / 2, -element.height * BLOCK_CONFIG.CELL_SIZE / 2);
+    ctx.translate(-element.width * GAME_CONFIG.CELL_SIZE / 2, -element.height * GAME_CONFIG.CELL_SIZE / 2);
 
     // 绘制方块
     element.blocks.forEach(function (blockPart) {
-        var blockX = blockPart[0] * BLOCK_CONFIG.CELL_SIZE;
-        var blockY = blockPart[1] * BLOCK_CONFIG.CELL_SIZE;
+        var blockX = blockPart[0] * GAME_CONFIG.CELL_SIZE;
+        var blockY = blockPart[1] * GAME_CONFIG.CELL_SIZE;
 
         // 绘制方块背景
         ctx.fillStyle = getColorFromGradient(element.color);
-        ctx.fillRect(blockX, blockY, BLOCK_CONFIG.CELL_SIZE, BLOCK_CONFIG.CELL_SIZE);
+        ctx.fillRect(blockX, blockY, GAME_CONFIG.CELL_SIZE, GAME_CONFIG.CELL_SIZE);
 
         // 绘制边框
         ctx.strokeStyle = 'rgba(0, 0, 0, 0.3)';
         ctx.lineWidth = 1;
-        ctx.strokeRect(blockX, blockY, BLOCK_CONFIG.CELL_SIZE, BLOCK_CONFIG.CELL_SIZE);
+        ctx.strokeRect(blockX, blockY, GAME_CONFIG.CELL_SIZE, GAME_CONFIG.CELL_SIZE);
 
         // 绘制眼睛（在第一个方块上）- 使用简化版本
         if (blockPart === element.blocks[0]) {
             // 简化的眼睛绘制，避免依赖 creature.js
-            var eyeSize = BLOCK_CONFIG.EYE_SIZE;
-            var eyeOffset = BLOCK_CONFIG.EYE_OFFSET;
-            var eyeSpacing = BLOCK_CONFIG.EYE_SPACING;
+            var eyeSize = GAME_CONFIG.CREATURE_CONFIG.EYE_SIZE;
+            var eyeOffset = 6; // 眼睛偏移
+            var eyeSpacing = 12; // 眼睛间距
 
             // 左眼
             ctx.fillStyle = 'white';
@@ -303,23 +293,19 @@ var drawBlock = function (ctx, block, startX, startY) {
 
 // 注意：getColorFromGradient 函数在 creature.js 中定义，这里不重复定义
 
-// 选择方块
+// 选择方块（已删除，使用统一的selectElement）
 var selectBlock = function (block) {
-    block.isSelected = true;
-    block.element.scale = BLOCK_CONFIG.SELECT_SCALE;
+    console.warn('selectBlock 已废弃，请使用 MapEngine.selectElement');
 };
 
-// 取消选择方块
+// 取消选择方块（已删除，使用统一的selectElement）
 var deselectBlock = function (block) {
-    block.isSelected = false;
-    block.element.scale = 1;
+    console.warn('deselectBlock 已废弃，请使用 MapEngine.selectElement');
 };
 
-// 移动方块
+// 移动方块（已删除，使用统一的moveElementToPosition）
 var moveBlock = function (block, newPosition) {
-    block.position = newPosition;
-    block.element.x = newPosition.x * BLOCK_CONFIG.CELL_SIZE;
-    block.element.y = newPosition.y * BLOCK_CONFIG.CELL_SIZE;
+    console.warn('moveBlock 已废弃，请使用 MapEngine.moveElementToPosition');
 };
 
 // 方块退出
@@ -364,10 +350,10 @@ var createIce = function (iceConfig) {
 
     var ice = {
         id: id, position: position, layer: layer, element: {
-            x: position.x * BLOCK_CONFIG.CELL_SIZE,
-            y: position.y * BLOCK_CONFIG.CELL_SIZE,
-            width: BLOCK_CONFIG.CELL_SIZE,
-            height: BLOCK_CONFIG.CELL_SIZE,
+        x: position.x * GAME_CONFIG.CELL_SIZE,
+        y: position.y * GAME_CONFIG.CELL_SIZE,
+        width: GAME_CONFIG.CELL_SIZE,
+        height: GAME_CONFIG.CELL_SIZE,
             alpha: 0.7
         }, // 添加 shapeData 属性，冰块是单个格子
         shapeData: {
@@ -415,7 +401,7 @@ var drawIce = function (ctx, ice, startX, startY) {
 // 确保在抖音小游戏环境中可用
 if (typeof window !== 'undefined') {
     window.BlockStates = BlockStates;
-    window.BLOCK_CONFIG = BLOCK_CONFIG;
+    // window.BLOCK_CONFIG = BLOCK_CONFIG; // 已删除，使用 GAME_CONFIG
     window.BLOCK_COLORS = BLOCK_COLORS;
     window.BLOCK_SHAPES = BLOCK_SHAPES;
     window.EYE_TYPES = EYE_TYPES;
@@ -431,7 +417,7 @@ if (typeof window !== 'undefined') {
     window.destroyBlock = destroyBlock;
 } else if (typeof global !== 'undefined') {
     global.BlockStates = BlockStates;
-    global.BLOCK_CONFIG = BLOCK_CONFIG;
+    // global.BLOCK_CONFIG = BLOCK_CONFIG; // 已删除，使用 GAME_CONFIG
     global.BLOCK_COLORS = BLOCK_COLORS;
     global.BLOCK_SHAPES = BLOCK_SHAPES;
     global.EYE_TYPES = EYE_TYPES;
@@ -448,7 +434,7 @@ if (typeof window !== 'undefined') {
 } else {
     // 在抖音小游戏环境中，直接设置为全局变量
     this.BlockStates = BlockStates;
-    this.BLOCK_CONFIG = BLOCK_CONFIG;
+    // this.BLOCK_CONFIG = BLOCK_CONFIG; // 已删除，使用 GAME_CONFIG
     this.BLOCK_COLORS = BLOCK_COLORS;
     this.BLOCK_SHAPES = BLOCK_SHAPES;
     this.EYE_TYPES = EYE_TYPES;

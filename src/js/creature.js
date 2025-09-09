@@ -3,8 +3,8 @@ var CreatureStates = {
     idle: 'idle', walking: 'walking', celebrating: 'celebrating', eliminated: 'eliminated'
 };
 
-// 生物配置常量 - 使用统一配置
-var CREATURE_CONFIG = GAME_CONFIG.CREATURE_CONFIG;
+// 生物配置常量 - 直接使用统一配置，避免重复定义
+// var CREATURE_CONFIG = GAME_CONFIG.CREATURE_CONFIG; // 已删除，直接使用 GAME_CONFIG.CREATURE_CONFIG
 
 // 创建俄罗斯方块风格的小人 - 适配抖音小游戏Canvas环境
 var createCreature = function (row, col, colorData) {
@@ -27,8 +27,8 @@ var createCreature = function (row, col, colorData) {
 
     // 在抖音小游戏环境中，创建Canvas元素而不是DOM元素
     creature.element = {
-        x: col * CREATURE_CONFIG.CELL_SIZE,
-        y: row * CREATURE_CONFIG.CELL_SIZE,
+        x: col * GAME_CONFIG.CREATURE_CONFIG.CELL_SIZE,
+        y: row * GAME_CONFIG.CREATURE_CONFIG.CELL_SIZE,
         width: Math.max.apply(Math, colorData.blocks.map(function (block) {
             return block[0];
         })) + 1,
@@ -57,23 +57,23 @@ var drawCreature = function (ctx, creature, startX, startY) {
     var y = startY + element.y;
 
     ctx.save();
-    ctx.translate(x + element.width * CREATURE_CONFIG.CELL_SIZE / 2, y + element.height * CREATURE_CONFIG.CELL_SIZE / 2);
+    ctx.translate(x + element.width * GAME_CONFIG.CREATURE_CONFIG.CELL_SIZE / 2, y + element.height * GAME_CONFIG.CREATURE_CONFIG.CELL_SIZE / 2);
     ctx.scale(element.scale, element.scale);
-    ctx.translate(-element.width * CREATURE_CONFIG.CELL_SIZE / 2, -element.height * CREATURE_CONFIG.CELL_SIZE / 2);
+    ctx.translate(-element.width * GAME_CONFIG.CREATURE_CONFIG.CELL_SIZE / 2, -element.height * GAME_CONFIG.CREATURE_CONFIG.CELL_SIZE / 2);
 
     // 绘制生物方块
     element.blocks.forEach(function (block) {
-        var blockX = block[0] * CREATURE_CONFIG.CELL_SIZE;
-        var blockY = block[1] * CREATURE_CONFIG.CELL_SIZE;
+        var blockX = block[0] * GAME_CONFIG.CREATURE_CONFIG.CELL_SIZE;
+        var blockY = block[1] * GAME_CONFIG.CREATURE_CONFIG.CELL_SIZE;
 
         // 绘制方块背景
         ctx.fillStyle = getColorFromGradient(element.color);
-        ctx.fillRect(blockX, blockY, CREATURE_CONFIG.CELL_SIZE, CREATURE_CONFIG.CELL_SIZE);
+        ctx.fillRect(blockX, blockY, GAME_CONFIG.CREATURE_CONFIG.CELL_SIZE, GAME_CONFIG.CREATURE_CONFIG.CELL_SIZE);
 
         // 绘制边框
         ctx.strokeStyle = 'rgba(0, 0, 0, 0.3)';
         ctx.lineWidth = 1;
-        ctx.strokeRect(blockX, blockY, CREATURE_CONFIG.CELL_SIZE, CREATURE_CONFIG.CELL_SIZE);
+        ctx.strokeRect(blockX, blockY, GAME_CONFIG.CREATURE_CONFIG.CELL_SIZE, GAME_CONFIG.CREATURE_CONFIG.CELL_SIZE);
 
         // 绘制眼睛（智能选择位置）
         if (shouldDrawEyesOnBlock(block, element.blocks)) {
@@ -116,13 +116,13 @@ var shouldDrawEyesOnBlock = function (currentBlock, allBlocks) {
 
 // 绘制眼睛 - 支持多种眼睛类型
 var drawEyes = function (ctx, blockX, blockY, element) {
-    var eyeSize = CREATURE_CONFIG.EYE_SIZE;
-    var cellSize = CREATURE_CONFIG.CELL_SIZE;
+    var eyeSize = GAME_CONFIG.CREATURE_CONFIG.EYE_SIZE;
+    var cellSize = GAME_CONFIG.CREATURE_CONFIG.CELL_SIZE;
 
     // 计算眼睛的精确位置，让它们居中
     var centerX = blockX + cellSize / 2;
     var centerY = blockY + cellSize / 3; // 稍微偏上一点
-    var eyeSpacing = CREATURE_CONFIG.EYE_SPACING;
+    var eyeSpacing = GAME_CONFIG.CREATURE_CONFIG.EYE_SPACING;
 
     // 获取眼睛类型配置 - 安全检查
     var eyeType = 'circle'; // 默认眼睛类型
@@ -412,22 +412,19 @@ var getColorFromGradient = function (gradientString) {
     return '#666666';
 };
 
-// 移动生物
+// 移动生物（已删除，使用统一的moveElementToPosition）
 var moveCreature = function (creature, newRow, newCol) {
-    creature.row = newRow;
-    creature.col = newCol;
-    creature.element.x = newCol * CREATURE_CONFIG.CELL_SIZE;
-    creature.element.y = newRow * CREATURE_CONFIG.CELL_SIZE;
+    console.warn('moveCreature 已废弃，请使用 MapEngine.moveElementToPosition');
 };
 
-// 选择生物（无视觉效果）
+// 选择生物（已删除，使用统一的selectElement）
 var selectCreature = function (creature) {
-    // 无操作 - 选择效果由地图引擎处理
+    console.warn('selectCreature 已废弃，请使用 MapEngine.selectElement');
 };
 
-// 取消选择生物（无视觉效果）
+// 取消选择生物（已删除，使用统一的selectElement）
 var deselectCreature = function (creature) {
-    // 无操作 - 选择效果由地图引擎处理
+    console.warn('deselectCreature 已废弃，请使用 MapEngine.selectElement');
 };
 
 // 销毁生物
@@ -444,21 +441,21 @@ if (typeof window !== 'undefined') {
     window.createCreature = createCreature;
     window.drawCreature = drawCreature;
     window.drawEyes = drawEyes;
-    window.CREATURE_CONFIG = CREATURE_CONFIG;
+    // window.CREATURE_CONFIG = CREATURE_CONFIG; // 已删除，使用 GAME_CONFIG.CREATURE_CONFIG
 }
 
 if (typeof global !== 'undefined') {
     global.createCreature = createCreature;
     global.drawCreature = drawCreature;
     global.drawEyes = drawEyes;
-    global.CREATURE_CONFIG = CREATURE_CONFIG;
+    // global.CREATURE_CONFIG = CREATURE_CONFIG; // 已删除，使用 GAME_CONFIG.CREATURE_CONFIG
 }
 
 if (typeof this !== 'undefined') {
     this.createCreature = createCreature;
     this.drawCreature = drawCreature;
     this.drawEyes = drawEyes;
-    this.CREATURE_CONFIG = CREATURE_CONFIG;
+    // this.CREATURE_CONFIG = CREATURE_CONFIG; // 已删除，使用 GAME_CONFIG.CREATURE_CONFIG
 }
 
 
