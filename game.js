@@ -6,11 +6,11 @@ console.log(
 // 加载必要的库和模块
 require('./src/js/config.js'); // 加载统一配置
 require('./src/js/gsap.min.js');
+require('./src/js/block.js'); // 需要先加载，因为包含EYE_TYPES等常量
 require('./src/js/creature.js');
 require('./src/js/game-engine.js'); // 加载游戏引擎
 require('./src/js/menu.js');
 require('./src/js/map-engine.js');
-require('./src/js/block.js');
 require('./src/map/map1.js');
 require('./src/map/map2.js');
 

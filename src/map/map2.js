@@ -25,13 +25,6 @@ const map2 = {
       position: { x: 3, y: 3 }, // 地图中心位置
       shape: "lshape",
       layer: 0,
-      // 设置为飞行模式，使用翅膀
-      movementType: "wings",
-      // 翅膀配置
-      wingConfig: {
-        color: "#2C3E50", // 深蓝色翅膀
-        size: "medium"
-      }
     },
     {
       id: "square_block_1",
@@ -39,8 +32,6 @@ const map2 = {
       position: { x: 1, y: 1 }, // 左上角位置
       shape: "square",
       layer: 0,
-      // 设置为走路模式，使用腿
-      movementType: "feet"
     }
   ],
   
