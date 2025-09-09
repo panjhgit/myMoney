@@ -94,9 +94,9 @@ function startGame(levelId) {
     return;
   }
   
-  // 检查 Block 系统是否已加载
-  if (typeof createBlock === 'undefined') {
-    console.error('Block 系统未找到，请检查 block.js 是否正确加载');
+  // 检查 Creature 系统是否已加载
+  if (typeof createCreature === 'undefined') {
+    console.error('Creature 系统未找到，请检查 creature.js 是否正确加载');
     return;
   }
   
@@ -128,7 +128,7 @@ function startGame(levelId) {
   // 加载地图数据
   mapEngine.loadMap(mapData);
   
-  console.log('Block 系统已加载，支持方块动画和行为');
+  console.log('Creature 系统已加载，支持方块动画和行为');
   console.log('游戏状态已切换到:', gameState);
 }
 

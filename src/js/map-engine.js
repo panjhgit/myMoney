@@ -8,7 +8,6 @@ class MapEngine {
     constructor() {
         // 使用统一配置
         this.GRID_SIZE = GAME_CONFIG.GRID_SIZE;
-        this.CELL_SIZE = GAME_CONFIG.CELL_SIZE;
         this.MAX_LAYERS = 10; // 最大层数
 
         // 核心数据结构
@@ -700,18 +699,9 @@ class MapEngine {
         // 使用新的统一位置更新方法
         this.updateElementPosition(element, newPosition);
 
-        // 如果方块有 blockElement，使用 block.js 的移动动画
-        if (element.blockElement && typeof moveBlock !== 'undefined') {
-            moveBlock(element.blockElement, newPosition, () => {
-                // 移动完成后的回调
-                this.checkIceMelting();
-                this.checkGateExit();
-            });
-        } else {
-            // 否则直接检查
-            this.checkIceMelting();
-            this.checkGateExit();
-        }
+        // 直接检查，不再使用废弃的moveBlock函数
+        this.checkIceMelting();
+        this.checkGateExit();
 
         // 记录移动历史
         this.moveHistory.push({
@@ -897,19 +887,10 @@ class MapEngine {
     exitThroughGate(element, gate) {
         console.log(`方块 ${element.id} 通过 ${gate.color} 门离开`);
 
-        // 如果方块有 blockElement，使用 block.js 的退出动画
-        if (element.blockElement && typeof exitBlock !== 'undefined') {
-            exitBlock(element.blockElement, () => {
-                this.removeElement(element.id);
-                this.selectedElement = null;
-                this.checkWinCondition();
-            });
-        } else {
-            // 否则直接移除
-            this.removeElement(element.id);
-            this.selectedElement = null;
-            this.checkWinCondition();
-        }
+        // 直接移除，不再使用废弃的exitBlock函数
+        this.removeElement(element.id);
+        this.selectedElement = null;
+        this.checkWinCondition();
     }
 
     /**
@@ -972,9 +953,10 @@ class MapEngine {
         const element = this.elementRegistry.get(elementId);
         if (!element) return;
 
-        // 如果方块有 blockElement，清理 block.js 的元素
-        if (element.blockElement && typeof destroyBlock !== 'undefined') {
-            destroyBlock(element.blockElement);
+        // 清理 blockElement（不再使用废弃的destroyBlock函数）
+        if (element.blockElement) {
+            // 简单的清理，避免内存泄漏
+            element.blockElement = null;
         }
 
         const layer = this.layers.get(element.layer);
@@ -1657,8 +1639,8 @@ class MapEngine {
         ctx.restore();
 
         // 绘制加粗的外边框 - 非门部分用黑色，门部分用对应颜色
-        const borderWidth = Math.max(6, this.cellSize * 0.15); // 边框宽度与格子大小成比例
-        const borderAlpha = 0.9; // 静态边框透明度
+        const borderWidth = Math.max(12, this.cellSize * 0.25); // 更粗的边框，向外延伸
+        const borderAlpha = 1.0; // 完全不透明的边框
 
         // 获取门的位置信息
         const gates = this.getAllElementsByType('gate');
@@ -1674,7 +1656,7 @@ class MapEngine {
             }))
         };
 
-        // 绘制完整的正方形边框，包含四个角
+        // 绘制完整的正方形边框，包含四个角 - 紧贴棋盘边缘
         // 先绘制整个边框为黑色
         ctx.strokeStyle = `rgba(0, 0, 0, ${borderAlpha})`;
         ctx.lineWidth = borderWidth;
@@ -1724,11 +1706,11 @@ class MapEngine {
             const gateColor = `rgba(${this.hexToRgb(color)}, ${borderAlpha})`;
 
             ctx.strokeStyle = gateColor;
-            ctx.lineWidth = borderWidth;
+            ctx.lineWidth = borderWidth + 2; // 门比边框稍粗一点
 
             let startX, startY, endX, endY;
 
-            // 根据门的方向计算坐标
+            // 根据门的方向计算坐标 - 紧贴棋盘边缘
             switch (gate.direction) {
                 case 'up':
                     // 上方的门
@@ -1800,6 +1782,9 @@ class MapEngine {
 
         // 绘制背景
         this.drawBackground();
+
+        // 绘制地图网格和边框
+        this.drawMapGrid();
 
         // 绘制棋盘
         this.drawBoard();
@@ -2031,11 +2016,11 @@ class MapEngine {
      * @param {Object} gate - 门对象
      */
     drawGateLabel(gate) {
-        const borderWidth = Math.max(6, this.cellSize * 0.15);
+        const borderWidth = Math.max(12, this.cellSize * 0.25); // 与边框保持一致
 
         let x, y, width, height;
 
-        // 根据门的方向和位置计算坐标
+        // 根据门的方向和位置计算坐标 - 紧贴棋盘边缘
         switch (gate.direction) {
             case 'up':
                 x = this.gridOffsetX + gate.position.x * this.cellSize;
@@ -2074,9 +2059,9 @@ class MapEngine {
         this.ctx.translate(x + width / 2, y + height / 2);
         this.ctx.translate(-width / 2, -height / 2);
 
-        // 门标签 - 移除脉冲特效，保持静态
+        // 门标签 - 更清晰可见的标签
         this.ctx.fillStyle = `rgba(255, 255, 255, 1)`;
-        this.ctx.font = 'bold 10px Arial';
+        this.ctx.font = 'bold 14px Arial';
         this.ctx.textAlign = 'center';
         this.ctx.fillText(gate.color.toUpperCase(), width / 2, height / 2 + 3);
 
