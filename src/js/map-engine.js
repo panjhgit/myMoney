@@ -619,11 +619,8 @@ class MapEngine {
      * @returns {boolean} 是否合法
      */
     isValidMove(element, newPosition) {
-        // 检查边界
-        const maxX = Math.max(...element.shapeData.blocks.map(block => block[0]));
-        const maxY = Math.max(...element.shapeData.blocks.map(block => block[1]));
-
-        if (newPosition.x < 0 || newPosition.y < 0 || newPosition.x + maxX >= this.GRID_SIZE || newPosition.y + maxY >= this.GRID_SIZE) {
+        // 使用统一的边界检查方法
+        if (!this.isPositionWithinBounds(newPosition, element.shapeData)) {
             return false;
         }
 
@@ -631,7 +628,7 @@ class MapEngine {
         const newCells = this.calculateOccupiedCells(newPosition, element.shapeData);
 
         // 检查碰撞
-        return this.checkCollision(element.id, newCells);
+        return !this.checkCollision(element.id, newCells);
     }
 
     /**
@@ -700,8 +697,8 @@ class MapEngine {
         this.updateElementPosition(element, newPosition);
 
         // 直接检查，不再使用废弃的moveBlock函数
-        this.checkIceMelting();
-        this.checkGateExit();
+                this.checkIceMelting();
+                this.checkGateExit();
 
         // 记录移动历史
         this.moveHistory.push({
@@ -888,9 +885,9 @@ class MapEngine {
         console.log(`方块 ${element.id} 通过 ${gate.color} 门离开`);
 
         // 直接移除，不再使用废弃的exitBlock函数
-        this.removeElement(element.id);
-        this.selectedElement = null;
-        this.checkWinCondition();
+            this.removeElement(element.id);
+            this.selectedElement = null;
+            this.checkWinCondition();
     }
 
     /**
@@ -1445,6 +1442,16 @@ class MapEngine {
             if (targetRules.blocksMovement) {
                 return {collision: true, action: 'block', reason: 'normal_collision'};
             }
+        }
+
+        // 特殊处理：tetris vs tetris 总是碰撞
+        if (movingElement.type === 'tetris' && targetElement.type === 'tetris') {
+            return {collision: true, action: 'block', reason: 'tetris_vs_tetris'};
+        }
+
+        // 特殊处理：tetris vs rock 总是碰撞
+        if (movingElement.type === 'tetris' && targetElement.type === 'rock') {
+            return {collision: true, action: 'block', reason: 'tetris_vs_rock'};
         }
 
         // 默认无碰撞
@@ -2403,160 +2410,227 @@ class MapEngine {
     }
 
     /**
-     * 移动元素到指定位置
+     * 移动元素到指定位置（简化版）
      * @param {string} elementId - 元素ID
      * @param {Object} targetPosition - 目标位置 {x, y}
      */
     moveElementToPosition(elementId, targetPosition) {
-        // 强制清理所有缓存以确保最新计算结果
-        this.collisionCache.clear();
-        this.pathCache.clear();
-
         const element = this.elementRegistry.get(elementId);
-        if (!element) {
-            console.warn(`元素 ${elementId} 不存在`);
+        if (!element || element.type !== 'tetris' || !element.movable) {
+            console.log(`[移动] 方块 ${elementId} 无法移动:`, {element: !!element, type: element?.type, movable: element?.movable});
             return;
         }
 
         const startPosition = {...element.position};
+        console.log(`[移动] 开始移动方块 ${elementId} 从 (${startPosition.x},${startPosition.y}) 到 (${targetPosition.x},${targetPosition.y})`);
 
-        // 使用BFS计算移动路径
-        const path = this.calculateStepPath(startPosition, targetPosition, element);
+        // 计算移动路径
+        const path = this.calculatePath(startPosition, targetPosition, element);
 
         if (path.length === 0) {
-            this.debugLog(`方块 ${elementId} 无法到达目标位置 (${targetPosition.x},${targetPosition.y})`);
-            // 添加详细的诊断信息
-            this.debugLog(`起始位置: (${startPosition.x},${startPosition.y})`);
-            this.debugLog(`目标位置碰撞检测:`, this.checkCollisionAtPosition(element, targetPosition, element.id));
-            this.debugLog(`当前方块信息:`, {
-                id: element.id,
-                position: element.position,
-                shapeData: element.shapeData,
-                movable: element.movable,
-                isMoving: element.isMoving
-            });
+            console.log(`[移动] 方块 ${elementId} 无法到达目标位置 (${targetPosition.x},${targetPosition.y})`);
+            // 清除所有缓存，避免缓存错误结果
+            this.clearAllCache();
             return;
         }
 
-        this.debugLog(`方块 ${elementId} 移动路径:`, {
-            from: startPosition, to: targetPosition, path: path, pathLength: path.length
-        });
-
-        // 执行移动动画
-        this.animateBlockMove(element, startPosition, targetPosition, path);
+        console.log(`[移动] 找到路径，长度: ${path.length}`);
+        // 执行移动
+        this.executeMoveWithAnimation(element, path);
     }
 
     /**
-     * 动画移动方块（使用BFS计算的路径）
+     * 计算移动路径（统一版）
+     * @param {Object} startPos - 起始位置
+     * @param {Object} targetPos - 目标位置
      * @param {Object} element - 方块元素
-     * @param {Object} fromPosition - 起始位置
-     * @param {Object} toPosition - 目标位置
-     * @param {Array} path - BFS计算的路径
+     * @returns {Array} 路径数组
      */
-    animateBlockMove(element, fromPosition, toPosition, path) {
+    calculatePath(startPos, targetPos, element) {
+        console.log(`[calculatePath] 开始计算路径: 从(${startPos.x},${startPos.y})到(${targetPos.x},${targetPos.y}), 方块: ${element.id}`);
+        console.log(`[calculatePath] 方块类型: ${element.type}, 形状:`, element.shapeData);
+        
+        // 如果起始位置就是目标位置
+        if (startPos.x === targetPos.x && startPos.y === targetPos.y) {
+            console.log(`[calculatePath] 起始位置就是目标位置，返回空路径`);
+            return [];
+        }
+
+        // 使用路径缓存优化性能
+        const pathCacheKey = `path-${element.id}-${startPos.x}-${startPos.y}-${targetPos.x}-${targetPos.y}`;
+        if (this.pathCache.has(pathCacheKey)) {
+            const cachedPath = this.pathCache.get(pathCacheKey);
+            console.log(`[calculatePath] 使用缓存路径, 长度: ${cachedPath.length}`);
+            return cachedPath;
+        }
+
+        // 使用BFS计算最短路径
+        console.log(`[calculatePath] 开始BFS路径计算`);
+        const path = this.calculateBFSPathSimple(element, startPos, targetPos);
+        console.log(`[calculatePath] BFS结果: 路径长度 ${path.length}`);
+        
+        if (path.length === 0) {
+            console.log(`[calculatePath] BFS失败，寻找最近可达位置`);
+            // 如果BFS失败，寻找最近可达位置
+            const nearestPos = this.findNearestReachablePosition(element, startPos, targetPos);
+            console.log(`[calculatePath] 最近可达位置: (${nearestPos.x},${nearestPos.y})`);
+            if (nearestPos.x !== startPos.x || nearestPos.y !== startPos.y) {
+                const nearestPath = this.calculateBFSPathSimple(element, startPos, nearestPos);
+                console.log(`[calculatePath] 最近可达路径长度: ${nearestPath.length}`);
+                this.pathCache.set(pathCacheKey, nearestPath);
+                return nearestPath;
+            } else {
+                console.log(`[calculatePath] 最近可达位置就是起始位置，无法移动`);
+                // 即使最近可达位置就是起始位置，也返回空路径
+                this.pathCache.set(pathCacheKey, []);
+                return [];
+            }
+        }
+
+        this.pathCache.set(pathCacheKey, path);
+        console.log(`[calculatePath] 最终路径长度: ${path.length}`);
+        return path;
+    }
+
+    /**
+     * 简化的BFS路径计算
+     * @param {Object} element - 方块元素
+     * @param {Object} startPos - 起始位置
+     * @param {Object} targetPos - 目标位置
+     * @returns {Array} 路径数组
+     */
+    calculateBFSPathSimple(element, startPos, targetPos) {
+        console.log(`[BFS] 开始BFS: 从(${startPos.x},${startPos.y})到(${targetPos.x},${targetPos.y})`);
+        
+        // BFS队列：存储 {position, path}
+        const queue = [{position: startPos, path: []}];
+        const visited = new Set();
+        visited.add(`${startPos.x},${startPos.y}`);
+
+        // 四个方向：只能上下左右移动
+        const directions = [
+            {dx: 0, dy: -1}, // 上
+            {dx: 0, dy: 1},  // 下
+            {dx: -1, dy: 0}, // 左
+            {dx: 1, dy: 0}   // 右
+        ];
+
+        // 限制搜索深度
+        const maxDepth = this.GRID_SIZE * 2;
+        let iterations = 0;
+
+        while (queue.length > 0) {
+            const {position, path} = queue.shift();
+            const currentDepth = path.length;
+            iterations++;
+
+            console.log(`[BFS] 处理位置 (${position.x},${position.y}), 深度: ${currentDepth}, 队列长度: ${queue.length}`);
+
+            // 如果到达目标位置
+            if (position.x === targetPos.x && position.y === targetPos.y) {
+                console.log(`[BFS] 找到路径! 迭代次数: ${iterations}, 路径长度: ${path.length}`);
+                return path;
+            }
+
+            // 检查深度限制
+            if (currentDepth >= maxDepth) {
+                console.log(`[BFS] 达到最大深度限制: ${currentDepth}`);
+                continue;
+            }
+
+            // 尝试四个方向
+            for (const dir of directions) {
+                const newX = position.x + dir.dx;
+                const newY = position.y + dir.dy;
+                const newPos = {x: newX, y: newY};
+                const newPosKey = `${newX},${newY}`;
+
+                // 如果已经访问过，跳过
+                if (visited.has(newPosKey)) {
+                    continue;
+                }
+
+                // 检查边界
+                if (newX < 0 || newY < 0 || newX >= this.GRID_SIZE || newY >= this.GRID_SIZE) {
+                    continue;
+                }
+
+                // 检查是否碰撞
+                const hasCollision = this.checkCollisionAtPosition(element, newPos, element.id);
+                if (hasCollision) {
+                    continue;
+                }
+
+                // 标记为已访问
+                visited.add(newPosKey);
+
+                // 创建新路径
+                const newPath = [...path, newPos];
+
+                // 添加到队列
+                queue.push({position: newPos, path: newPath});
+                console.log(`[BFS] 添加位置 (${newX},${newY}) 到队列`);
+            }
+        }
+
+        // 没有找到路径
+        console.log(`[BFS] 未找到路径! 迭代次数: ${iterations}, 队列长度: ${queue.length}, 最大深度: ${maxDepth}`);
+        return [];
+    }
+
+    /**
+     * 执行移动动画（简化版）
+     * @param {Object} element - 方块元素
+     * @param {Array} path - 移动路径
+     */
+    executeMoveWithAnimation(element, path) {
         if (!element.blockElement || !element.blockElement.element) {
-            // 如果没有 blockElement，直接更新位置
-            this.executeMove(element, toPosition);
+            // 如果没有blockElement，直接更新位置
+            this.updateElementPosition(element, path[path.length - 1]);
             return;
         }
 
-        // 检查是否已有动画在运行，如果有则停止
+        // 检查是否已有动画在运行
         const animationId = `block_move_${element.id}`;
         if (this.animations.has(animationId)) {
-            console.log(`停止方块 ${element.id} 的旧动画`);
-            const oldAnimation = this.animations.get(animationId);
-            if (oldAnimation && oldAnimation.kill) {
-                oldAnimation.kill();
-            }
-            this.animations.delete(animationId);
+            this.animations.get(animationId).kill();
         }
 
         const blockElement = element.blockElement.element;
+        element.isMoving = true;
 
-
-        this.debugLog(`方块 ${element.id} 使用BFS路径移动:`, {
-            from: fromPosition, to: toPosition, path: path, pathLength: path.length
-        });
-
-        if (path.length === 0) {
-            // 没有有效路径
-            this.debugLog(`方块 ${element.id} 没有有效路径`);
-            return;
-        }
-
-        // 创建走路时间线
+        // 创建动画时间线
         const walkTimeline = gsap.timeline({
             onComplete: () => {
-                // 使用新的统一方法确保最终位置同步
-                this.updateElementPosition(element, toPosition);
-
-                // 清除移动状态
                 element.isMoving = false;
-                element.movingTo = null;
-
-                // 检查是否有下层方块显露
                 this.checkLayerReveal(element);
-
-                // 清理缓存
                 this.cleanupCache();
-
-                // 打印移动后的网格状态
-                this.debugLog(`方块 ${element.id} 移动完成后的网格状态:`);
-                this.printGridState();
-
-
-                // 清理动画
                 this.animations.delete(animationId);
-
-                this.debugLog(`方块 ${element.id} 移动动画完成，最终位置: (${toPosition.x},${toPosition.y})`);
             }
         });
 
-        // 标记方块为移动状态
-        element.isMoving = true;
-        element.movingTo = toPosition;
-
-        // 注册动画
         this.animations.set(animationId, walkTimeline);
 
-        // 按照BFS路径一格一格移动
+        // 按路径逐步移动
         path.forEach((step, index) => {
-            const stepDuration = 0.6; // 每步持续时间
+            const stepDuration = 0.6;
             const delay = index * stepDuration;
 
-            // 更新逻辑位置（使用新的统一方法）
+            // 更新逻辑位置
             walkTimeline.call(() => {
                 this.updateElementPosition(element, {x: step.x, y: step.y});
-                this.debugLog(`方块 ${element.id} 移动到步骤: (${step.x},${step.y})`);
             }, [], delay);
 
-            // 使用更自然的缓动函数和物理效果
-            if (typeof Physics2DPlugin !== 'undefined' && Physics2DPlugin) {
-                // 使用Physics2D插件创建更自然的移动效果
+            // 更新渲染位置
                 walkTimeline.to(blockElement, {
                     x: step.x * this.cellSize,
                     y: step.y * this.cellSize,
                     duration: stepDuration,
-                    ease: "power2.out",
-                    physics2D: {
-                        velocity: 200 + Math.random() * 100, // 随机速度变化
-                        angle: 0, gravity: 0, friction: 0.8, bounce: 0.1 // 轻微弹跳
-                    }
+                ease: "power2.out"
                 }, delay);
-            } else {
-                // 降级到普通动画，但使用更自然的缓动
-                walkTimeline.to(blockElement, {
-                    x: step.x * this.cellSize,
-                    y: step.y * this.cellSize,
-                    duration: stepDuration,
-                    ease: "elastic.out(1, 0.6)" // 弹性缓动，更生动
-                }, delay);
-            }
-
-            // 添加更丰富的身体动画
-            // 移动效果已简化
         });
     }
+
 
     /**
      * 网格坐标系统 - 将屏幕坐标转换为网格坐标
@@ -2667,6 +2741,30 @@ class MapEngine {
     }
 
     /**
+     * 清除指定元素的路径缓存
+     * @param {string} elementId - 元素ID
+     */
+    clearPathCacheForElement(elementId) {
+        const keysToDelete = [];
+        for (const key of this.pathCache.keys()) {
+            if (key.includes(elementId)) {
+                keysToDelete.push(key);
+            }
+        }
+        keysToDelete.forEach(key => this.pathCache.delete(key));
+        console.log(`[缓存] 清除元素 ${elementId} 的路径缓存，删除了 ${keysToDelete.length} 个缓存项`);
+    }
+
+    /**
+     * 清除所有缓存 - 调试用
+     */
+    clearAllCache() {
+        this.collisionCache.clear();
+        this.pathCache.clear();
+        console.log(`[缓存] 清除所有缓存`);
+    }
+
+    /**
      * 打印完整的网格状态 - 调试用
      */
     printGridState() {
@@ -2705,6 +2803,13 @@ class MapEngine {
     }
 
     isWithinBounds(x, y) {
+        return x >= 0 && x < this.GRID_SIZE && y >= 0 && y < this.GRID_SIZE;
+    }
+
+    /**
+     * 检查单个位置是否在边界内（调试用）
+     */
+    isPositionWithinBoundsSimple(x, y) {
         return x >= 0 && x < this.GRID_SIZE && y >= 0 && y < this.GRID_SIZE;
     }
 
@@ -2768,283 +2873,23 @@ class MapEngine {
                         const collisionResult = this.checkSmartCollision(element, otherElement);
 
                         if (collisionResult.collision) {
-                            this.debugLog(`碰撞检测: ${collisionResult.reason} - ${element.id} vs ${otherElement.id}`);
                             this.collisionCache.set(cacheKey, true);
                             return true;
                         } else if (collisionResult.action !== 'none') {
                             // 记录特殊动作（如融化冰块、通过门）
-                            this.debugLog(`特殊动作: ${collisionResult.action} - ${collisionResult.reason}`);
                             // 这些情况不阻止移动，但可能触发特殊效果
                         }
                     }
                 }
             }
         }
-
         this.collisionCache.set(cacheKey, false);
         return false;
     }
 
-    /**
-     * BFS路径计算 - 计算从起始位置到目标位置的最短路径
-     * @param {Object} element - 方块元素
-     * @param {Object} startPos - 起始位置 {x, y}
-     * @param {Object} targetPos - 目标位置 {x, y}
-     * @returns {Array} 路径数组，如果不可达返回空数组
-     */
-    calculateBFSPath(element, startPos, targetPos) {
-        // 如果起始位置就是目标位置
-        if (startPos.x === targetPos.x && startPos.y === targetPos.y) {
-            return [];
-        }
 
-        // 使用路径缓存优化性能
-        const pathCacheKey = `path-${element.id}-${startPos.x}-${startPos.y}-${targetPos.x}-${targetPos.y}`;
-        if (this.pathCache.has(pathCacheKey)) {
-            return this.pathCache.get(pathCacheKey);
-        }
 
-        // 注释掉过于激进的快速检查，因为目标位置可能通过移动其他方块变得可达
-        // if (this.checkCollisionAtPosition(element, targetPos, element.id)) {
-        //     this.pathCache.set(pathCacheKey, []);
-        //     return [];
-        // }
 
-        // BFS队列：存储 {position, path}
-        const queue = [{position: startPos, path: []}];
-        const visited = new Set();
-        visited.add(`${startPos.x},${startPos.y}`);
-
-        // 八个方向：上下左右 + 四个对角线方向
-        const directions = [{dx: 0, dy: -1}, // 上
-            {dx: 0, dy: 1},  // 下
-            {dx: -1, dy: 0}, // 左
-            {dx: 1, dy: 0},  // 右
-            {dx: -1, dy: -1}, // 左上
-            {dx: 1, dy: -1},  // 右上
-            {dx: -1, dy: 1},  // 左下
-            {dx: 1, dy: 1}    // 右下
-        ];
-
-        // 限制搜索深度，避免无限搜索（增加深度限制以应对复杂路径）
-        const maxDepth = this.GRID_SIZE * 3; // 从 *2 增加到 *3
-        let currentDepth = 0;
-
-        while (queue.length > 0) {
-            const {position, path} = queue.shift();
-            const currentPathLength = path.length;
-
-            // 检查路径长度限制
-            if (currentPathLength >= maxDepth) {
-                continue;
-            }
-
-            this.debugLog(`BFS: 处理位置 (${position.x},${position.y}), 路径长度: ${currentPathLength}, 队列剩余: ${queue.length}`);
-
-            // 尝试四个方向
-            for (const dir of directions) {
-                const newX = position.x + dir.dx;
-                const newY = position.y + dir.dy;
-                const newPos = {x: newX, y: newY};
-                const newPosKey = `${newX},${newY}`;
-
-                // 如果已经访问过，跳过
-                if (visited.has(newPosKey)) {
-                    continue;
-                }
-
-                // 检查新位置是否有效（检查整个方块的边界）
-                if (!this.isPositionWithinBounds(newPos, element.shapeData)) {
-                    continue;
-                }
-
-                // 检查是否碰撞
-                if (this.checkCollisionAtPosition(element, newPos, element.id)) {
-                    this.debugLog(`BFS: 位置(${newX},${newY})有碰撞，跳过`);
-                    continue;
-                }
-
-                // 只有通过所有检查后才标记为已访问
-                visited.add(newPosKey);
-
-                // 创建新路径
-                const newPath = [...path, newPos];
-
-                // 如果到达目标位置
-                if (newX === targetPos.x && newY === targetPos.y) {
-                    this.pathCache.set(pathCacheKey, newPath);
-                    return newPath;
-                }
-
-                // 添加到队列
-                this.debugLog(`BFS: 添加位置(${newX},${newY})到队列，路径长度: ${newPath.length}`);
-                queue.push({position: newPos, path: newPath});
-            }
-        }
-
-        // 没有找到路径
-        this.debugLog(`BFS搜索失败: 从(${startPos.x},${startPos.y})到(${targetPos.x},${targetPos.y}), 最大深度: ${maxDepth}, 已访问位置数: ${visited.size}`);
-
-        // 尝试使用改进的搜索策略
-        this.debugLog(`尝试使用改进的搜索策略...`);
-        const improvedPath = this.calculateImprovedPath(element, startPos, targetPos);
-        if (improvedPath.length > 0) {
-            this.pathCache.set(pathCacheKey, improvedPath);
-            return improvedPath;
-        }
-
-        this.pathCache.set(pathCacheKey, []);
-        return [];
-    }
-
-    /**
-     * 改进的路径搜索策略
-     * 当BFS失败时，尝试更智能的搜索方法
-     * @param {Object} element - 方块元素
-     * @param {Object} startPos - 起始位置
-     * @param {Object} targetPos - 目标位置
-     * @returns {Array} 路径数组
-     */
-    calculateImprovedPath(element, startPos, targetPos) {
-        this.debugLog(`改进搜索: 从(${startPos.x},${startPos.y})到(${targetPos.x},${targetPos.y})`);
-
-        // 策略1: 尝试直接路径（忽略中间障碍物）
-        const directPath = this.calculateDirectPath(element, startPos, targetPos);
-        if (directPath.length > 0) {
-            this.debugLog(`直接路径成功: ${directPath.length} 步`);
-            return directPath;
-        }
-
-        // 策略2: 尝试绕行路径（优先选择远离障碍物的方向）
-        const detourPath = this.calculateDetourPath(element, startPos, targetPos);
-        if (detourPath.length > 0) {
-            this.debugLog(`绕行路径成功: ${detourPath.length} 步`);
-            return detourPath;
-        }
-
-        // 策略3: 寻找最近的可达位置
-        const nearestPos = this.findNearestReachablePosition(element, startPos, targetPos);
-        if (nearestPos.x !== startPos.x || nearestPos.y !== startPos.y) {
-            this.debugLog(`找到最近可达位置: (${nearestPos.x},${nearestPos.y})`);
-            return this.calculateBFSPath(element, startPos, nearestPos);
-        }
-
-        this.debugLog(`改进搜索失败: 无法找到任何路径`);
-        return [];
-    }
-
-    /**
-     * 计算直接路径（直线移动）
-     * @param {Object} element - 方块元素
-     * @param {Object} startPos - 起始位置
-     * @param {Object} targetPos - 目标位置
-     * @returns {Array} 路径数组
-     */
-    calculateDirectPath(element, startPos, targetPos) {
-        const path = [];
-        let currentPos = {...startPos};
-
-        // 计算移动方向
-        const dx = targetPos.x - startPos.x;
-        const dy = targetPos.y - startPos.y;
-
-        // 如果目标位置就是起始位置
-        if (dx === 0 && dy === 0) {
-            return [];
-        }
-
-        // 尝试直线移动
-        const steps = Math.max(Math.abs(dx), Math.abs(dy));
-        const stepX = dx === 0 ? 0 : (dx > 0 ? 1 : -1);
-        const stepY = dy === 0 ? 0 : (dy > 0 ? 1 : -1);
-
-        for (let i = 0; i < steps; i++) {
-            currentPos.x += stepX;
-            currentPos.y += stepY;
-
-            // 检查是否碰撞
-            if (this.checkCollisionAtPosition(element, currentPos, element.id)) {
-                this.debugLog(`直接路径在位置 (${currentPos.x},${currentPos.y}) 遇到碰撞`);
-                return [];
-            }
-
-            path.push({...currentPos});
-        }
-
-        return path;
-    }
-
-    /**
-     * 计算绕行路径（优先选择远离障碍物的方向）
-     * @param {Object} element - 方块元素
-     * @param {Object} startPos - 起始位置
-     * @param {Object} targetPos - 目标位置
-     * @returns {Array} 路径数组
-     */
-    calculateDetourPath(element, startPos, targetPos) {
-        // 使用优先级队列，优先选择距离目标更近且障碍物更少的方向
-        const queue = [{position: startPos, path: [], priority: 0}];
-        const visited = new Set();
-        visited.add(`${startPos.x},${startPos.y}`);
-
-        const directions = [{dx: 0, dy: -1, name: '上'}, {dx: 0, dy: 1, name: '下'}, {
-            dx: -1,
-            dy: 0,
-            name: '左'
-        }, {dx: 1, dy: 0, name: '右'}, {dx: -1, dy: -1, name: '左上'}, {dx: 1, dy: -1, name: '右上'}, {
-            dx: -1,
-            dy: 1,
-            name: '左下'
-        }, {dx: 1, dy: 1, name: '右下'}];
-
-        while (queue.length > 0) {
-            // 按优先级排序（优先级越低越优先）
-            queue.sort((a, b) => a.priority - b.priority);
-            const {position, path} = queue.shift();
-
-            if (path.length >= 10) { // 限制绕行路径长度
-                continue;
-            }
-
-            // 尝试四个方向
-            for (const dir of directions) {
-                const newX = position.x + dir.dx;
-                const newY = position.y + dir.dy;
-                const newPos = {x: newX, y: newY};
-                const newPosKey = `${newX},${newY}`;
-
-                if (visited.has(newPosKey)) {
-                    continue;
-                }
-
-                // 检查边界
-                if (!this.isPositionWithinBounds(newPos, element.shapeData)) {
-                    continue;
-                }
-
-                // 检查碰撞
-                if (this.checkCollisionAtPosition(element, newPos, element.id)) {
-                    continue;
-                }
-
-                visited.add(newPosKey);
-
-                // 计算优先级（距离目标的曼哈顿距离）
-                const distanceToTarget = Math.abs(newX - targetPos.x) + Math.abs(newY - targetPos.y);
-                const newPath = [...path, newPos];
-
-                // 如果到达目标
-                if (newX === targetPos.x && newY === targetPos.y) {
-                    this.debugLog(`绕行路径成功: ${newPath.length} 步`);
-                    return newPath;
-                }
-
-                queue.push({position: newPos, path: newPath, priority: distanceToTarget});
-            }
-        }
-
-        return [];
-    }
 
     /**
      * 寻找距离目标最近的可达位置
@@ -3054,7 +2899,7 @@ class MapEngine {
      * @returns {Object} 最近的可达位置
      */
     findNearestReachablePosition(element, startPos, targetPos) {
-        this.debugLog(`寻找最近可达位置: 从(${startPos.x},${startPos.y})到(${targetPos.x},${targetPos.y})`);
+        console.log(`[最近位置] 寻找最近可达位置: 从(${startPos.x},${startPos.y})到(${targetPos.x},${targetPos.y})`);
 
         // 使用BFS寻找最近的可达位置
         const queue = [{position: startPos, distance: 0}];
@@ -3064,15 +2909,14 @@ class MapEngine {
         let bestPosition = startPos;
         let bestDistance = Math.abs(startPos.x - targetPos.x) + Math.abs(startPos.y - targetPos.y);
 
-        const directions = [// 四个基本方向
-            {dx: 0, dy: -1}, {dx: 0, dy: 1}, {dx: -1, dy: 0}, {dx: 1, dy: 0}, // 四个对角线方向
-            {dx: -1, dy: -1}, {dx: 1, dy: -1}, {dx: -1, dy: 1}, {dx: 1, dy: 1}];
+        const directions = [// 四个基本方向：只能上下左右移动
+            {dx: 0, dy: -1}, {dx: 0, dy: 1}, {dx: -1, dy: 0}, {dx: 1, dy: 0}];
 
         while (queue.length > 0) {
             const {position, distance} = queue.shift();
 
             // 限制搜索深度，避免无限搜索
-            if (distance > 5) {
+            if (distance > 10) {
                 continue;
             }
 
@@ -3088,13 +2932,15 @@ class MapEngine {
 
                 // 检查新位置是否有效（检查整个方块的边界）
                 if (!this.isPositionWithinBounds(newPos, element.shapeData)) {
+                    console.log(`[最近位置] 位置(${newX},${newY})超出边界`);
                     continue;
                 }
 
                 visited.add(newPosKey);
 
                 // 检查是否可达
-                if (!this.checkCollisionAtPosition(element, newPos, element.id)) {
+                const hasCollision = this.checkCollisionAtPosition(element, newPos, element.id);
+                if (!hasCollision) {
                     // 计算到目标的距离
                     const distanceToTarget = Math.abs(newX - targetPos.x) + Math.abs(newY - targetPos.y);
 
@@ -3102,64 +2948,21 @@ class MapEngine {
                     if (distanceToTarget < bestDistance) {
                         bestPosition = newPos;
                         bestDistance = distanceToTarget;
-                        this.debugLog(`找到更好的位置: (${newX},${newY}), 距离目标: ${distanceToTarget}`);
+                        console.log(`[最近位置] 找到更好的位置: (${newX},${newY}), 距离目标: ${distanceToTarget}`);
                     }
+                    
+                    // 只有可达的位置才加入队列继续搜索
+                    queue.push({position: newPos, distance: distance + 1});
+                } else {
+                    console.log(`[最近位置] 位置(${newX},${newY})有碰撞，跳过`);
                 }
-
-                queue.push({position: newPos, distance: distance + 1});
             }
         }
 
-        this.debugLog(`最近可达位置: (${bestPosition.x},${bestPosition.y}), 距离目标: ${bestDistance}`);
+        console.log(`[最近位置] 最近可达位置: (${bestPosition.x},${bestPosition.y}), 距离目标: ${bestDistance}`);
         return bestPosition;
     }
 
-    /**
-     * 计算移动路径（使用BFS算法）
-     * @param {Object} fromPosition - 起始位置
-     * @param {Object} toPosition - 目标位置
-     * @param {Object} element - 方块元素
-     * @returns {Array} 路径数组
-     */
-    calculateStepPath(fromPosition, toPosition, element) {
-        // 使用BFS计算最短路径
-        const path = this.calculateBFSPath(element, fromPosition, toPosition);
-
-        if (path.length === 0) {
-            this.debugLog(`calculateStepPath: BFS失败，尝试改进的搜索策略...`);
-            // 使用改进的搜索策略
-            const improvedPath = this.calculateImprovedPath(element, fromPosition, toPosition);
-            if (improvedPath.length > 0) {
-                this.debugLog(`calculateStepPath: 改进搜索成功，找到 ${improvedPath.length} 步路径`);
-                return improvedPath;
-            }
-
-            // 如果改进搜索也失败，寻找最近的可达位置
-            this.debugLog(`calculateStepPath: 改进搜索失败，寻找最近可达位置...`);
-            const nearestPos = this.findNearestReachablePosition(element, fromPosition, toPosition);
-
-            // 防止无限循环：检查找到的位置是否与起始位置不同
-            if (nearestPos.x !== fromPosition.x || nearestPos.y !== fromPosition.y) {
-                this.debugLog(`calculateStepPath: 找到最近可达位置 (${nearestPos.x},${nearestPos.y})`);
-                // 再次检查这个位置是否真的可达
-                const nearestPath = this.calculateBFSPath(element, fromPosition, nearestPos);
-                if (nearestPath.length > 0) {
-                    this.debugLog(`calculateStepPath: 成功找到到最近位置的路径，长度: ${nearestPath.length}`);
-                    return nearestPath;
-                } else {
-                    this.debugLog(`calculateStepPath: 到最近位置的路径也不可达，放弃移动`);
-                }
-            } else {
-                this.debugLog(`calculateStepPath: 最近可达位置就是起始位置，无法移动`);
-            }
-
-            // 如果所有方法都失败，返回空路径
-            this.debugLog(`calculateStepPath: 所有搜索策略都失败，无法移动`);
-            return [];
-        }
-
-        return path;
-    }
 
 
     /**
@@ -3224,7 +3027,7 @@ class MapEngine {
                         // 检查是否完全显露
                         if (this.isElementFullyRevealed(element, layer)) {
                             // 完全显露，冰块融化，方块变为可移动
-                            elementsToReveal.push(element);
+                        elementsToReveal.push(element);
                         } else {
                             // 部分显露，显示冰块但不参与碰撞检测
                             this.showPartialIce(element, layer);
