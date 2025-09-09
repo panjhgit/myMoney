@@ -2298,17 +2298,23 @@ class MapEngine {
         blocks.forEach(block => {
             // 如果方块有 blockElement，使用 creature.js 的绘制函数
             if (block.blockElement && typeof drawCreature !== 'undefined') {
-                // 确保 blockElement 的位置与逻辑位置同步（使用统一的位置更新）
+                // 只在位置真正改变时才更新位置，避免不必要的重新渲染
                 if (block.blockElement.element) {
-                    block.blockElement.element.x = block.position.x * this.cellSize;
-                    block.blockElement.element.y = block.position.y * this.cellSize;
+                    const newX = block.position.x * this.cellSize;
+                    const newY = block.position.y * this.cellSize;
+                    
+                    // 只有位置真正改变时才更新
+                    if (block.blockElement.element.x !== newX || block.blockElement.element.y !== newY) {
+                        block.blockElement.element.x = newX;
+                        block.blockElement.element.y = newY;
+                    }
                 }
 
-                // 同步 creature 的 row 和 col
-                if (block.blockElement.row !== undefined) {
+                // 同步 creature 的 row 和 col（只在需要时）
+                if (block.blockElement.row !== undefined && block.blockElement.row !== block.position.y) {
                     block.blockElement.row = block.position.y;
                 }
-                if (block.blockElement.col !== undefined) {
+                if (block.blockElement.col !== undefined && block.blockElement.col !== block.position.x) {
                     block.blockElement.col = block.position.x;
                 }
 
