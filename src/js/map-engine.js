@@ -1309,6 +1309,8 @@ class MapEngine {
                 for (const elementId of elementsAtCell) {
                     const element = this.elementRegistry.get(elementId);
                     if (element && element.layer === upperLayer && element.type === 'tetris') {
+                        // 添加调试日志
+                        console.log(`[遮挡检测] 位置(${x},${y}) 被第${upperLayer}层方块 ${elementId} 遮挡`);
                         return true; // 被遮挡
                     }
                 }
@@ -1349,6 +1351,7 @@ class MapEngine {
      */
     revealHiddenElement(hiddenElement, fromLayer) {
         console.log(`显露隐藏方块: ${hiddenElement.id} 从第${fromLayer}层移动到第0层`);
+        console.log(`[显露前] 方块 ${hiddenElement.id} 位置: (${hiddenElement.position.x},${hiddenElement.position.y})`);
 
         // 将方块移动到第0层
         hiddenElement.layer = 0;
@@ -1374,6 +1377,18 @@ class MapEngine {
                 this.spatialIndex.set(cellKey, new Set());
             }
             this.spatialIndex.get(cellKey).add(hiddenElement.id);
+        });
+
+        // 确保空间索引的一致性：移除可能存在的重复引用
+        this.spatialIndex.forEach((elementSet, cellKey) => {
+            const validElements = new Set();
+            elementSet.forEach(elementId => {
+                const element = this.elementRegistry.get(elementId);
+                if (element) {
+                    validElements.add(elementId);
+                }
+            });
+            this.spatialIndex.set(cellKey, validElements);
         });
 
         // 触发显露动画
@@ -1938,31 +1953,66 @@ class MapEngine {
         const startX = this.gridOffsetX;
         const startY = this.gridOffsetY;
 
-        // 从所有层级获取冰块数据
+        // 绘制隐藏方块位置的冰块
         for (let layer = 1; layer < this.MAX_LAYERS; layer++) {
             const layerData = this.layers.get(layer);
             if (!layerData) continue;
 
-            layerData.iceCells.forEach(cellKey => {
-                const [x, y] = cellKey.split(',').map(Number);
-                const screenX = startX + x * this.cellSize;
-                const screenY = startY + y * this.cellSize;
+            // 获取该层的所有隐藏方块
+            const hiddenBlocks = Array.from(layerData.elements.values()).filter(element => element.type === 'tetris');
+            
+            hiddenBlocks.forEach(block => {
+                // 检查方块是否被上层遮挡
+                const isCovered = this.isBlockCoveredByUpperLayers(block, layer);
+                
+                if (isCovered) {
+                    // 被遮挡，绘制冰块
+                    const occupiedCells = this.calculateOccupiedCells(block.position, block.shapeData);
+                    
+                    occupiedCells.forEach(cellKey => {
+                        const [x, y] = cellKey.split(',').map(Number);
+                        const screenX = startX + x * this.cellSize;
+                        const screenY = startY + y * this.cellSize;
 
-                this.ctx.save();
-                this.ctx.fillStyle = 'rgba(173, 216, 230, 0.3)'; // 淡蓝色，30%透明度
-                this.ctx.strokeStyle = 'rgba(135, 206, 235, 0.5)'; // 稍深的蓝色边框，50%透明度
-                this.ctx.lineWidth = 1;
-                this.ctx.fillRect(screenX, screenY, this.cellSize, this.cellSize);
-                this.ctx.strokeRect(screenX, screenY, this.cellSize, this.cellSize);
-                this.ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
-                this.ctx.fillRect(screenX + 2, screenY + 2, this.cellSize - 4, this.cellSize - 4);
-                this.ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
-                this.ctx.font = '12px Arial';
-                this.ctx.textAlign = 'center';
-                this.ctx.fillText('❄', screenX + this.cellSize / 2, screenY + this.cellSize / 2 + 4);
-                this.ctx.restore();
+                        this.ctx.save();
+                        this.ctx.fillStyle = 'rgba(173, 216, 230, 0.3)'; // 淡蓝色，30%透明度
+                        this.ctx.strokeStyle = 'rgba(135, 206, 235, 0.5)'; // 稍深的蓝色边框，50%透明度
+                        this.ctx.lineWidth = 1;
+                        this.ctx.fillRect(screenX, screenY, this.cellSize, this.cellSize);
+                        this.ctx.strokeRect(screenX, screenY, this.cellSize, this.cellSize);
+                        this.ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
+                        this.ctx.fillRect(screenX + 2, screenY + 2, this.cellSize - 4, this.cellSize - 4);
+                        this.ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+                        this.ctx.font = '12px Arial';
+                        this.ctx.textAlign = 'center';
+                        this.ctx.fillText('🧊', screenX + this.cellSize / 2, screenY + this.cellSize / 2 + 4);
+                        this.ctx.restore();
+                    });
+                }
             });
         }
+    }
+
+    /**
+     * 检查隐藏方块是否被上层遮挡
+     * @param {Object} block - 隐藏方块
+     * @param {number} layer - 方块所在层级
+     * @returns {boolean} 是否被遮挡
+     */
+    isBlockCoveredByUpperLayers(block, layer) {
+        const occupiedCells = this.calculateOccupiedCells(block.position, block.shapeData);
+        
+        // 检查方块的每个格子是否被上层遮挡
+        for (const cellKey of occupiedCells) {
+            const [x, y] = cellKey.split(',').map(Number);
+            
+            // 检查这个位置是否被上层遮挡
+            if (this.isPositionCovered(x, y, layer)) {
+                return true; // 至少有一个格子被遮挡
+            }
+        }
+        
+        return false; // 没有被遮挡
     }
 
     /**
@@ -2293,9 +2343,10 @@ class MapEngine {
      * 绘制俄罗斯方块
      */
     drawTetrisBlocks() {
-        const blocks = this.getAllElementsByType('tetris');
+        // 只绘制第0层的方块（可见且可移动的方块）
+        const visibleBlocks = this.getAllElementsByType('tetris').filter(block => block.layer === 0);
 
-        blocks.forEach(block => {
+        visibleBlocks.forEach(block => {
             // 如果方块有 blockElement，使用 creature.js 的绘制函数
             if (block.blockElement && typeof drawCreature !== 'undefined') {
                 // 只在位置真正改变时才更新位置，避免不必要的重新渲染
@@ -2493,7 +2544,7 @@ class MapEngine {
 
         // 计算完整路径
         const path = this.calculateCompletePath(element, startPosition, targetPosition);
-        
+
         if (path.length === 0) {
             console.log(`[移动] 方块 ${elementId} 无法到达目标位置`);
             return;

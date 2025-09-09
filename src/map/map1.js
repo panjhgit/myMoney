@@ -12,49 +12,39 @@ const map1 = {
     gates: [{
         id: "gate_up_red", color: "red", position: {x: 2, y: 0}, size: {width: 3, height: 2}, direction: "up"
     }, {
-        id: "gate_right_blue", color: "blue", position: {x: 7, y: 2}, size: {width: 2, height: 3}, direction: "right"
+        id: "gate_right_blue", color: "blue", position: {x: 6, y: 2}, size: {width: 2, height: 3}, direction: "right"
     }, {
-        id: "gate_down_green", color: "green", position: {x: 2, y: 7}, size: {width: 3, height: 2}, direction: "down"
+        id: "gate_down_green", color: "green", position: {x: 2, y: 6}, size: {width: 3, height: 2}, direction: "down"
     }, {
         id: "gate_left_yellow", color: "yellow", position: {x: 0, y: 2}, size: {width: 2, height: 3}, direction: "left"
     }],
 
-    // 俄罗斯方块配置 - 每种类型一个代表性方块
-    tetrisBlocks: [// 第0层 - 顶层方块（可见，可移动）
-
-        // 基础形状 - 每种一个
+    // 俄罗斯方块配置 - 2层结构
+    tetrisBlocks: [
+        // 第0层 - 顶层方块（可见，可移动）
         {
-            id: "single_1x1", color: "red", position: {x: 0, y: 0}, shape: "single", layer: 0
+            id: "red_single", color: "red", position: {x: 1, y: 1}, shape: "single", layer: 0
         }, {
-            id: "line_horizontal", color: "blue", position: {x: 1, y: 0}, shape: "line2", layer: 0
+            id: "blue_line", color: "blue", position: {x: 3, y: 1}, shape: "line2", layer: 0
         }, {
-            id: "line_vertical", color: "green", position: {x: 4, y: 0}, shape: "line3", layer: 0
+            id: "green_square", color: "green", position: {x: 5, y: 1}, shape: "square", layer: 0
         }, {
-            id: "square_2x2", color: "yellow", position: {x: 0, y: 6}, shape: "square", layer: 0
+            id: "yellow_L", color: "yellow", position: {x: 1, y: 3}, shape: "lshape", layer: 0
+        }, {
+            id: "red_single2", color: "red", position: {x: 2, y: 2}, shape: "single", layer: 0
         },
 
-        // 经典形状 - 每种一个
+        // 第1层 - 隐藏的方块（被上层遮挡，显示为冰块）
         {
-            id: "L_shape", color: "purple", position: {x: 0, y: 2}, shape: "lshape", layer: 0
+            id: "hidden_red", color: "red", position: {x: 1, y: 1}, shape: "single", layer: 1
         }, {
-            id: "T_shape", color: "orange", position: {x: 2, y: 4}, shape: "tshape", layer: 0
+            id: "hidden_blue", color: "blue", position: {x: 4, y: 2}, shape: "line2", layer: 1
         }, {
-            id: "S_shape", color: "cyan", position: {x: 4, y: 4}, shape: "zshape", layer: 0
-        },
-
-        // 第1层 - 隐藏的方块（被上层遮挡）
-        {
-            id: "big_L", color: "magenta", position: {x: 0, y: 5}, shape: "bigl", layer: 1
+            id: "hidden_green", color: "green", position: {x: 6, y: 2}, shape: "square", layer: 1
         }, {
-            id: "cross_shape", color: "red", position: {x: 4, y: 5}, shape: "cross", layer: 1
-        },
-
-        // 第2层 - 更深层的隐藏方块
-        {
-            id: "hidden_square", color: "green", position: {x: 1, y: 6}, shape: "square", layer: 2
-        }, {
-            id: "hidden_line", color: "blue", position: {x: 5, y: 6}, shape: "line2", layer: 2
-        }],
+            id: "hidden_yellow", color: "yellow", position: {x: 2, y: 4}, shape: "lshape", layer: 1
+        }
+    ],
 
     // 石块配置 - 中心一个岩石作为障碍物
     rocks: [{
@@ -70,7 +60,17 @@ const map1 = {
 
 
     // 提示信息
-    hints: ["点击方块选择，然后点击目标位置移动", "方块会使用智能路径规划自动避开障碍物", "移动上层方块后，下层的隐藏方块会显露出来", "方块必须通过对应颜色的门才能离开", "方块的尺寸必须小于门的尺寸", "石块是不可移动的障碍物", "尝试移动方块来\"挖出\"被隐藏的方块"]
+    hints: [
+        "点击方块选择，然后点击目标位置移动", 
+        "方块会使用智能路径规划自动避开障碍物", 
+        "移动上层方块后，下层的隐藏方块会显露出来", 
+        "方块必须通过对应颜色的门才能离开", 
+        "方块的尺寸必须小于门的尺寸", 
+        "石块是不可移动的障碍物", 
+        "尝试移动方块来\"挖出\"被隐藏的方块",
+        "第1层的方块被遮挡时会显示为冰块🧊",
+        "当上层方块移开后，冰块会融化显示原本的方块"
+    ]
 };
 
 // 导出地图数据
