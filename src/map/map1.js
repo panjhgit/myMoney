@@ -39,7 +39,7 @@ const map1 = {
         }, {
             id: "T_shape", color: "orange", position: {x: 2, y: 4}, shape: "tshape", layer: 0
         }, {
-            id: "S_shape", color: "cyan", position: {x: 5, y: 4}, shape: "zshape", layer: 0
+            id: "S_shape", color: "cyan", position: {x: 4, y: 4}, shape: "zshape", layer: 0
         },
 
         // 第1层 - 隐藏的方块（被上层遮挡）
@@ -68,11 +68,6 @@ const map1 = {
         hints: 3 // 提示次数
     },
 
-    // 胜利条件
-    winCondition: {
-        description: "所有方块通过对应颜色的门离开",
-        requiredBlocks: ["red_block_1", "red_block_2", "blue_block_1", "blue_block_2", "green_block_1", "yellow_block_1"]
-    },
 
     // 提示信息
     hints: ["点击方块选择，然后点击目标位置移动", "方块会使用智能路径规划自动避开障碍物", "移动上层方块后，下层的隐藏方块会显露出来", "方块必须通过对应颜色的门才能离开", "方块的尺寸必须小于门的尺寸", "石块是不可移动的障碍物", "尝试移动方块来\"挖出\"被隐藏的方块"]

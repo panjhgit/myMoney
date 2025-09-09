@@ -45,11 +45,6 @@ const map2 = {
     hints: 3 // 提示次数
   },
   
-  // 胜利条件
-  winCondition: {
-    description: "测试翅膀飞行动画和走路动画",
-    requiredBlocks: ["l_block_1", "square_block_1"]
-  },
   
   // 提示信息
   hints: [

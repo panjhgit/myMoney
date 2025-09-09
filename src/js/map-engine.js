@@ -816,19 +816,68 @@ class MapEngine {
      */
     canExitThroughGate(element, gate) {
         // 检查颜色匹配
-        if (element.color !== gate.color) return false;
-
-        // 检查位置是否在门内
-        if (!this.isElementAtGate(element, gate)) return false;
-
-        // 检查尺寸是否小于门的尺寸
-        const maxX = Math.max(...element.shapeData.blocks.map(block => block[0])) + 1;
-        const maxY = Math.max(...element.shapeData.blocks.map(block => block[1])) + 1;
-
-        if (maxX >= gate.size.width || maxY >= gate.size.height) {
+        if (element.color !== gate.color) {
+            console.log(`[通过门] 颜色不匹配: 方块${element.color} vs 门${gate.color}`);
             return false;
         }
 
+        // 检查位置是否贴着门
+        if (!this.isElementAtGate(element, gate)) {
+            console.log(`[通过门] 位置不匹配: 方块未贴着门`);
+            return false;
+        }
+
+        // 检查尺寸：方块的上下左右都小于等于门的大小
+        const blockWidth = Math.max(...element.shapeData.blocks.map(block => block[0])) - Math.min(...element.shapeData.blocks.map(block => block[0])) + 1;
+        const blockHeight = Math.max(...element.shapeData.blocks.map(block => block[1])) - Math.min(...element.shapeData.blocks.map(block => block[1])) + 1;
+
+        if (blockWidth > gate.size.width || blockHeight > gate.size.height) {
+            console.log(`[通过门] 尺寸不匹配: 方块(${blockWidth}x${blockHeight}) vs 门(${gate.size.width}x${gate.size.height})`);
+            return false;
+        }
+
+        // 检查门是否被其他方块挡住
+        if (!this.isGateClear(gate)) {
+            console.log(`[通过门] 门被挡住: 门${gate.id}被其他方块挡住`);
+            return false;
+        }
+
+        console.log(`[通过门] 检查通过: 方块${element.id}可以通过门${gate.id}`);
+        return true;
+    }
+
+    /**
+     * 检查门是否被其他方块挡住
+     * @param {Object} gate - 门元素
+     * @returns {boolean} 门是否畅通
+     */
+    isGateClear(gate) {
+        // 获取门覆盖的所有格子
+        const gateCells = [];
+        for (let x = gate.position.x; x < gate.position.x + gate.size.width; x++) {
+            for (let y = gate.position.y; y < gate.position.y + gate.size.height; y++) {
+                gateCells.push(`${x},${y}`);
+            }
+        }
+
+        console.log(`[门畅通] 检查门${gate.id}的格子:`, gateCells);
+
+        // 检查每个门格子是否有其他方块占据
+        for (const cellKey of gateCells) {
+            const elementsAtCell = this.spatialIndex.get(cellKey);
+            if (elementsAtCell && elementsAtCell.size > 0) {
+                // 检查是否有非门元素占据这个格子
+                for (const elementId of elementsAtCell) {
+                    const element = this.elementRegistry.get(elementId);
+                    if (element && element.type !== 'gate') {
+                        console.log(`[门畅通] 门${gate.id}被方块${elementId}挡住，位置: ${cellKey}`);
+                        return false;
+                    }
+                }
+            }
+        }
+
+        console.log(`[门畅通] 门${gate.id}畅通无阻`);
         return true;
     }
 
@@ -839,36 +888,48 @@ class MapEngine {
      * @returns {boolean} 是否在门内
      */
     isElementAtGate(element, gate) {
-        // 检查方块是否在网格边缘，且与门的方向匹配（实时计算占据格子）
+        // 检查方块是否贴着门（相邻）
         const elementCells = this.calculateOccupiedCells(element.position, element.shapeData);
+        
+        console.log(`[贴着门] 检查方块${element.id}是否贴着门${gate.id}`);
+        console.log(`[贴着门] 方块占据格子:`, elementCells);
+        console.log(`[贴着门] 门位置: (${gate.position.x},${gate.position.y}), 尺寸: ${gate.size.width}x${gate.size.height}, 方向: ${gate.direction}`);
 
         switch (gate.direction) {
             case 'up':
-                // 检查方块是否在网格顶部边缘
+                // 检查方块是否在门下方，贴着门
                 return elementCells.some(cell => {
                     const [x, y] = cell.split(',').map(Number);
-                    return y === 0 && x >= gate.position.x && x < gate.position.x + gate.size.width;
+                    // 方块在门下方，且水平位置与门重叠
+                    return y === gate.position.y + gate.size.height && 
+                           x >= gate.position.x && x < gate.position.x + gate.size.width;
                 });
 
             case 'down':
-                // 检查方块是否在网格底部边缘
+                // 检查方块是否在门上方，贴着门
                 return elementCells.some(cell => {
                     const [x, y] = cell.split(',').map(Number);
-                    return y === this.GRID_SIZE - 1 && x >= gate.position.x && x < gate.position.x + gate.size.width;
+                    // 方块在门上方，且水平位置与门重叠
+                    return y === gate.position.y - 1 && 
+                           x >= gate.position.x && x < gate.position.x + gate.size.width;
                 });
 
             case 'left':
-                // 检查方块是否在网格左侧边缘
+                // 检查方块是否在门右侧，贴着门
                 return elementCells.some(cell => {
                     const [x, y] = cell.split(',').map(Number);
-                    return x === 0 && y >= gate.position.y && y < gate.position.y + gate.size.height;
+                    // 方块在门右侧，且垂直位置与门重叠
+                    return x === gate.position.x + gate.size.width && 
+                           y >= gate.position.y && y < gate.position.y + gate.size.height;
                 });
 
             case 'right':
-                // 检查方块是否在网格右侧边缘
+                // 检查方块是否在门左侧，贴着门
                 return elementCells.some(cell => {
                     const [x, y] = cell.split(',').map(Number);
-                    return x === this.GRID_SIZE - 1 && y >= gate.position.y && y < gate.position.y + gate.size.height;
+                    // 方块在门左侧，且垂直位置与门重叠
+                    return x === gate.position.x - 1 && 
+                           y >= gate.position.y && y < gate.position.y + gate.size.height;
                 });
 
             default:
