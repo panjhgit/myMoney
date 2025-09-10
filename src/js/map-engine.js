@@ -1771,7 +1771,43 @@ class MapEngine {
             ctx.stroke();
         }
 
+        // 绘制坐标标记
+        this.drawCoordinateLabels(ctx);
+
         // 网格边框已由 drawGatesOnBorder 函数统一绘制，这里不需要再画
+    }
+
+    /**
+     * 绘制坐标标签
+     * @param {CanvasRenderingContext2D} ctx - 画布上下文
+     */
+    drawCoordinateLabels(ctx) {
+        ctx.save();
+        
+        // 设置文字样式
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+        ctx.strokeStyle = 'rgba(0, 0, 0, 0.8)';
+        ctx.lineWidth = 2;
+        ctx.font = '12px Arial';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        
+        // 绘制每个格子的坐标
+        for (let x = 0; x < this.GRID_SIZE; x++) {
+            for (let y = 0; y < this.GRID_SIZE; y++) {
+                const cellX = this.gridOffsetX + x * this.cellSize + this.cellSize / 2;
+                const cellY = this.gridOffsetY + y * this.cellSize + this.cellSize / 2;
+                
+                const coordinateText = `${x},${y}`;
+                
+                // 绘制文字描边（黑色背景）
+                ctx.strokeText(coordinateText, cellX, cellY);
+                // 绘制文字（白色前景）
+                ctx.fillText(coordinateText, cellX, cellY);
+            }
+        }
+        
+        ctx.restore();
     }
 
     /**
@@ -2002,17 +2038,31 @@ class MapEngine {
     isBlockCoveredByUpperLayers(block, layer) {
         const occupiedCells = this.calculateOccupiedCells(block.position, block.shapeData);
         
+        let coveredCells = 0;
+        let totalCells = occupiedCells.length;
+        
         // 检查方块的每个格子是否被上层遮挡
         for (const cellKey of occupiedCells) {
             const [x, y] = cellKey.split(',').map(Number);
             
             // 检查这个位置是否被上层遮挡
             if (this.isPositionCovered(x, y, layer)) {
-                return true; // 至少有一个格子被遮挡
+                coveredCells++;
             }
         }
         
-        return false; // 没有被遮挡
+        // 如果所有格子都被遮挡，不显示冰块（完全隐藏）
+        if (coveredCells === totalCells) {
+            return false;
+        }
+        
+        // 如果部分格子被遮挡，显示冰块
+        if (coveredCells > 0) {
+            return true;
+        }
+        
+        // 如果没有格子被遮挡，直接显示方块
+        return false;
     }
 
     /**
@@ -3225,3 +3275,4 @@ if (typeof window !== 'undefined') {
 } else {
     this.MapEngine = MapEngine;
 }
+
