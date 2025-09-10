@@ -51,7 +51,7 @@ const map1 = {
         // red_single(1,0) 遮挡 hidden_red(1,1) ✅
         // blue_line2(3,0)(4,0) 遮挡 hidden_blue(3,1)(4,1) ✅  
         // green_line3(5,0)(6,0)(7,0) 没有下层方块 ✅
-        // yellow_square(0,1)(1,1)(0,2)(1,2) 遮挡 hidden_yellow(0,2)(1,2)(0,3)(1,3) ✅
+        // yellow_square(0,0)(1,0)(0,1)(1,1) 遮挡 hidden_yellow(0,1)(1,1)(0,2)(1,2) ✅
         // purple_lshape(4,1)(4,2)(4,3)(5,3) 遮挡 hidden_purple(4,2)(4,3)(4,4)(5,4) ✅
         // 石块(3,3)上方无任何方块 ✅
     ],

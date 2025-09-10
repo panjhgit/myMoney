@@ -277,6 +277,7 @@ class MapEngine {
         const element = {
             id: blockElement.id, // 暂时使用 blockElement.id 来匹配现有行为
             type: 'tetris', color: block.color, position: block.position, // {x, y}
+            initialPosition: {...block.position}, // 保存初始位置
             shape: block.shape, // 原始形状数据
             shapeData: blockElement.shapeData, // 处理后的形状数据
             layer: block.layer || 0, movable: true, isMoving: false, // 初始化移动状态
@@ -1289,6 +1290,38 @@ class MapEngine {
     }
 
     /**
+     * 检查指定位置是否被遮挡（使用初始位置）
+     * @param {number} x - 网格X坐标
+     * @param {number} y - 网格Y坐标
+     * @param {number} layer - 层级
+     * @returns {boolean} 是否被遮挡
+     */
+    isPositionCoveredInitial(x, y, layer) {
+        // 检查上层（layer-1）是否有遮挡
+        for (let upperLayer = layer - 1; upperLayer >= 0; upperLayer--) {
+            const upperLayerData = this.layers.get(upperLayer);
+            if (!upperLayerData) continue;
+
+            // 直接检查该层级的元素，不依赖spatialIndex
+            for (const elementId of upperLayerData.elements.keys()) {
+                const element = this.elementRegistry.get(elementId);
+                if (element && element.type === 'tetris') {
+                    // 使用初始位置检查遮挡
+                    const initialPosition = element.initialPosition || element.position;
+                    const occupiedCells = this.calculateOccupiedCells(initialPosition, element.shapeData);
+                    const cellKey = `${x},${y}`;
+                    
+                    if (occupiedCells.includes(cellKey)) {
+                        return true; // 被遮挡
+                    }
+                }
+            }
+        }
+
+        return false; // 没有被遮挡
+    }
+
+    /**
      * 检查指定位置是否被遮挡
      * @param {number} x - 网格X坐标
      * @param {number} y - 网格Y坐标
@@ -1296,19 +1329,20 @@ class MapEngine {
      * @returns {boolean} 是否被遮挡
      */
     isPositionCovered(x, y, layer) {
-        const cellKey = `${x},${y}`;
-
         // 检查上层（layer-1）是否有遮挡
         for (let upperLayer = layer - 1; upperLayer >= 0; upperLayer--) {
             const upperLayerData = this.layers.get(upperLayer);
             if (!upperLayerData) continue;
 
-            // 检查该位置是否有上层元素
-            const elementsAtCell = this.spatialIndex.get(cellKey);
-            if (elementsAtCell) {
-                for (const elementId of elementsAtCell) {
-                    const element = this.elementRegistry.get(elementId);
-                    if (element && element.layer === upperLayer && element.type === 'tetris') {
+            // 直接检查该层级的元素，不依赖spatialIndex
+            for (const elementId of upperLayerData.elements.keys()) {
+                const element = this.elementRegistry.get(elementId);
+                if (element && element.type === 'tetris') {
+                    // 检查这个元素是否覆盖了目标位置
+                    const occupiedCells = this.calculateOccupiedCells(element.position, element.shapeData);
+                    const cellKey = `${x},${y}`;
+                    
+                    if (occupiedCells.includes(cellKey)) {
                         // 添加调试日志
                         console.log(`[遮挡检测] 位置(${x},${y}) 被第${upperLayer}层方块 ${elementId} 遮挡`);
                         return true; // 被遮挡
@@ -1998,8 +2032,8 @@ class MapEngine {
             const hiddenBlocks = Array.from(layerData.elements.values()).filter(element => element.type === 'tetris');
             
             hiddenBlocks.forEach(block => {
-                // 检查方块是否被上层遮挡
-                const isCovered = this.isBlockCoveredByUpperLayers(block, layer);
+                // 检查方块是否被上层遮挡（使用初始位置，不受移动影响）
+                const isCovered = this.isBlockCoveredByUpperLayersInitial(block, layer);
                 
                 if (isCovered) {
                     // 被遮挡，绘制冰块
@@ -2011,17 +2045,17 @@ class MapEngine {
                         const screenY = startY + y * this.cellSize;
 
                         this.ctx.save();
-                        this.ctx.fillStyle = 'rgba(173, 216, 230, 0.3)'; // 淡蓝色，30%透明度
-                        this.ctx.strokeStyle = 'rgba(135, 206, 235, 0.5)'; // 稍深的蓝色边框，50%透明度
-                        this.ctx.lineWidth = 1;
+                        this.ctx.fillStyle = 'rgba(173, 216, 230, 0.8)'; // 提高透明度到80%
+                        this.ctx.strokeStyle = 'rgba(135, 206, 235, 1.0)'; // 边框完全不透明
+                        this.ctx.lineWidth = 2; // 增加边框宽度
                         this.ctx.fillRect(screenX, screenY, this.cellSize, this.cellSize);
                         this.ctx.strokeRect(screenX, screenY, this.cellSize, this.cellSize);
-                        this.ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
+                        this.ctx.fillStyle = 'rgba(255, 255, 255, 0.6)'; // 提高内部透明度
                         this.ctx.fillRect(screenX + 2, screenY + 2, this.cellSize - 4, this.cellSize - 4);
-                        this.ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
-                        this.ctx.font = '12px Arial';
+                        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.8)'; // 黑色文字更明显
+                        this.ctx.font = '16px Arial'; // 增大字体
                         this.ctx.textAlign = 'center';
-                        this.ctx.fillText('🧊', screenX + this.cellSize / 2, screenY + this.cellSize / 2 + 4);
+                        this.ctx.fillText('🧊', screenX + this.cellSize / 2, screenY + this.cellSize / 2 + 6);
                         this.ctx.restore();
                     });
                 }
@@ -2030,13 +2064,15 @@ class MapEngine {
     }
 
     /**
-     * 检查隐藏方块是否被上层遮挡
+     * 检查隐藏方块是否被上层遮挡（使用初始位置，不受移动影响）
      * @param {Object} block - 隐藏方块
      * @param {number} layer - 方块所在层级
      * @returns {boolean} 是否被遮挡
      */
-    isBlockCoveredByUpperLayers(block, layer) {
-        const occupiedCells = this.calculateOccupiedCells(block.position, block.shapeData);
+    isBlockCoveredByUpperLayersInitial(block, layer) {
+        // 使用初始位置，不受移动影响
+        const initialPosition = block.initialPosition || block.position;
+        const occupiedCells = this.calculateOccupiedCells(initialPosition, block.shapeData);
         
         let coveredCells = 0;
         let totalCells = occupiedCells.length;
@@ -2045,8 +2081,10 @@ class MapEngine {
         for (const cellKey of occupiedCells) {
             const [x, y] = cellKey.split(',').map(Number);
             
-            // 检查这个位置是否被上层遮挡
-            if (this.isPositionCovered(x, y, layer)) {
+            // 检查这个位置是否被上层遮挡（使用初始位置）
+            const isCovered = this.isPositionCoveredInitial(x, y, layer);
+            
+            if (isCovered) {
                 coveredCells++;
             }
         }
@@ -2062,6 +2100,52 @@ class MapEngine {
         }
         
         // 如果没有格子被遮挡，直接显示方块
+        return false;
+    }
+
+    /**
+     * 检查隐藏方块是否被上层遮挡
+     * @param {Object} block - 隐藏方块
+     * @param {number} layer - 方块所在层级
+     * @returns {boolean} 是否被遮挡
+     */
+    isBlockCoveredByUpperLayers(block, layer) {
+        const occupiedCells = this.calculateOccupiedCells(block.position, block.shapeData);
+        
+        let coveredCells = 0;
+        let totalCells = occupiedCells.length;
+        
+        console.log(`[冰块检测] 方块 ${block.id} 占据位置: ${occupiedCells.join(', ')}`);
+        
+        // 检查方块的每个格子是否被上层遮挡
+        for (const cellKey of occupiedCells) {
+            const [x, y] = cellKey.split(',').map(Number);
+            
+            // 检查这个位置是否被上层遮挡
+            const isCovered = this.isPositionCovered(x, y, layer);
+            console.log(`[冰块检测] 位置 (${x},${y}) 被遮挡: ${isCovered}`);
+            
+            if (isCovered) {
+                coveredCells++;
+            }
+        }
+        
+        console.log(`[冰块检测] 方块 ${block.id} 被遮挡格子: ${coveredCells}/${totalCells}`);
+        
+        // 如果所有格子都被遮挡，不显示冰块（完全隐藏）
+        if (coveredCells === totalCells) {
+            console.log(`[冰块检测] 方块 ${block.id} 完全被遮挡，不显示冰块`);
+            return false;
+        }
+        
+        // 如果部分格子被遮挡，显示冰块
+        if (coveredCells > 0) {
+            console.log(`[冰块检测] 方块 ${block.id} 部分被遮挡，显示冰块`);
+            return true;
+        }
+        
+        // 如果没有格子被遮挡，直接显示方块
+        console.log(`[冰块检测] 方块 ${block.id} 完全不被遮挡，不显示冰块`);
         return false;
     }
 
