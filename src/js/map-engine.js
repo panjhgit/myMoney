@@ -2684,11 +2684,131 @@ class MapEngine {
     }
 
     /**
-     * 移动元素到指定位置（智能寻路版 - 逐步执行）
-     * @param {string} elementId - 元素ID
-     * @param {Object} targetPosition - 目标位置 {x, y}
+     * 计算边缘对齐的目标位置
+     * @param {Object} element - 方块元素
+     * @param {Object} clickPosition - 点击位置 {x, y}
+     * @returns {Object} 边缘对齐后的目标位置 {x, y}
      */
-    moveElementToPosition(elementId, targetPosition) {
+    calculateEdgeAlignedPosition(element, clickPosition) {
+        const startPos = element.position;
+        const shapeData = element.shapeData;
+        
+        // 计算方块的边界
+        const bounds = this.calculateElementBounds(startPos, shapeData);
+        
+        // 计算网格位置差
+        const dx = clickPosition.x - startPos.x;
+        const dy = clickPosition.y - startPos.y;
+        
+        let targetPosition;
+        
+        console.log(`[边缘对齐] 原始点击: (${clickPosition.x},${clickPosition.y})`);
+        console.log(`[边缘对齐] 方块边界: 宽${bounds.width} 高${bounds.height}`);
+        console.log(`[边缘对齐] 网格差值: dx=${dx}, dy=${dy}`);
+        
+        // 根据网格位置差判断方向
+        if (dx > 0 && dy === 0) {
+            // 向右：右边缘对齐到目标位置
+            targetPosition = {
+                x: clickPosition.x - bounds.width + 1,
+                y: startPos.y
+            };
+            console.log(`[边缘对齐] 方向: 向右`);
+        } else if (dx > 0 && dy > 0) {
+            // 右下：右下角对齐到目标位置
+            targetPosition = {
+                x: clickPosition.x - bounds.width + 1,
+                y: clickPosition.y - bounds.height + 1
+            };
+            console.log(`[边缘对齐] 方向: 右下`);
+        } else if (dx === 0 && dy > 0) {
+            // 向下：下边缘对齐到目标位置
+            targetPosition = {
+                x: startPos.x,
+                y: clickPosition.y - bounds.height + 1
+            };
+            console.log(`[边缘对齐] 方向: 向下`);
+        } else if (dx < 0 && dy > 0) {
+            // 左下：左下角对齐到目标位置
+            targetPosition = {
+                x: clickPosition.x,
+                y: clickPosition.y - bounds.height + 1
+            };
+            console.log(`[边缘对齐] 方向: 左下`);
+        } else if (dx < 0 && dy === 0) {
+            // 向左：左边缘对齐到目标位置
+            targetPosition = {
+                x: clickPosition.x,
+                y: startPos.y
+            };
+            console.log(`[边缘对齐] 方向: 向左`);
+        } else if (dx < 0 && dy < 0) {
+            // 左上：左上角对齐到目标位置
+            targetPosition = {
+                x: clickPosition.x,
+                y: clickPosition.y
+            };
+            console.log(`[边缘对齐] 方向: 左上`);
+        } else if (dx === 0 && dy < 0) {
+            // 向上：上边缘对齐到目标位置
+            targetPosition = {
+                x: startPos.x,
+                y: clickPosition.y
+            };
+            console.log(`[边缘对齐] 方向: 向上`);
+        } else if (dx > 0 && dy < 0) {
+            // 右上：右上角对齐到目标位置
+            targetPosition = {
+                x: clickPosition.x - bounds.width + 1,
+                y: clickPosition.y
+            };
+            console.log(`[边缘对齐] 方向: 右上`);
+        } else {
+            // dx === 0 && dy === 0，没有移动
+            console.log(`[边缘对齐] 方向: 无移动`);
+            return startPos;
+        }
+        
+        console.log(`[边缘对齐] 计算目标: (${targetPosition.x},${targetPosition.y})`);
+        
+        return targetPosition;
+    }
+    
+    /**
+     * 计算方块的边界尺寸
+     * @param {Object} position - 位置 {x, y}
+     * @param {Object} shapeData - 形状数据
+     * @returns {Object} 边界 {width, height}
+     */
+    calculateElementBounds(position, shapeData) {
+        if (!shapeData || !shapeData.blocks) {
+            return { width: 1, height: 1 };
+        }
+        
+        let minX = Infinity, maxX = -Infinity;
+        let minY = Infinity, maxY = -Infinity;
+        
+        shapeData.blocks.forEach(block => {
+            const x = position.x + block[0];
+            const y = position.y + block[1];
+            minX = Math.min(minX, x);
+            maxX = Math.max(maxX, x);
+            minY = Math.min(minY, y);
+            maxY = Math.max(maxY, y);
+        });
+        
+        return {
+            width: maxX - minX + 1,
+            height: maxY - minY + 1
+        };
+    }
+
+    /**
+     * 移动元素到指定位置（边缘对齐版）
+     * @param {string} elementId - 元素ID
+     * @param {Object} clickPosition - 点击位置 {x, y}
+     */
+    moveElementToPosition(elementId, clickPosition) {
         // 强制清理所有缓存以确保最新计算结果
         this.collisionCache.clear();
         this.pathCache.clear();
@@ -2700,7 +2820,10 @@ class MapEngine {
         }
 
         const startPosition = {...element.position};
-        console.log(`[移动] 开始移动方块 ${elementId} 从 (${startPosition.x},${startPosition.y}) 到 (${targetPosition.x},${targetPosition.y})`);
+        console.log(`[移动] 开始移动方块 ${elementId} 从 (${startPosition.x},${startPosition.y}) 到点击位置 (${clickPosition.x},${clickPosition.y})`);
+        
+        // 计算边缘对齐的目标位置
+        const targetPosition = this.calculateEdgeAlignedPosition(element, clickPosition);
         
         // 计算距离，判断是否为相邻位置
         const dx = Math.abs(targetPosition.x - startPosition.x);
@@ -2709,33 +2832,112 @@ class MapEngine {
         
         if (isAdjacent) {
             // 相邻位置：直接移动
-            console.log(`[移动] 相邻移动到 (${targetPosition.x},${targetPosition.y})`);
+            console.log(`[移动] 相邻移动到边缘对齐位置 (${targetPosition.x},${targetPosition.y})`);
             
             // 检查目标位置是否有碰撞
             if (this.checkCollisionAtPosition(element, targetPosition, element.id)) {
                 console.log(`[移动] 目标位置 (${targetPosition.x},${targetPosition.y}) 有碰撞，无法移动`);
-            return;
-        }
+                return;
+            }
 
             // 直接移动
             const path = [startPosition, targetPosition];
             this.executeMoveWithAnimation(element, path);
         } else {
-            // 远距离：使用A*寻路，但只执行第一步
-            console.log(`[移动] 远距离移动，开始寻路`);
+            // 远距离：使用A*寻路，执行完整路径
+            console.log(`[移动] 远距离移动，开始寻路到边缘对齐位置`);
             const fullPath = this.calculateCompletePath(element, startPosition, targetPosition);
             
             if (fullPath.length === 0) {
-                console.log(`[移动] 无法找到到达目标位置的路径`);
+                console.log(`[移动] 无法找到到达目标位置的路径，尝试寻找最近可达位置`);
+                // 如果无法到达目标，尝试移动到最近的可达位置
+                const nearestPosition = this.findNearestReachablePosition(element, startPosition, targetPosition);
+                if (nearestPosition && (nearestPosition.x !== startPosition.x || nearestPosition.y !== startPosition.y)) {
+                    console.log(`[移动] 找到最近可达位置: (${nearestPosition.x},${nearestPosition.y})`);
+                    const path = [startPosition, nearestPosition];
+                    this.executeMoveWithAnimation(element, path);
+                } else {
+                    console.log(`[移动] 无法找到任何可达位置`);
+                }
                 return;
             }
             
-            // 只执行第一步
-            const nextStep = fullPath[0];
-            console.log(`[移动] 执行寻路第一步: (${nextStep.x},${nextStep.y})`);
-            const path = [startPosition, nextStep];
-            this.executeMoveWithAnimation(element, path);
+            // 执行完整路径
+            console.log(`[移动] 执行完整路径，共 ${fullPath.length} 步`);
+            this.executeMoveWithAnimation(element, fullPath);
         }
+    }
+
+    /**
+     * 寻找最近的可达位置（当无法到达目标时使用）
+     * @param {Object} element - 方块元素
+     * @param {Object} startPos - 起始位置
+     * @param {Object} targetPos - 目标位置
+     * @returns {Object|null} 最近的可达位置
+     */
+    findNearestReachablePosition(element, startPos, targetPos) {
+        console.log(`[最近位置] 开始寻找从(${startPos.x},${startPos.y})到(${targetPos.x},${targetPos.y})的最近可达位置`);
+        
+        // 使用BFS寻找最近的可达位置
+        const visited = new Set();
+        const queue = [{ position: startPos, distance: 0 }];
+        visited.add(`${startPos.x},${startPos.y}`);
+        
+        const directions = [
+            { dx: 0, dy: -1 }, // 上
+            { dx: 0, dy: 1 },  // 下
+            { dx: -1, dy: 0 }, // 左
+            { dx: 1, dy: 0 }   // 右
+        ];
+        
+        let nearestPosition = null;
+        let minDistance = Infinity;
+        
+        while (queue.length > 0) {
+            const current = queue.shift();
+            const currentPos = current.position;
+            const currentDistance = current.distance;
+            
+            // 计算到目标的距离
+            const distanceToTarget = Math.abs(currentPos.x - targetPos.x) + Math.abs(currentPos.y - targetPos.y);
+            
+            // 如果这个位置比之前找到的更接近目标，更新最近位置
+            if (distanceToTarget < minDistance) {
+                minDistance = distanceToTarget;
+                nearestPosition = currentPos;
+            }
+            
+            // 如果已经到达目标位置，直接返回
+            if (distanceToTarget === 0) {
+                return currentPos;
+            }
+            
+            // 检查四个方向
+            for (const dir of directions) {
+                const newX = currentPos.x + dir.dx;
+                const newY = currentPos.y + dir.dy;
+                const newPos = { x: newX, y: newY };
+                const newKey = `${newX},${newY}`;
+                
+                if (visited.has(newKey)) continue;
+                
+                // 检查边界
+                if (newX < 0 || newX >= this.GRID_SIZE || newY < 0 || newY >= this.GRID_SIZE) {
+                    continue;
+                }
+                
+                // 检查碰撞
+                if (this.checkCollisionAtPosition(element, newPos, element.id)) {
+                    continue;
+                }
+                
+                visited.add(newKey);
+                queue.push({ position: newPos, distance: currentDistance + 1 });
+            }
+        }
+        
+        console.log(`[最近位置] 找到最近可达位置: (${nearestPosition.x},${nearestPosition.y}), 距离目标: ${minDistance}`);
+        return nearestPosition;
     }
 
     /**
