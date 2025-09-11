@@ -506,6 +506,9 @@ class MainMenu {
       if (Math.abs(this.scrollVelocity) < 0.1) {
         this.scrollVelocity = 0;
       }
+      
+      // 滚动时触发重绘
+      this.triggerRedraw();
     }
   }
   
@@ -840,6 +843,46 @@ class MainMenu {
     this.ctx.fillText('开始游戏', centerX, buttonY + 5);
     
     this.ctx.restore();
+  }
+
+  // 主绘制方法 - 事件驱动
+  draw() {
+    this.drawBackground();
+    this.drawTopBar();
+    this.drawLevels();
+    this.drawScrollIndicator();
+    this.drawPlayButton();
+  }
+
+  // 检查是否有活跃动画
+  hasActiveAnimations() {
+    // 检查滚动动画
+    if (Math.abs(this.scrollVelocity) > 0.1) {
+      return true;
+    }
+    
+    // 检查GSAP动画（简单检查）
+    if (this.animationState.playButton.scale < 0.99) {
+      return true;
+    }
+    
+    return false;
+  }
+
+  // 触发重绘（事件驱动）
+  /**
+   * 检查是否有活跃的动画
+   * @returns {boolean} 是否有动画在运行
+   */
+  hasActiveAnimations() {
+    return this.isScrolling || this.scrollVelocity !== 0;
+  }
+
+  triggerRedraw() {
+    this.hasDrawn = false;
+    if (typeof window !== 'undefined' && window.markNeedsRedraw) {
+      window.markNeedsRedraw();
+    }
   }
 }
 

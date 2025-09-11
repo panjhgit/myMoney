@@ -1309,8 +1309,8 @@ class MapEngine {
                     // 使用初始位置检查遮挡
                     const initialPosition = element.initialPosition || element.position;
                     const occupiedCells = this.calculateOccupiedCells(initialPosition, element.shapeData);
-                    const cellKey = `${x},${y}`;
-                    
+        const cellKey = `${x},${y}`;
+
                     if (occupiedCells.includes(cellKey)) {
                         return true; // 被遮挡
                     }
@@ -1336,7 +1336,7 @@ class MapEngine {
 
             // 直接检查该层级的元素，不依赖spatialIndex
             for (const elementId of upperLayerData.elements.keys()) {
-                const element = this.elementRegistry.get(elementId);
+                    const element = this.elementRegistry.get(elementId);
                 if (element && element.type === 'tetris') {
                     // 检查这个元素是否覆盖了目标位置
                     const occupiedCells = this.calculateOccupiedCells(element.position, element.shapeData);
@@ -1427,6 +1427,9 @@ class MapEngine {
 
         // 触发显露动画
         this.animateElementReveal(hiddenElement);
+        
+        // 状态变化后触发重绘
+        this.triggerRedraw();
     }
 
     /**
@@ -1537,13 +1540,13 @@ class MapEngine {
 
         // 检查门的通过逻辑
         if (targetElement.type === 'gate') {
-            if (targetRules.requiresColorMatch) {
-                // 检查颜色匹配
+            // 寻路过程中，颜色匹配的门不阻止移动
                 if (movingElement.color === targetElement.color) {
                     return {collision: false, action: 'pass_through_gate', reason: 'color_match'};
                 } else {
-                    return {collision: true, action: 'block', reason: 'color_mismatch'};
-                }
+                // 寻路过程中，颜色不匹配的门也不阻止移动（只是路径权重高）
+                // 只有在最终到达门位置时才检查颜色
+                return {collision: false, action: 'approach_gate', reason: 'can_pass_through'};
             }
         }
 
@@ -2150,6 +2153,24 @@ class MapEngine {
     }
 
     /**
+     * 检查是否有活跃的动画
+     * @returns {boolean} 是否有动画在运行
+     */
+    hasActiveAnimations() {
+        return this.animations.size > 0;
+    }
+
+    /**
+     * 触发重绘（事件驱动）
+     */
+    triggerRedraw() {
+        if (typeof window !== 'undefined' && window.markNeedsRedraw) {
+            window.markNeedsRedraw();
+        }
+    }
+
+
+    /**
      * 绘制UI
      */
     drawUI() {
@@ -2640,11 +2661,12 @@ class MapEngine {
         const gridPos = this.screenToGrid(x, y);
         console.log(`点击位置: 屏幕(${x}, ${y}) -> 网格(${gridPos.x}, ${gridPos.y})`);
 
-        // 检查是否点击了方块
-        const blocks = this.getAllElementsByType('tetris');
+        // 检查是否点击了方块 - 只检查第0层的方块
+        const blocks = this.getAllElementsByType('tetris').filter(block => block.layer === 0);
 
         for (const block of blocks) {
             const occupiedCells = this.calculateOccupiedCells(block.position, block.shapeData);
+            console.log(`检查方块 ${block.id}: 位置(${block.position.x},${block.position.y}), 层级(${block.layer}), 占用格子: [${occupiedCells.join(', ')}]`);
             if (occupiedCells.includes(`${gridPos.x},${gridPos.y}`)) {
                 // 每次点击方块都是选中
                 this.selectElement(block.id);
@@ -2662,31 +2684,89 @@ class MapEngine {
     }
 
     /**
-     * 移动元素到指定位置（完整重构版）
+     * 移动元素到指定位置（智能寻路版 - 逐步执行）
      * @param {string} elementId - 元素ID
      * @param {Object} targetPosition - 目标位置 {x, y}
      */
     moveElementToPosition(elementId, targetPosition) {
+        // 强制清理所有缓存以确保最新计算结果
+        this.collisionCache.clear();
+        this.pathCache.clear();
+
         const element = this.elementRegistry.get(elementId);
-        if (!element || element.type !== 'tetris' || !element.movable) {
-            console.log(`[移动] 方块 ${elementId} 无法移动`);
+        if (!element) {
+            console.warn(`元素 ${elementId} 不存在`);
             return;
         }
 
         const startPosition = {...element.position};
         console.log(`[移动] 开始移动方块 ${elementId} 从 (${startPosition.x},${startPosition.y}) 到 (${targetPosition.x},${targetPosition.y})`);
-
-        // 计算完整路径
-        const path = this.calculateCompletePath(element, startPosition, targetPosition);
-
-        if (path.length === 0) {
-            console.log(`[移动] 方块 ${elementId} 无法到达目标位置`);
+        
+        // 计算距离，判断是否为相邻位置
+        const dx = Math.abs(targetPosition.x - startPosition.x);
+        const dy = Math.abs(targetPosition.y - startPosition.y);
+        const isAdjacent = (dx <= 1 && dy <= 1) && !(dx === 0 && dy === 0);
+        
+        if (isAdjacent) {
+            // 相邻位置：直接移动
+            console.log(`[移动] 相邻移动到 (${targetPosition.x},${targetPosition.y})`);
+            
+            // 检查目标位置是否有碰撞
+            if (this.checkCollisionAtPosition(element, targetPosition, element.id)) {
+                console.log(`[移动] 目标位置 (${targetPosition.x},${targetPosition.y}) 有碰撞，无法移动`);
             return;
         }
 
-        console.log(`[移动] 找到路径，长度: ${path.length}`);
-        // 执行移动动画
-        this.executeMoveWithAnimation(element, path);
+            // 直接移动
+            const path = [startPosition, targetPosition];
+            this.executeMoveWithAnimation(element, path);
+        } else {
+            // 远距离：使用A*寻路，但只执行第一步
+            console.log(`[移动] 远距离移动，开始寻路`);
+            const fullPath = this.calculateCompletePath(element, startPosition, targetPosition);
+            
+            if (fullPath.length === 0) {
+                console.log(`[移动] 无法找到到达目标位置的路径`);
+                return;
+            }
+            
+            // 只执行第一步
+            const nextStep = fullPath[0];
+            console.log(`[移动] 执行寻路第一步: (${nextStep.x},${nextStep.y})`);
+            const path = [startPosition, nextStep];
+            this.executeMoveWithAnimation(element, path);
+        }
+    }
+
+    /**
+     * 计算下一步移动位置（单步移动逻辑）
+     * @param {Object} startPos - 起始位置
+     * @param {Object} targetPos - 目标位置
+     * @returns {Object} 下一步位置
+     */
+    calculateNextStep(startPos, targetPos) {
+        const dx = targetPos.x - startPos.x;
+        const dy = targetPos.y - startPos.y;
+        
+        // 如果已经在目标位置
+        if (dx === 0 && dy === 0) {
+            return startPos;
+        }
+        
+        // 优先移动距离更大的方向
+        if (Math.abs(dx) > Math.abs(dy)) {
+            // 水平移动优先
+            return {
+                x: startPos.x + (dx > 0 ? 1 : -1),
+                y: startPos.y
+            };
+        } else {
+            // 垂直移动优先
+            return {
+                x: startPos.x,
+                y: startPos.y + (dy > 0 ? 1 : -1)
+            };
+        }
     }
 
     /**
@@ -2719,10 +2799,133 @@ class MapEngine {
         
         if (nearestPos.x !== startPos.x || nearestPos.y !== startPos.y) {
             console.log(`[路径计算] 找到最近位置: (${nearestPos.x},${nearestPos.y})`);
-            return this.calculateAStarPath(element, startPos, nearestPos);
+            // 递归调用时不要再次修改空间索引
+            return this.calculateAStarPathDirect(element, startPos, nearestPos);
         }
 
         console.log(`[路径计算] 无法找到任何可达位置`);
+        return [];
+    }
+
+    /**
+     * A*路径计算算法（不修改空间索引的版本）
+     * @param {Object} element - 方块元素
+     * @param {Object} startPos - 起始位置
+     * @param {Object} targetPos - 目标位置
+     * @returns {Array} 路径数组
+     */
+    calculateAStarPathDirect(element, startPos, targetPos) {
+        console.log(`[A*Direct] 开始A*搜索: 从(${startPos.x},${startPos.y})到(${targetPos.x},${targetPos.y})`);
+        
+        // 开放列表和关闭列表
+        const openList = [];
+        const closedList = new Set();
+        
+        // 起始节点
+        const startNode = {
+            position: startPos,
+            g: 0,
+            h: this.calculateHeuristic(startPos, targetPos),
+            f: 0,
+            parent: null
+        };
+        startNode.f = startNode.g + startNode.h;
+        openList.push(startNode);
+        
+        const directions = [
+            {dx: 0, dy: -1}, // 上
+            {dx: 0, dy: 1},  // 下
+            {dx: -1, dy: 0}, // 左
+            {dx: 1, dy: 0}   // 右
+        ];
+        
+        let iterations = 0;
+        const maxIterations = 100;
+        
+        while (openList.length > 0 && iterations < maxIterations) {
+            iterations++;
+            
+            // 找到f值最小的节点
+            let currentIndex = 0;
+            for (let i = 1; i < openList.length; i++) {
+                if (openList[i].f < openList[currentIndex].f) {
+                    currentIndex = i;
+                }
+            }
+            
+            const currentNode = openList.splice(currentIndex, 1)[0];
+            const currentPos = currentNode.position;
+            const currentKey = `${currentPos.x},${currentPos.y}`;
+            
+            // 添加到关闭列表
+            closedList.add(currentKey);
+            
+            // 如果到达目标
+            if (currentPos.x === targetPos.x && currentPos.y === targetPos.y) {
+                console.log(`[A*Direct] 找到路径! 迭代次数: ${iterations}`);
+                return this.reconstructPath(currentNode);
+            }
+            
+            // 检查四个方向
+            for (const dir of directions) {
+                const newX = currentPos.x + dir.dx;
+                const newY = currentPos.y + dir.dy;
+                const newPos = {x: newX, y: newY};
+                const newKey = `${newX},${newY}`;
+                
+                // 跳过已关闭的节点
+                if (closedList.has(newKey)) {
+                    continue;
+                }
+                
+                // 检查边界
+                if (newX < 0 || newY < 0 || newX >= this.GRID_SIZE || newY >= this.GRID_SIZE) {
+                    continue;
+                }
+                
+                // 检查碰撞
+                const hasCollision = this.checkCollisionAtPosition(element, newPos, element.id);
+                if (hasCollision) {
+                    continue;
+                }
+                
+                // 计算g值
+                const tentativeG = currentNode.g + 1;
+                
+                // 检查是否已在开放列表中
+                let existingNode = null;
+                let existingIndex = -1;
+                for (let i = 0; i < openList.length; i++) {
+                    if (openList[i].position.x === newX && openList[i].position.y === newY) {
+                        existingNode = openList[i];
+                        existingIndex = i;
+                        break;
+                    }
+                }
+                
+                if (existingNode) {
+                    // 如果找到更好的路径，更新节点
+                    if (tentativeG < existingNode.g) {
+                        existingNode.g = tentativeG;
+                        existingNode.f = existingNode.g + existingNode.h;
+                        existingNode.parent = currentNode;
+                    }
+                } else {
+                    // 创建新节点
+                    const newNode = {
+                        position: newPos,
+                        g: tentativeG,
+                        h: this.calculateHeuristic(newPos, targetPos),
+                        f: 0,
+                        parent: currentNode
+                    };
+                    newNode.f = newNode.g + newNode.h;
+                    openList.push(newNode);
+                }
+            }
+        }
+        
+        console.log(`[A*Direct] 未找到路径! 迭代次数: ${iterations}`);
         return [];
     }
 
@@ -2735,6 +2938,20 @@ class MapEngine {
      */
     calculateAStarPath(element, startPos, targetPos) {
         console.log(`[A*] 开始A*搜索: 从(${startPos.x},${startPos.y})到(${targetPos.x},${targetPos.y})`);
+        
+        // 临时从空间索引中移除移动方块，避免自碰撞
+        const oldCells = this.calculateOccupiedCells(startPos, element.shapeData);
+        const removedCells = new Map();
+        oldCells.forEach(cell => {
+            const elementsAtCell = this.spatialIndex.get(cell);
+            if (elementsAtCell) {
+                removedCells.set(cell, new Set(elementsAtCell));
+                elementsAtCell.delete(element.id);
+                if (elementsAtCell.size === 0) {
+                    this.spatialIndex.delete(cell);
+                }
+            }
+        });
         
         // 开放列表和关闭列表
         const openList = [];
@@ -2783,6 +3000,8 @@ class MapEngine {
             // 如果到达目标
             if (currentPos.x === targetPos.x && currentPos.y === targetPos.y) {
                 console.log(`[A*] 找到路径! 迭代次数: ${iterations}`);
+                // 恢复空间索引
+                this.restoreSpatialIndex(element, startPos, removedCells);
                 return this.reconstructPath(currentNode);
             }
             
@@ -2804,7 +3023,10 @@ class MapEngine {
                 }
                 
                 // 检查碰撞
-                if (this.checkCollisionAtPosition(element, newPos, element.id)) {
+                const hasCollision = this.checkCollisionAtPosition(element, newPos, element.id);
+                console.log(`[A*] 检查位置(${newX},${newY}) 碰撞结果: ${hasCollision}`);
+                if (hasCollision) {
+                    console.log(`[A*] 位置(${newX},${newY})碰撞详情:`, this.getCollisionDetails(element, newPos, element.id));
                     continue;
                 }
                 
@@ -2845,9 +3067,59 @@ class MapEngine {
         }
         
         console.log(`[A*] 未找到路径! 迭代次数: ${iterations}`);
+        // 恢复空间索引
+        this.restoreSpatialIndex(element, startPos, removedCells);
         return [];
     }
     
+    /**
+     * 获取碰撞详情（调试用）
+     * @param {Object} element - 移动的元素
+     * @param {Object} position - 目标位置
+     * @param {string} excludeId - 排除的元素ID
+     * @returns {Object} 碰撞详情
+     */
+    getCollisionDetails(element, position, excludeId) {
+        const occupiedCells = this.calculateOccupiedCells(position, element.shapeData);
+        const details = {
+            position: position,
+            occupiedCells: occupiedCells,
+            collisions: []
+        };
+
+        for (const cellKey of occupiedCells) {
+            const elementsAtCell = this.spatialIndex.get(cellKey);
+            if (elementsAtCell) {
+                for (const elementId of elementsAtCell) {
+                    if (elementId === excludeId) continue;
+                    const otherElement = this.elementRegistry.get(elementId);
+                    if (otherElement && otherElement.layer === 0) {
+                        details.collisions.push({
+                            cell: cellKey,
+                            elementId: elementId,
+                            type: otherElement.type,
+                            color: otherElement.color
+                        });
+                    }
+                }
+            }
+        }
+        return details;
+    }
+
+    /**
+     * 恢复空间索引（A*算法结束后）
+     * @param {Object} element - 移动的元素
+     * @param {Object} startPos - 起始位置
+     * @param {Map} removedCells - 被移除的格子数据
+     */
+    restoreSpatialIndex(element, startPos, removedCells) {
+        // 恢复所有被修改的格子
+        removedCells.forEach((originalElements, cell) => {
+            this.spatialIndex.set(cell, originalElements);
+        });
+    }
+
     /**
      * 计算启发式函数（曼哈顿距离）
      * @param {Object} pos1 - 位置1
@@ -2944,7 +3216,9 @@ class MapEngine {
                 }
                 
                 // 检查碰撞
-                if (this.checkCollisionAtPosition(element, newPos, element.id)) {
+                const hasCollision = this.checkCollisionAtPosition(element, newPos, element.id);
+                console.log(`[BFS] 检查位置(${newX},${newY}) 碰撞结果: ${hasCollision}`);
+                if (hasCollision) {
                     continue;
                 }
                 
@@ -2988,6 +3262,8 @@ class MapEngine {
                 this.checkLayerReveal(element);
                 this.cleanupCache();
                 this.animations.delete(animationId);
+                // 动画完成后触发重绘
+                this.triggerRedraw();
             }
         });
 
@@ -3091,7 +3367,7 @@ class MapEngine {
                     validElementIds.add(elementId);
                 } else {
                     removedCount++;
-                    console.log(`移除非layer 0元素: ${elementId} (layer: ${element?.layer})`);
+                    console.log(`移除非layer 0元素: ${elementId} (layer: ${element ? element.layer : 'undefined'})`);
                 }
             }
 
@@ -3245,10 +3521,12 @@ class MapEngine {
 
                     // 只检查第0层的方块和障碍物
                     if (otherElement && otherElement.layer === 0) {
+                        console.log(`[碰撞检测] 位置${cellKey}与元素${elementId}(${otherElement.type})碰撞`);
                         // 使用智能碰撞检测替代简单的类型检查
                         const collisionResult = this.checkSmartCollision(element, otherElement);
 
                         if (collisionResult.collision) {
+                            console.log(`[碰撞检测] 碰撞原因: ${collisionResult.reason}`);
                             this.collisionCache.set(cacheKey, true);
                             return true;
                         } else if (collisionResult.action !== 'none') {

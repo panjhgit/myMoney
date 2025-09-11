@@ -137,16 +137,29 @@ let needsRedraw = true; // 是否需要重绘
 let lastDrawTime = 0;
 const DRAW_THROTTLE = 16; // 限制绘制频率，约60fps
 
+// 标记需要重绘（事件驱动）
+function markNeedsRedraw() {
+  needsRedraw = true;
+}
+
+// 将markNeedsRedraw设置为全局函数
+if (typeof window !== 'undefined') {
+  window.markNeedsRedraw = markNeedsRedraw;
+} else if (typeof global !== 'undefined') {
+  global.markNeedsRedraw = markNeedsRedraw;
+} else {
+  this.markNeedsRedraw = markNeedsRedraw;
+}
+
 // 主绘制函数 - 适配抖音小游戏环境
 function draw() {
   if (gameState === 'menu' && mainMenu) {
     mainMenu.draw();
-    // 主菜单需要持续重绘来显示动画效果
+    // 主菜单需要持续重绘来处理交互
     scheduleNextDraw();
   } else if (gameState === 'game' && mapEngine) {
     drawGame();
-    mapEngine.update();
-    // 游戏状态需要持续重绘
+    // 游戏状态需要持续重绘来处理交互
     scheduleNextDraw();
   } else {
     drawDefault();
@@ -311,23 +324,26 @@ function drawDefault() {
 function setupGameEvents() {
   // 鼠标点击事件
   canvas.addEventListener('click', (e) => {
+    let x, y;
+    
+    // 抖音小游戏环境兼容处理
+    if (typeof canvas.getBoundingClientRect === 'function') {
+      // 浏览器环境
+      const rect = canvas.getBoundingClientRect();
+      x = e.clientX - rect.left;
+      y = e.clientY - rect.top;
+    } else {
+      // 抖音小游戏环境 - 直接使用触摸坐标
+      x = e.clientX || e.x || 0;
+      y = e.clientY || e.y || 0;
+    }
+    
     if (gameState === 'game' && mapEngine) {
-      let x, y;
-      
-      // 抖音小游戏环境兼容处理
-      if (typeof canvas.getBoundingClientRect === 'function') {
-        // 浏览器环境
-        const rect = canvas.getBoundingClientRect();
-        x = e.clientX - rect.left;
-        y = e.clientY - rect.top;
-      } else {
-        // 抖音小游戏环境 - 直接使用触摸坐标
-        x = e.clientX || e.x || 0;
-        y = e.clientY || e.y || 0;
-      }
-      
       mapEngine.handleClick(x, y);
       markNeedsRedraw(); // 游戏交互后需要重绘
+    } else if (gameState === 'menu' && mainMenu) {
+      // 菜单交互处理
+      markNeedsRedraw(); // 菜单交互后需要重绘
     }
   });
   
