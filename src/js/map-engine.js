@@ -828,23 +828,159 @@ class MapEngine {
             return false;
         }
 
-        // 检查尺寸：方块的上下左右都小于等于门的大小
-        const blockWidth = Math.max(...element.shapeData.blocks.map(block => block[0])) - Math.min(...element.shapeData.blocks.map(block => block[0])) + 1;
-        const blockHeight = Math.max(...element.shapeData.blocks.map(block => block[1])) - Math.min(...element.shapeData.blocks.map(block => block[1])) + 1;
-
-        if (blockWidth > gate.size.width || blockHeight > gate.size.height) {
-            console.log(`[通过门] 尺寸不匹配: 方块(${blockWidth}x${blockHeight}) vs 门(${gate.size.width}x${gate.size.height})`);
+        // 检查尺寸：门的大小必须大于方块的最大宽度或高度
+        const bounds = this.calculateElementBounds(element.position, element.shapeData);
+        
+        if (bounds.width > gate.size.width || bounds.height > gate.size.height) {
+            console.log(`[通过门] 尺寸不匹配: 方块(${bounds.width}x${bounds.height}) vs 门(${gate.size.width}x${gate.size.height})`);
             return false;
         }
 
-        // 检查门是否被其他方块挡住
-        if (!this.isGateClear(gate)) {
-            console.log(`[通过门] 门被挡住: 门${gate.id}被其他方块挡住`);
+        // 检查从当前位置到门的方向是否有阻碍
+        if (!this.isPathClearToGate(element, gate)) {
+            console.log(`[通过门] 路径被阻碍: 从方块${element.id}到门${gate.id}的路径被阻挡`);
             return false;
         }
 
         console.log(`[通过门] 检查通过: 方块${element.id}可以通过门${gate.id}`);
         return true;
+    }
+
+    /**
+     * 检查从方块到门的路径是否畅通
+     * @param {Object} element - 方块元素
+     * @param {Object} gate - 门元素
+     * @returns {boolean} 路径是否畅通
+     */
+    isPathClearToGate(element, gate) {
+        console.log(`[路径检查] 检查方块${element.id}到门${gate.id}的路径`);
+        
+        // 计算方块到门的移动方向
+        const elementCenter = this.calculateElementCenter(element);
+        const gateCenter = this.calculateGateCenter(gate);
+        
+        const dx = gateCenter.x - elementCenter.x;
+        const dy = gateCenter.y - elementCenter.y;
+        
+        console.log(`[路径检查] 方块中心: (${elementCenter.x},${elementCenter.y}), 门中心: (${gateCenter.x},${gateCenter.y})`);
+        console.log(`[路径检查] 移动方向: dx=${dx}, dy=${dy}`);
+        
+        // 根据门的方向检查路径
+        switch (gate.direction) {
+            case 'up':
+                // 门向上，检查方块是否在门下方，且路径畅通
+                return this.checkVerticalPath(element, gate, 'up');
+            case 'down':
+                // 门向下，检查方块是否在门上方，且路径畅通
+                return this.checkVerticalPath(element, gate, 'down');
+            case 'left':
+                // 门向左，检查方块是否在门右侧，且路径畅通
+                return this.checkHorizontalPath(element, gate, 'left');
+            case 'right':
+                // 门向右，检查方块是否在门左侧，且路径畅通
+                return this.checkHorizontalPath(element, gate, 'right');
+            default:
+                return false;
+        }
+    }
+    
+    /**
+     * 计算方块的中心位置
+     * @param {Object} element - 方块元素
+     * @returns {Object} 中心位置 {x, y}
+     */
+    calculateElementCenter(element) {
+        const bounds = this.calculateElementBounds(element.position, element.shapeData);
+        return {
+            x: element.position.x + bounds.width / 2,
+            y: element.position.y + bounds.height / 2
+        };
+    }
+    
+    /**
+     * 计算门的中心位置
+     * @param {Object} gate - 门元素
+     * @returns {Object} 中心位置 {x, y}
+     */
+    calculateGateCenter(gate) {
+        return {
+            x: gate.position.x + gate.size.width / 2,
+            y: gate.position.y + gate.size.height / 2
+        };
+    }
+    
+    /**
+     * 检查垂直方向的路径
+     * @param {Object} element - 方块元素
+     * @param {Object} gate - 门元素
+     * @param {string} direction - 方向 'up' 或 'down'
+     * @returns {boolean} 路径是否畅通
+     */
+    checkVerticalPath(element, gate, direction) {
+        const elementCells = this.calculateOccupiedCells(element.position, element.shapeData);
+        
+        // 检查方块是否在门的正确一侧
+        for (const cellKey of elementCells) {
+            const [x, y] = cellKey.split(',').map(Number);
+            
+            if (direction === 'up') {
+                // 门向上，方块应该在门下方
+                if (y !== gate.position.y + gate.size.height) {
+                    continue; // 这个格子不在门下方
+                }
+            } else {
+                // 门向下，方块应该在门上方
+                if (y !== gate.position.y - 1) {
+                    continue; // 这个格子不在门上方
+                }
+            }
+            
+            // 检查水平位置是否与门重叠
+            if (x >= gate.position.x && x < gate.position.x + gate.size.width) {
+                console.log(`[路径检查] 方块在门的正确位置，路径畅通`);
+                return true;
+            }
+        }
+        
+        console.log(`[路径检查] 方块不在门的正确位置`);
+        return false;
+    }
+    
+    /**
+     * 检查水平方向的路径
+     * @param {Object} element - 方块元素
+     * @param {Object} gate - 门元素
+     * @param {string} direction - 方向 'left' 或 'right'
+     * @returns {boolean} 路径是否畅通
+     */
+    checkHorizontalPath(element, gate, direction) {
+        const elementCells = this.calculateOccupiedCells(element.position, element.shapeData);
+        
+        // 检查方块是否在门的正确一侧
+        for (const cellKey of elementCells) {
+            const [x, y] = cellKey.split(',').map(Number);
+            
+            if (direction === 'left') {
+                // 门向左，方块应该在门右侧
+                if (x !== gate.position.x + gate.size.width) {
+                    continue; // 这个格子不在门右侧
+                }
+            } else {
+                // 门向右，方块应该在门左侧
+                if (x !== gate.position.x - 1) {
+                    continue; // 这个格子不在门左侧
+                }
+            }
+            
+            // 检查垂直位置是否与门重叠
+            if (y >= gate.position.y && y < gate.position.y + gate.size.height) {
+                console.log(`[路径检查] 方块在门的正确位置，路径畅通`);
+                return true;
+            }
+        }
+        
+        console.log(`[路径检查] 方块不在门的正确位置`);
+        return false;
     }
 
     /**
@@ -2771,9 +2907,46 @@ class MapEngine {
         
         console.log(`[边缘对齐] 计算目标: (${targetPosition.x},${targetPosition.y})`);
         
+        // 检查目标位置是否在边界内
+        if (!this.isPositionWithinBounds(targetPosition, element.shapeData)) {
+            console.log(`[边缘对齐] 目标位置超出边界，调整到最近的有效位置`);
+            // 调整到边界内的位置
+            targetPosition = this.adjustPositionToBounds(targetPosition, element.shapeData);
+            console.log(`[边缘对齐] 调整后目标: (${targetPosition.x},${targetPosition.y})`);
+        }
+        
         return targetPosition;
     }
     
+    /**
+     * 调整位置到边界内
+     * @param {Object} position - 目标位置
+     * @param {Object} shapeData - 形状数据
+     * @returns {Object} 调整后的位置
+     */
+    adjustPositionToBounds(position, shapeData) {
+        const bounds = this.calculateElementBounds(position, shapeData);
+        
+        let adjustedX = position.x;
+        let adjustedY = position.y;
+        
+        // 调整X坐标
+        if (adjustedX < 0) {
+            adjustedX = 0;
+        } else if (adjustedX + bounds.width > this.GRID_SIZE) {
+            adjustedX = this.GRID_SIZE - bounds.width;
+        }
+        
+        // 调整Y坐标
+        if (adjustedY < 0) {
+            adjustedY = 0;
+        } else if (adjustedY + bounds.height > this.GRID_SIZE) {
+            adjustedY = this.GRID_SIZE - bounds.height;
+        }
+        
+        return { x: adjustedX, y: adjustedY };
+    }
+
     /**
      * 计算方块的边界尺寸
      * @param {Object} position - 位置 {x, y}
@@ -2785,12 +2958,13 @@ class MapEngine {
             return { width: 1, height: 1 };
         }
         
+        // 计算方块的相对尺寸（不依赖position）
         let minX = Infinity, maxX = -Infinity;
         let minY = Infinity, maxY = -Infinity;
         
         shapeData.blocks.forEach(block => {
-            const x = position.x + block[0];
-            const y = position.y + block[1];
+            const x = block[0]; // 使用相对坐标
+            const y = block[1]; // 使用相对坐标
             minX = Math.min(minX, x);
             maxX = Math.max(maxX, x);
             minY = Math.min(minY, y);
@@ -2830,28 +3004,49 @@ class MapEngine {
         const dy = Math.abs(targetPosition.y - startPosition.y);
         const isAdjacent = (dx <= 1 && dy <= 1) && !(dx === 0 && dy === 0);
         
-        if (isAdjacent) {
+        // 如果是单格移动，直接使用点击位置，不进行边缘对齐
+        const clickDx = Math.abs(clickPosition.x - startPosition.x);
+        const clickDy = Math.abs(clickPosition.y - startPosition.y);
+        const isSingleStep = (clickDx <= 1 && clickDy <= 1) && !(clickDx === 0 && clickDy === 0);
+        
+        let finalTargetPosition;
+        if (isSingleStep) {
+            // 单格移动：直接使用点击位置
+            finalTargetPosition = clickPosition;
+            console.log(`[移动] 单格移动，直接使用点击位置: (${finalTargetPosition.x},${finalTargetPosition.y})`);
+        } else {
+            // 多格移动：使用边缘对齐位置
+            finalTargetPosition = targetPosition;
+            console.log(`[移动] 多格移动，使用边缘对齐位置: (${finalTargetPosition.x},${finalTargetPosition.y})`);
+        }
+        
+        // 重新计算是否为相邻位置
+        const finalDx = Math.abs(finalTargetPosition.x - startPosition.x);
+        const finalDy = Math.abs(finalTargetPosition.y - startPosition.y);
+        const isFinalAdjacent = (finalDx <= 1 && finalDy <= 1) && !(finalDx === 0 && finalDy === 0);
+        
+        if (isFinalAdjacent) {
             // 相邻位置：直接移动
-            console.log(`[移动] 相邻移动到边缘对齐位置 (${targetPosition.x},${targetPosition.y})`);
+            console.log(`[移动] 相邻移动到最终目标位置 (${finalTargetPosition.x},${finalTargetPosition.y})`);
             
             // 检查目标位置是否有碰撞
-            if (this.checkCollisionAtPosition(element, targetPosition, element.id)) {
-                console.log(`[移动] 目标位置 (${targetPosition.x},${targetPosition.y}) 有碰撞，无法移动`);
+            if (this.checkCollisionAtPosition(element, finalTargetPosition, element.id)) {
+                console.log(`[移动] 目标位置 (${finalTargetPosition.x},${finalTargetPosition.y}) 有碰撞，无法移动`);
                 return;
             }
 
             // 直接移动
-            const path = [startPosition, targetPosition];
+            const path = [startPosition, finalTargetPosition];
             this.executeMoveWithAnimation(element, path);
         } else {
             // 远距离：使用A*寻路，执行完整路径
-            console.log(`[移动] 远距离移动，开始寻路到边缘对齐位置`);
-            const fullPath = this.calculateCompletePath(element, startPosition, targetPosition);
+            console.log(`[移动] 远距离移动，开始寻路到最终目标位置`);
+            const fullPath = this.calculateCompletePath(element, startPosition, finalTargetPosition);
             
             if (fullPath.length === 0) {
                 console.log(`[移动] 无法找到到达目标位置的路径，尝试寻找最近可达位置`);
                 // 如果无法到达目标，尝试移动到最近的可达位置
-                const nearestPosition = this.findNearestReachablePosition(element, startPosition, targetPosition);
+                const nearestPosition = this.findNearestReachablePosition(element, startPosition, finalTargetPosition);
                 if (nearestPosition && (nearestPosition.x !== startPosition.x || nearestPosition.y !== startPosition.y)) {
                     console.log(`[移动] 找到最近可达位置: (${nearestPosition.x},${nearestPosition.y})`);
                     const path = [startPosition, nearestPosition];
@@ -3464,6 +3659,12 @@ class MapEngine {
                 this.checkLayerReveal(element);
                 this.cleanupCache();
                 this.animations.delete(animationId);
+                
+                // 动画完成后检查门检测
+                if (element.type === 'tetris' && element.movable) {
+                    this.checkElementGateExit(element);
+                }
+                
                 // 动画完成后触发重绘
                 this.triggerRedraw();
             }
