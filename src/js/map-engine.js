@@ -19,6 +19,15 @@ class MapEngine {
         this.gameState = 'ready'; // ready, playing, completed
         this.selectedElement = null;
         this.moveHistory = [];
+        
+        // 弹窗状态
+        this.dialogState = {
+            show: false,
+            currentLevel: 1,
+            nextLevel: 2,
+            selectedButton: 0,
+            animationTime: 0
+        };
         this.currentLevel = 1; // 当前关卡
 
         // 性能优化缓存
@@ -276,7 +285,7 @@ class MapEngine {
 
         const element = {
             id: blockElement.id, // 暂时使用 blockElement.id 来匹配现有行为
-            type: 'tetris', color: block.color, position: block.position, // {x, y}
+            type: 'tetris', color: blockElement.color, position: block.position, // {x, y} - 使用 blockElement.color
             initialPosition: {...block.position}, // 保存初始位置
             shape: block.shape, // 原始形状数据
             shapeData: blockElement.shapeData, // 处理后的形状数据
@@ -793,19 +802,90 @@ class MapEngine {
     }
 
     /**
-     * 检查指定元素的出门条件（新增 - 修复方法调用错误）
+     * 检查指定元素的出门条件（优化 - 只检测触碰的门）
      * @param {Object} element - 要检查的元素
      */
     checkElementGateExit(element) {
         if (!element || element.type !== 'tetris' || !element.movable) return;
 
-        const gates = this.getAllElementsByType('gate');
-
-        for (const gate of gates) {
+        // 获取方块占据的所有格子
+        const elementCells = this.calculateOccupiedCells(element.position, element.shapeData);
+        
+        // 检查方块是否触碰任何门
+        const touchedGates = this.findTouchedGates(element, elementCells);
+        
+        // 只检查触碰的门
+        for (const gate of touchedGates) {
             if (this.canExitThroughGate(element, gate)) {
                 this.exitThroughGate(element, gate);
                 break;
             }
+        }
+    }
+
+    /**
+     * 查找方块触碰的门（新增 - 优化门检测）
+     * @param {Object} element - 方块元素
+     * @param {Array} elementCells - 方块占据的格子
+     * @returns {Array} 触碰的门列表
+     */
+    findTouchedGates(element, elementCells) {
+        const touchedGates = [];
+        const allGates = this.getAllElementsByType('gate');
+        
+        for (const gate of allGates) {
+            if (this.isElementTouchingGate(element, elementCells, gate)) {
+                touchedGates.push(gate);
+            }
+        }
+        
+        return touchedGates;
+    }
+    
+    /**
+     * 检查方块是否触碰门（新增 - 精确触碰检测）
+     * @param {Object} element - 方块元素
+     * @param {Array} elementCells - 方块占据的格子
+     * @param {Object} gate - 门元素
+     * @returns {boolean} 是否触碰门
+     */
+    isElementTouchingGate(element, elementCells, gate) {
+        // 根据门的方向检查触碰
+        switch (gate.direction) {
+            case 'up':
+                // 门向上，检查方块是否在门下方
+                return elementCells.some(cell => {
+                    const [x, y] = cell.split(',').map(Number);
+                    return y === gate.position.y + gate.size.height && 
+                           x >= gate.position.x && x < gate.position.x + gate.size.width;
+                });
+                
+            case 'down':
+                // 门向下，检查方块是否在门内或门下方
+                return elementCells.some(cell => {
+                    const [x, y] = cell.split(',').map(Number);
+                    return (y >= gate.position.y && y <= gate.position.y + gate.size.height) && 
+                           x >= gate.position.x && x < gate.position.x + gate.size.width;
+                });
+                
+            case 'left':
+                // 门向左，检查方块是否在门内或门右侧
+                return elementCells.some(cell => {
+                    const [x, y] = cell.split(',').map(Number);
+                    return (x >= gate.position.x && x <= gate.position.x + gate.size.width) && 
+                           y >= gate.position.y && y < gate.position.y + gate.size.height;
+                });
+                
+            case 'right':
+                // 门向右，检查方块是否在门内或门左侧
+                return elementCells.some(cell => {
+                    const [x, y] = cell.split(',').map(Number);
+                    return (x >= gate.position.x && x <= gate.position.x + gate.size.width) && 
+                           y >= gate.position.y && y < gate.position.y + gate.size.height;
+                });
+                
+            default:
+                return false;
         }
     }
 
@@ -822,11 +902,6 @@ class MapEngine {
             return false;
         }
 
-        // 检查位置是否贴着门
-        if (!this.isElementAtGate(element, gate)) {
-            console.log(`[通过门] 位置不匹配: 方块未贴着门`);
-            return false;
-        }
 
         // 检查尺寸：门的大小必须大于方块的最大宽度或高度
         const bounds = this.calculateElementBounds(element.position, element.shapeData);
@@ -929,9 +1004,9 @@ class MapEngine {
                     continue; // 这个格子不在门下方
                 }
             } else {
-                // 门向下，方块应该在门上方
-                if (y !== gate.position.y - 1) {
-                    continue; // 这个格子不在门上方
+                // 门向下，方块应该在门下方（贴着门）
+                if (y !== gate.position.y + gate.size.height) {
+                    continue; // 这个格子不在门下方
                 }
             }
             
@@ -1043,11 +1118,11 @@ class MapEngine {
                 });
 
             case 'down':
-                // 检查方块是否在门上方，贴着门
+                // 检查方块是否贴着门下方
                 return elementCells.some(cell => {
                     const [x, y] = cell.split(',').map(Number);
-                    // 方块在门上方，且水平位置与门重叠
-                    return y === gate.position.y - 1 && 
+                    // 方块在门下方，且水平位置与门重叠
+                    return y === gate.position.y + gate.size.height && 
                            x >= gate.position.x && x < gate.position.x + gate.size.width;
                 });
 
@@ -1082,10 +1157,18 @@ class MapEngine {
     exitThroughGate(element, gate) {
         console.log(`方块 ${element.id} 通过 ${gate.color} 门离开`);
 
-        // 直接移除，不再使用废弃的exitBlock函数
-            this.removeElement(element.id);
-            this.selectedElement = null;
-            this.checkWinCondition();
+        // 停止当前动画
+        const animationId = `block_move_${element.id}`;
+        if (this.animations.has(animationId)) {
+            console.log(`[通过门] 停止方块 ${element.id} 的移动动画`);
+            this.animations.get(animationId).kill();
+            this.animations.delete(animationId);
+        }
+
+        // 移除方块
+        this.removeElement(element.id);
+        this.selectedElement = null;
+        this.checkWinCondition();
     }
 
     /**
@@ -1096,23 +1179,27 @@ class MapEngine {
 
         console.log(`检查通关条件: 当前还有 ${tetrisBlocks.length} 个方块`);
 
-        // 如果还有方块，检查是否所有方块都已经到达目标位置
-        if (tetrisBlocks.length > 0) {
+        // 检查是否还有可移动的方块
+        const movableBlocks = tetrisBlocks.filter(block => block.movable);
+        console.log(`可移动的方块数量: ${movableBlocks.length}`);
+
+        // 如果还有可移动的方块，检查是否所有方块都已经到达目标位置
+        if (movableBlocks.length > 0) {
             // 检查是否所有方块都已经在正确的位置（通过门）
-            const allBlocksAtTarget = tetrisBlocks.every(block => {
+            const allBlocksAtTarget = movableBlocks.every(block => {
                 return this.isBlockAtCorrectGate(block);
             });
 
             if (allBlocksAtTarget) {
-                console.log('所有方块都已到达目标位置，关卡完成！');
+                console.log('所有可移动方块都已到达目标位置，关卡完成！');
                 this.gameState = 'completed';
                 this.onGameComplete();
             } else {
-                console.log('还有方块未到达目标位置，继续游戏');
+                console.log('还有可移动方块未到达目标位置，继续游戏');
             }
         } else {
-            // 没有方块了，关卡完成
-            console.log('所有方块都已离开，关卡完成！');
+            // 没有可移动的方块了，关卡完成
+            console.log('所有可移动方块都已离开，关卡完成！');
             this.gameState = 'completed';
             this.onGameComplete();
         }
@@ -1718,12 +1805,64 @@ class MapEngine {
             window.onLevelComplete(this.currentLevel || 1);
         }
 
+        // 显示过关弹窗
+        this.showLevelCompleteDialog();
+    }
+
+    /**
+     * 显示关卡完成弹窗（Canvas版本）
+     */
+    showLevelCompleteDialog() {
+        const currentLevel = this.currentLevel || 1;
+        const nextLevel = currentLevel + 1;
+        
+        // 设置弹窗状态
+        this.dialogState = {
+            show: true,
+            currentLevel: currentLevel,
+            nextLevel: nextLevel,
+            selectedButton: 0, // 0: 下一关, 1: 主菜单
+            animationTime: 0
+        };
+        
+        console.log(`显示关卡完成弹窗: 第${currentLevel}关完成，下一关${nextLevel}`);
+    }
+
+    /**
+     * 加载下一关
+     */
+    loadNextLevel(levelId) {
+        console.log(`加载下一关: ${levelId}`);
+        
+        // 清理当前地图
+        this.clearMap();
+        
+        // 加载新地图
+        if (this.loadMapByLevel(levelId)) {
+            console.log(`成功加载第 ${levelId} 关`);
+            // 触发重绘
+            this.triggerRedraw();
+        } else {
+            console.error(`加载第 ${levelId} 关失败`);
+            this.returnToMainMenu();
+        }
+    }
+
+    /**
+     * 返回主菜单
+     */
+    returnToMainMenu() {
+        console.log('返回主菜单');
+        
+        // 清理当前地图
+        this.clearMap();
+        
         // 延迟返回主菜单，让玩家看到完成效果
         setTimeout(() => {
             if (window.initMainMenu) {
                 window.initMainMenu();
             }
-        }, 2000);
+        }, 500);
     }
 
     /**
@@ -2098,6 +2237,9 @@ class MapEngine {
 
         // 绘制UI
         this.drawUI();
+        
+        // 绘制弹窗
+        this.drawDialog();
     }
 
     /**
@@ -2407,6 +2549,117 @@ class MapEngine {
         this.ctx.font = 'bold 14px Arial';
         this.ctx.textAlign = 'center';
         this.ctx.fillText(`关卡 ${this.currentLevel}`, x, y + 15);
+    }
+
+    /**
+     * 绘制弹窗
+     */
+    drawDialog() {
+        if (!this.dialogState.show || !this.ctx) return;
+
+        const ctx = this.ctx;
+        const screenWidth = this.systemInfo.windowWidth;
+        const screenHeight = this.systemInfo.windowHeight;
+        
+        // 更新动画时间
+        this.dialogState.animationTime += 0.016; // 假设60fps
+        
+        // 计算弹窗动画效果
+        const fadeAlpha = Math.min(1, this.dialogState.animationTime * 2);
+        const scale = 0.8 + 0.2 * Math.min(1, this.dialogState.animationTime * 3);
+        
+        // 绘制半透明背景
+        ctx.save();
+        ctx.fillStyle = `rgba(0, 0, 0, ${0.8 * fadeAlpha})`;
+        ctx.fillRect(0, 0, screenWidth, screenHeight);
+        
+        // 弹窗尺寸
+        const dialogWidth = Math.min(400, screenWidth * 0.9);
+        const dialogHeight = 300;
+        const dialogX = (screenWidth - dialogWidth) / 2;
+        const dialogY = (screenHeight - dialogHeight) / 2;
+        
+        // 绘制弹窗背景
+        ctx.save();
+        ctx.translate(dialogX + dialogWidth / 2, dialogY + dialogHeight / 2);
+        ctx.scale(scale, scale);
+        
+        // 渐变背景
+        const gradient = ctx.createLinearGradient(-dialogWidth/2, -dialogHeight/2, dialogWidth/2, dialogHeight/2);
+        gradient.addColorStop(0, '#667eea');
+        gradient.addColorStop(1, '#764ba2');
+        
+        ctx.fillStyle = gradient;
+        ctx.fillRect(-dialogWidth/2, -dialogHeight/2, dialogWidth, dialogHeight);
+        
+        // 绘制边框
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(-dialogWidth/2, -dialogHeight/2, dialogWidth, dialogHeight);
+        
+        // 绘制标题
+        ctx.fillStyle = '#FFFFFF';
+        ctx.font = 'bold 28px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText('🎉 关卡完成！', 0, -80);
+        
+        // 绘制关卡信息
+        ctx.font = '18px Arial';
+        ctx.fillText(`恭喜你完成了第 ${this.dialogState.currentLevel} 关！`, 0, -40);
+        
+        // 绘制按钮
+        const buttonWidth = 120;
+        const buttonHeight = 40;
+        const buttonSpacing = 20;
+        const totalWidth = buttonWidth * 2 + buttonSpacing;
+        const startX = -totalWidth / 2;
+        
+        // 下一关按钮
+        const nextButtonX = startX + buttonWidth / 2;
+        const nextButtonY = 20;
+        this.drawDialogButton(nextButtonX, nextButtonY, buttonWidth, buttonHeight, 
+            this.dialogState.nextLevel <= 2 ? `下一关 (${this.dialogState.nextLevel})` : '返回主菜单',
+            this.dialogState.selectedButton === 0);
+        
+        // 主菜单按钮
+        const menuButtonX = startX + buttonWidth + buttonSpacing + buttonWidth / 2;
+        const menuButtonY = 20;
+        this.drawDialogButton(menuButtonX, menuButtonY, buttonWidth, buttonHeight, 
+            '主菜单', this.dialogState.selectedButton === 1);
+        
+        ctx.restore();
+        ctx.restore();
+    }
+
+    /**
+     * 绘制弹窗按钮
+     */
+    drawDialogButton(x, y, width, height, text, isSelected) {
+        const ctx = this.ctx;
+        
+        // 按钮背景
+        const gradient = ctx.createLinearGradient(x - width/2, y - height/2, x + width/2, y + height/2);
+        if (isSelected) {
+            gradient.addColorStop(0, '#4CAF50');
+            gradient.addColorStop(1, '#45a049');
+        } else {
+            gradient.addColorStop(0, '#2196F3');
+            gradient.addColorStop(1, '#1976D2');
+        }
+        
+        ctx.fillStyle = gradient;
+        ctx.fillRect(x - width/2, y - height/2, width, height);
+        
+        // 按钮边框
+        ctx.strokeStyle = isSelected ? '#2E7D32' : '#1565C0';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(x - width/2, y - height/2, width, height);
+        
+        // 按钮文字
+        ctx.fillStyle = '#FFFFFF';
+        ctx.font = 'bold 16px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText(text, x, y + 6);
     }
 
     /**
@@ -2787,6 +3040,12 @@ class MapEngine {
      * @param {number} y - 点击Y坐标
      */
     handleClick(x, y) {
+        // 如果弹窗显示，处理弹窗点击
+        if (this.dialogState.show) {
+            this.handleDialogClick(x, y);
+            return;
+        }
+
         // 检查是否点击在网格内
         if (x < this.gridOffsetX || x > this.gridOffsetX + this.gridSize || y < this.gridOffsetY || y > this.gridOffsetY + this.gridSize) {
             console.log('点击在网格外，忽略');
@@ -2820,101 +3079,73 @@ class MapEngine {
     }
 
     /**
-     * 计算边缘对齐的目标位置
+     * 处理弹窗点击事件
+     * @param {number} x - 点击X坐标
+     * @param {number} y - 点击Y坐标
+     */
+    handleDialogClick(x, y) {
+        const screenWidth = this.systemInfo.windowWidth;
+        const screenHeight = this.systemInfo.windowHeight;
+        
+        // 弹窗尺寸
+        const dialogWidth = Math.min(400, screenWidth * 0.9);
+        const dialogHeight = 300;
+        const dialogX = (screenWidth - dialogWidth) / 2;
+        const dialogY = (screenHeight - dialogHeight) / 2;
+        
+        // 按钮尺寸
+        const buttonWidth = 120;
+        const buttonHeight = 40;
+        const buttonSpacing = 20;
+        const totalWidth = buttonWidth * 2 + buttonSpacing;
+        const startX = dialogX + (dialogWidth - totalWidth) / 2;
+        const buttonY = dialogY + dialogHeight / 2 + 20;
+        
+        // 检查点击的是哪个按钮
+        const nextButtonX = startX + buttonWidth / 2;
+        const menuButtonX = startX + buttonWidth + buttonSpacing + buttonWidth / 2;
+        
+        if (x >= nextButtonX - buttonWidth / 2 && x <= nextButtonX + buttonWidth / 2 &&
+            y >= buttonY - buttonHeight / 2 && y <= buttonY + buttonHeight / 2) {
+            // 点击了下一关按钮
+            this.dialogState.show = false;
+            if (this.dialogState.nextLevel <= 2) {
+                this.loadNextLevel(this.dialogState.nextLevel);
+            } else {
+                this.returnToMainMenu();
+            }
+        } else if (x >= menuButtonX - buttonWidth / 2 && x <= menuButtonX + buttonWidth / 2 &&
+                   y >= buttonY - buttonHeight / 2 && y <= buttonY + buttonHeight / 2) {
+            // 点击了主菜单按钮
+            this.dialogState.show = false;
+            this.returnToMainMenu();
+        }
+    }
+
+    /**
+     * 计算目标位置（简化版本，直接使用点击位置）
      * @param {Object} element - 方块元素
      * @param {Object} clickPosition - 点击位置 {x, y}
-     * @returns {Object} 边缘对齐后的目标位置 {x, y}
+     * @returns {Object} 目标位置 {x, y}
      */
-    calculateEdgeAlignedPosition(element, clickPosition) {
+    calculateTargetPosition(element, clickPosition) {
         const startPos = element.position;
-        const shapeData = element.shapeData;
         
-        // 计算方块的边界
-        const bounds = this.calculateElementBounds(startPos, shapeData);
+        console.log(`[目标计算] 起始位置: (${startPos.x},${startPos.y})`);
+        console.log(`[目标计算] 点击位置: (${clickPosition.x},${clickPosition.y})`);
         
-        // 计算网格位置差
-        const dx = clickPosition.x - startPos.x;
-        const dy = clickPosition.y - startPos.y;
-        
-        let targetPosition;
-        
-        console.log(`[边缘对齐] 原始点击: (${clickPosition.x},${clickPosition.y})`);
-        console.log(`[边缘对齐] 方块边界: 宽${bounds.width} 高${bounds.height}`);
-        console.log(`[边缘对齐] 网格差值: dx=${dx}, dy=${dy}`);
-        
-        // 根据网格位置差判断方向
-        if (dx > 0 && dy === 0) {
-            // 向右：右边缘对齐到目标位置
-            targetPosition = {
-                x: clickPosition.x - bounds.width + 1,
-                y: startPos.y
-            };
-            console.log(`[边缘对齐] 方向: 向右`);
-        } else if (dx > 0 && dy > 0) {
-            // 右下：右下角对齐到目标位置
-            targetPosition = {
-                x: clickPosition.x - bounds.width + 1,
-                y: clickPosition.y - bounds.height + 1
-            };
-            console.log(`[边缘对齐] 方向: 右下`);
-        } else if (dx === 0 && dy > 0) {
-            // 向下：下边缘对齐到目标位置
-            targetPosition = {
-                x: startPos.x,
-                y: clickPosition.y - bounds.height + 1
-            };
-            console.log(`[边缘对齐] 方向: 向下`);
-        } else if (dx < 0 && dy > 0) {
-            // 左下：左下角对齐到目标位置
-            targetPosition = {
-                x: clickPosition.x,
-                y: clickPosition.y - bounds.height + 1
-            };
-            console.log(`[边缘对齐] 方向: 左下`);
-        } else if (dx < 0 && dy === 0) {
-            // 向左：左边缘对齐到目标位置
-            targetPosition = {
-                x: clickPosition.x,
-                y: startPos.y
-            };
-            console.log(`[边缘对齐] 方向: 向左`);
-        } else if (dx < 0 && dy < 0) {
-            // 左上：左上角对齐到目标位置
-            targetPosition = {
-                x: clickPosition.x,
-                y: clickPosition.y
-            };
-            console.log(`[边缘对齐] 方向: 左上`);
-        } else if (dx === 0 && dy < 0) {
-            // 向上：上边缘对齐到目标位置
-            targetPosition = {
-                x: startPos.x,
-                y: clickPosition.y
-            };
-            console.log(`[边缘对齐] 方向: 向上`);
-        } else if (dx > 0 && dy < 0) {
-            // 右上：右上角对齐到目标位置
-            targetPosition = {
-                x: clickPosition.x - bounds.width + 1,
-                y: clickPosition.y
-            };
-            console.log(`[边缘对齐] 方向: 右上`);
-        } else {
-            // dx === 0 && dy === 0，没有移动
-            console.log(`[边缘对齐] 方向: 无移动`);
-            return startPos;
-        }
-        
-        console.log(`[边缘对齐] 计算目标: (${targetPosition.x},${targetPosition.y})`);
+        // 直接使用点击位置作为目标位置
+        let targetPosition = { ...clickPosition };
         
         // 检查目标位置是否在边界内
         if (!this.isPositionWithinBounds(targetPosition, element.shapeData)) {
-            console.log(`[边缘对齐] 目标位置超出边界，调整到最近的有效位置`);
+            console.log(`[目标计算] 目标位置超出边界，调整到最近的有效位置`);
             // 调整到边界内的位置
             targetPosition = this.adjustPositionToBounds(targetPosition, element.shapeData);
-            console.log(`[边缘对齐] 调整后目标: (${targetPosition.x},${targetPosition.y})`);
+            console.log(`[目标计算] 调整后目标: (${targetPosition.x},${targetPosition.y})`);
         }
         
+        console.log(`[目标计算] 最终目标: (${targetPosition.x},${targetPosition.y})`);
         return targetPosition;
     }
     
@@ -2996,71 +3227,29 @@ class MapEngine {
         const startPosition = {...element.position};
         console.log(`[移动] 开始移动方块 ${elementId} 从 (${startPosition.x},${startPosition.y}) 到点击位置 (${clickPosition.x},${clickPosition.y})`);
         
-        // 计算边缘对齐的目标位置
-        const targetPosition = this.calculateEdgeAlignedPosition(element, clickPosition);
+        // 计算目标位置
+        const targetPosition = this.calculateTargetPosition(element, clickPosition);
         
-        // 计算距离，判断是否为相邻位置
-        const dx = Math.abs(targetPosition.x - startPosition.x);
-        const dy = Math.abs(targetPosition.y - startPosition.y);
-        const isAdjacent = (dx <= 1 && dy <= 1) && !(dx === 0 && dy === 0);
+        // 使用A*算法计算路径到目标位置
+        console.log(`[移动] 使用A*算法计算路径到目标位置: (${targetPosition.x},${targetPosition.y})`);
+        const fullPath = this.calculateCompletePath(element, startPosition, targetPosition);
         
-        // 如果是单格移动，直接使用点击位置，不进行边缘对齐
-        const clickDx = Math.abs(clickPosition.x - startPosition.x);
-        const clickDy = Math.abs(clickPosition.y - startPosition.y);
-        const isSingleStep = (clickDx <= 1 && clickDy <= 1) && !(clickDx === 0 && clickDy === 0);
-        
-        let finalTargetPosition;
-        if (isSingleStep) {
-            // 单格移动：直接使用点击位置
-            finalTargetPosition = clickPosition;
-            console.log(`[移动] 单格移动，直接使用点击位置: (${finalTargetPosition.x},${finalTargetPosition.y})`);
-        } else {
-            // 多格移动：使用边缘对齐位置
-            finalTargetPosition = targetPosition;
-            console.log(`[移动] 多格移动，使用边缘对齐位置: (${finalTargetPosition.x},${finalTargetPosition.y})`);
+        if (fullPath.length === 0) {
+            console.log(`[移动] 无法找到到达目标位置的路径，尝试寻找最近可达位置`);
+            // 如果无法到达目标，尝试移动到最近的可达位置
+            const nearestPosition = this.findNearestReachablePosition(element, startPosition, targetPosition);
+            if (nearestPosition && (nearestPosition.x !== startPosition.x || nearestPosition.y !== startPosition.y)) {
+                console.log(`[移动] 找到最近可达位置: (${nearestPosition.x},${nearestPosition.y})`);
+                const path = [startPosition, nearestPosition];
+                this.executeMoveWithAnimation(element, path);
+            } else {
+                console.log(`[移动] 无法找到任何可达位置`);
+            }
+            return;
         }
         
-        // 重新计算是否为相邻位置
-        const finalDx = Math.abs(finalTargetPosition.x - startPosition.x);
-        const finalDy = Math.abs(finalTargetPosition.y - startPosition.y);
-        const isFinalAdjacent = (finalDx <= 1 && finalDy <= 1) && !(finalDx === 0 && finalDy === 0);
-        
-        if (isFinalAdjacent) {
-            // 相邻位置：直接移动
-            console.log(`[移动] 相邻移动到最终目标位置 (${finalTargetPosition.x},${finalTargetPosition.y})`);
-            
-            // 检查目标位置是否有碰撞
-            if (this.checkCollisionAtPosition(element, finalTargetPosition, element.id)) {
-                console.log(`[移动] 目标位置 (${finalTargetPosition.x},${finalTargetPosition.y}) 有碰撞，无法移动`);
-                return;
-            }
-
-            // 直接移动
-            const path = [startPosition, finalTargetPosition];
-            this.executeMoveWithAnimation(element, path);
-        } else {
-            // 远距离：使用A*寻路，执行完整路径
-            console.log(`[移动] 远距离移动，开始寻路到最终目标位置`);
-            const fullPath = this.calculateCompletePath(element, startPosition, finalTargetPosition);
-            
-            if (fullPath.length === 0) {
-                console.log(`[移动] 无法找到到达目标位置的路径，尝试寻找最近可达位置`);
-                // 如果无法到达目标，尝试移动到最近的可达位置
-                const nearestPosition = this.findNearestReachablePosition(element, startPosition, finalTargetPosition);
-                if (nearestPosition && (nearestPosition.x !== startPosition.x || nearestPosition.y !== startPosition.y)) {
-                    console.log(`[移动] 找到最近可达位置: (${nearestPosition.x},${nearestPosition.y})`);
-                    const path = [startPosition, nearestPosition];
-                    this.executeMoveWithAnimation(element, path);
-                } else {
-                    console.log(`[移动] 无法找到任何可达位置`);
-                }
-                return;
-            }
-            
-            // 执行完整路径
-            console.log(`[移动] 执行完整路径，共 ${fullPath.length} 步`);
-            this.executeMoveWithAnimation(element, fullPath);
-        }
+        console.log(`[移动] 找到路径，共 ${fullPath.length} 步`);
+        this.executeMoveWithAnimation(element, fullPath);
     }
 
     /**
