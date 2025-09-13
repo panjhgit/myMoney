@@ -68,6 +68,13 @@ var BLOCK_COLORS = {
         glowColor: 'rgba(255, 107, 107, 0.6)',
         shape: 'cross',
         blocks: [[1, 0], [0, 1], [1, 1], [2, 1], [1, 2]]
+    }, // 添加 H 形状的颜色定义
+    hshape: {
+        name: 'hshape',
+        gradient: 'linear-gradient(135deg, #8B4513, #A0522D)',
+        glowColor: 'rgba(139, 69, 19, 0.6)',
+        shape: 'hshape',
+        blocks: [[0, 0], [2, 0], [0, 1], [1, 1], [2, 1], [0, 2], [2, 2]]
     }
 };
 
@@ -293,44 +300,6 @@ var drawBlock = function (ctx, block, startX, startY) {
 
 // 注意：getColorFromGradient 函数在 creature.js 中定义，这里不重复定义
 
-// 选择方块（已删除，使用统一的selectElement）
-var selectBlock = function (block) {
-    console.warn('selectBlock 已废弃，请使用 MapEngine.selectElement');
-};
-
-// 取消选择方块（已删除，使用统一的selectElement）
-var deselectBlock = function (block) {
-    console.warn('deselectBlock 已废弃，请使用 MapEngine.selectElement');
-};
-
-// 移动方块（已删除，使用统一的moveElementToPosition）
-var moveBlock = function (block, newPosition) {
-    console.warn('moveBlock 已废弃，请使用 MapEngine.moveElementToPosition');
-};
-
-// 方块退出
-var exitBlock = function (block) {
-    block.state = BlockStates.exiting;
-    block.element.alpha = 0.5;
-};
-
-// 更新方块位置
-var updateBlockPosition = function (block, x, y) {
-    block.element.x = x;
-    block.element.y = y;
-};
-
-// 销毁方块
-var destroyBlock = function (block) {
-    // 清理动画
-    if (block.animations) {
-        Object.values(block.animations).forEach(function (animation) {
-            if (animation && animation.kill) {
-                animation.kill();
-            }
-        });
-    }
-};
 
 // 创建冰块
 var createIce = function (iceConfig) {
@@ -349,7 +318,9 @@ var createIce = function (iceConfig) {
     }
 
     var ice = {
-        id: id, position: position, layer: layer, element: {
+        id: id, position: position, layer: layer, 
+        meltProgress: 0, // 融化进度 0-100
+        element: {
         x: position.x * GAME_CONFIG.CELL_SIZE,
         y: position.y * GAME_CONFIG.CELL_SIZE,
         width: GAME_CONFIG.CELL_SIZE,
@@ -412,9 +383,9 @@ if (typeof window !== 'undefined') {
     // window.selectBlock = selectBlock; // 已废弃
     // window.deselectBlock = deselectBlock; // 已废弃
     // window.moveBlock = moveBlock; // 已废弃
-    window.exitBlock = exitBlock;
-    window.updateBlockPosition = updateBlockPosition;
-    window.destroyBlock = destroyBlock;
+    // window.exitBlock = exitBlock; // 已废弃
+    // window.updateBlockPosition = updateBlockPosition; // 已废弃
+    // window.destroyBlock = destroyBlock; // 已废弃
 } else if (typeof global !== 'undefined') {
     global.BlockStates = BlockStates;
     // global.BLOCK_CONFIG = BLOCK_CONFIG; // 已删除，使用 GAME_CONFIG
@@ -428,9 +399,9 @@ if (typeof window !== 'undefined') {
     // global.selectBlock = selectBlock; // 已废弃
     // global.deselectBlock = deselectBlock; // 已废弃
     // global.moveBlock = moveBlock; // 已废弃
-    global.exitBlock = exitBlock;
-    global.updateBlockPosition = updateBlockPosition;
-    global.destroyBlock = destroyBlock;
+    // global.exitBlock = exitBlock; // 已废弃
+    // global.updateBlockPosition = updateBlockPosition; // 已废弃
+    // global.destroyBlock = destroyBlock; // 已废弃
 } else {
     // 在抖音小游戏环境中，直接设置为全局变量
     this.BlockStates = BlockStates;
@@ -445,7 +416,7 @@ if (typeof window !== 'undefined') {
     // this.selectBlock = selectBlock; // 已废弃
     // this.deselectBlock = deselectBlock; // 已废弃
     // this.moveBlock = moveBlock; // 已废弃
-    this.exitBlock = exitBlock;
-    this.updateBlockPosition = updateBlockPosition;
-    this.destroyBlock = destroyBlock;
+    // this.exitBlock = exitBlock; // 已废弃
+    // this.updateBlockPosition = updateBlockPosition; // 已废弃
+    // this.destroyBlock = destroyBlock; // 已废弃
 }

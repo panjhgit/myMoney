@@ -34,6 +34,8 @@ const map1 = {
             id: "yellow_square", color: "yellow", position: {x: 0, y: 1}, shape: "square", layer: 0
         }, {
             id: "purple_lshape", color: "purple", position: {x: 4, y: 1}, shape: "lshape", layer: 0
+        }, {
+            id: "brown_hshape", color: "hshape", position: {x: 0, y: 3}, shape: "hshape", layer: 0
         },
 
         // 第1层 - 隐藏的方块（被上层完全遮挡，显示为冰块）

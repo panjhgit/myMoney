@@ -31,6 +31,38 @@ class MapEngine {
         this.collisionDetector = new CollisionDetector(this.GRID_SIZE);
         this.movementManager = new MovementManager(this.GRID_SIZE);
 
+        // 动画管理
+        this.animations = new Map();
+
+        // 元素类型碰撞规则配置
+        this.collisionRules = {
+            'tetris': {
+                canCollideWith: ['tetris', 'rock'], canPassThrough: ['gate'], // 同色门可以通过
+                canMelt: ['ice'], // 可以融化冰块
+                blocksMovement: true
+            }, 'ice': {
+                canCollideWith: ['tetris'], canPassThrough: [], canMelt: [], blocksMovement: false, // 冰块不阻止移动，会被融化
+                canBeMelted: true
+            }, 'rock': {
+                canCollideWith: ['tetris'], canPassThrough: [], canMelt: [], blocksMovement: true, canBeMelted: false
+            }, 'gate': {
+                canCollideWith: ['tetris'], canPassThrough: [], canMelt: [], blocksMovement: true, // 默认阻止，除非颜色匹配
+                requiresColorMatch: true // 需要颜色匹配才能通过
+            }
+        };
+
+        // 调试开关
+        this.debugMode = true;
+
+        /**
+         * 调试日志方法
+         */
+        this.debugLog = (...args) => {
+            if (this.debugMode) {
+                console.log(...args);
+            }
+        };
+
         this.init();
     }
 
@@ -77,6 +109,7 @@ class MapEngine {
         this.gates.clear();
         this.rocks.clear();
         this.selectedBlock = null;
+        this.animations.clear();
     }
 
     /**
@@ -98,6 +131,8 @@ class MapEngine {
      * 添加方块
      */
     addBlock(block) {
+        console.log(`[添加方块] ${block.id}: layer=${block.layer}, color=${block.color}`);
+
         if (typeof createCreature === 'undefined') {
             console.error('createCreature 函数未找到');
             return;
@@ -127,10 +162,12 @@ class MapEngine {
             initialPosition: {...block.position},
             shapeData: blockElement.shapeData,
             layer: block.layer || 0,
-            movable: true,
+            movable: (block.layer || 0) === 0, // 只有第0层才能移动
             blockElement: blockElement
         };
 
+        console.log(`[添加方块] 创建的元素: id=${element.id}, layer=${element.layer}, movable=${element.movable}`);
+        console.log(`[添加方块] 原始方块ID: ${block.id}, 新生成ID: ${blockElement.id}`);
         this.blocks.set(element.id, element);
         this.updateGrid();
     }
@@ -148,14 +185,18 @@ class MapEngine {
      * 更新网格数据
      */
     updateGrid() {
+        console.log(`[更新网格] 开始更新网格，方块数量: ${this.blocks.size}`);
+
         // 清空网格
         this.grid.forEach(row => row.fill(null));
 
         // 按层级顺序填充网格
         for (let layer = 0; layer < this.MAX_LAYERS; layer++) {
+            let layerBlockCount = 0;
             // 添加方块
             this.blocks.forEach(block => {
                 if (block.layer === layer) {
+                    layerBlockCount++;
                     const cells = this.collisionDetector.getBlockCells(block);
                     cells.forEach(cell => {
                         if (this.collisionDetector.isValidPosition(cell.x, cell.y)) {
@@ -164,6 +205,10 @@ class MapEngine {
                     });
                 }
             });
+
+            if (layerBlockCount > 0) {
+                console.log(`[更新网格] 第${layer}层: ${layerBlockCount}个方块`);
+            }
 
             // 添加石块
             if (layer === 0) {
@@ -175,18 +220,29 @@ class MapEngine {
                 });
             }
         }
+
+        console.log(`[更新网格] 网格更新完成`);
     }
 
     /**
      * 选择方块
      */
     selectBlock(blockId) {
+        console.log(`[选择] 尝试选择方块: ${blockId}`);
         const block = this.blocks.get(blockId);
-        if (!block || !block.movable) {
+        if (!block) {
+            console.log(`[选择] 方块不存在: ${blockId}`);
+            return false;
+        }
+
+        console.log(`[选择] 方块属性: layer=${block.layer}, movable=${block.movable}`);
+        if (!block.movable) {
+            console.log(`[选择] 方块不可移动: ${blockId}`);
             return false;
         }
 
         this.selectedBlock = block;
+        console.log(`[选择] 成功选择方块: ${blockId}`);
         return true;
     }
 
@@ -219,11 +275,54 @@ class MapEngine {
      * 检查冰块融化
      */
     checkIceMelting() {
-        // 检查是否有下层方块显露
+        // 检查所有下层方块（冰块）
         for (let layer = 1; layer < this.MAX_LAYERS; layer++) {
             this.blocks.forEach(block => {
-                if (block.layer === layer && this.collisionDetector.isBlockFullyRevealed(block, this.grid, this.blocks)) {
-                    this.revealBlock(block);
+                if (block.layer === layer) {
+                    // 检查方块是否被覆盖
+                    const isCovered = !this.collisionDetector.isBlockFullyRevealed(block, this.grid, this.blocks);
+
+                    if (!isCovered && block.meltProgress < 100) {
+                        // 开始融化
+                        if (!block.meltProgress) {
+                            block.meltProgress = 0;
+                        }
+                        block.meltProgress += 2; // 每帧融化2%
+
+                        if (block.meltProgress >= 100) {
+                            this.completeIceMelting(block);
+                        }
+                    }
+                }
+            });
+        }
+    }
+
+    /**
+     * 完成冰块融化
+     */
+    completeIceMelting(block) {
+        console.log(`冰块 ${block.id} 融化完成`);
+        this.revealBlock(block);
+    }
+
+    /**
+     * 检查层级显露（移动后调用）
+     */
+    checkLayerReveal(movedBlock) {
+        console.log(`[层级显露] 检查方块 ${movedBlock.id} 移动后的下层显露`);
+
+        // 检查所有下层方块，看是否有完全显露的
+        for (let layer = 1; layer < this.MAX_LAYERS; layer++) {
+            this.blocks.forEach(block => {
+                if (block.layer === layer && block.id !== movedBlock.id) {
+                    // 检查这个下层方块是否完全显露
+                    const isFullyRevealed = this.collisionDetector.isBlockFullyRevealed(block, this.grid, this.blocks);
+
+                    if (isFullyRevealed) {
+                        console.log(`[层级显露] 方块 ${block.id} 完全显露，开始融化`);
+                        this.revealBlock(block);
+                    }
                 }
             });
         }
@@ -257,8 +356,17 @@ class MapEngine {
     exitThroughGate(block, gate) {
         console.log(`方块 ${block.id} 通过 ${gate.color} 门离开`);
 
+        // 停止当前动画
+        const animationId = `block_move_${block.id}`;
+        if (this.animations.has(animationId)) {
+            console.log(`[通过门] 停止方块 ${block.id} 的移动动画`);
+            this.animations.get(animationId).kill();
+            this.animations.delete(animationId);
+        }
+
         // 移除方块
         this.blocks.delete(block.id);
+        this.selectedBlock = null;
         this.updateGrid();
 
         // 检查胜利条件
@@ -271,11 +379,72 @@ class MapEngine {
     checkWinCondition() {
         const movableBlocks = Array.from(this.blocks.values()).filter(block => block.movable);
 
+        console.log(`检查通关条件: 当前还有 ${movableBlocks.length} 个可移动方块`);
+
         if (movableBlocks.length === 0) {
-            console.log('关卡完成！');
+            console.log('所有可移动方块都已离开，关卡完成！');
             this.gameState = 'completed';
             this.onGameComplete();
+            return;
         }
+
+        // 检查是否所有方块都已经在正确的位置（通过门）
+        const allBlocksAtTarget = movableBlocks.every(block => {
+            return this.isBlockAtCorrectGate(block);
+        });
+
+        if (allBlocksAtTarget) {
+            console.log('所有可移动方块都已到达目标位置，关卡完成！');
+            this.gameState = 'completed';
+            this.onGameComplete();
+        } else {
+            console.log('还有可移动方块未到达目标位置，继续游戏');
+        }
+    }
+
+    /**
+     * 检查方块是否在正确的位置（通过门）
+     */
+    isBlockAtCorrectGate(block) {
+        // 找到与方块颜色匹配的门
+        const matchingGate = Array.from(this.gates.values()).find(gate => gate.color === block.color);
+        if (!matchingGate) {
+            console.log(`方块 ${block.id} 没有找到匹配的门 (颜色: ${block.color})`);
+            return false;
+        }
+
+        // 检查方块是否在门的位置
+        const isAtGate = this.isBlockAtGate(block, matchingGate);
+        console.log(`方块 ${block.id} (${block.color}) 是否在门 ${matchingGate.id} (${matchingGate.color}) 位置: ${isAtGate}`);
+
+        return isAtGate;
+    }
+
+    /**
+     * 检查方块是否在门的位置
+     */
+    isBlockAtGate(block, gate) {
+        const blockCells = this.collisionDetector.getBlockCells(block);
+
+        // 检查方块的任何一格是否在门的位置
+        return blockCells.some(cell => {
+            switch (gate.direction) {
+                case 'up':
+                    // 门在上方，检查方块是否在门下方
+                    return cell.x >= gate.position.x && cell.x < gate.position.x + gate.size.width && cell.y === gate.position.y + gate.size.height;
+                case 'down':
+                    // 门在下方，检查方块是否在门上方
+                    return cell.x >= gate.position.x && cell.x < gate.position.x + gate.size.width && cell.y === gate.position.y - 1;
+                case 'left':
+                    // 门在左侧，检查方块是否在门右侧
+                    return cell.y >= gate.position.y && cell.y < gate.position.y + gate.size.height && cell.x === gate.position.x + gate.size.width;
+                case 'right':
+                    // 门在右侧，检查方块是否在门左侧
+                    return cell.y >= gate.position.y && cell.y < gate.position.y + gate.size.height && cell.x === gate.position.x - 1;
+                default:
+                    return false;
+            }
+        });
     }
 
     /**
@@ -617,27 +786,48 @@ class MapEngine {
         this.blocks.forEach(block => {
             if (block.layer > 0 && !this.collisionDetector.isBlockFullyRevealed(block, this.grid, this.blocks)) {
                 const cells = this.collisionDetector.getBlockCells(block);
+
+                // 根据融化进度调整透明度
+                const meltProgress = block.meltProgress || 0;
+                const iceAlpha = 0.8 - (meltProgress / 100) * 0.5; // 融化时变透明
+
+                // 冰块效果 - 淡蓝色半透明
+                this.ctx.fillStyle = `rgba(173, 216, 230, ${iceAlpha})`;
+
+                // 冰块是一个格子一个格子的（有网格线分隔）
                 cells.forEach(cell => {
                     const x = this.gridOffsetX + cell.x * this.cellSize;
                     const y = this.gridOffsetY + cell.y * this.cellSize;
 
-                    // 冰块效果 - 淡蓝色半透明
-                    this.ctx.fillStyle = 'rgba(173, 216, 230, 0.6)';
+                    // 绘制冰块主体
+                    this.ctx.fillStyle = `rgba(173, 216, 230, ${iceAlpha})`;
                     this.ctx.fillRect(x, y, this.cellSize, this.cellSize);
 
-                    // 冰块边框
-                    this.ctx.strokeStyle = 'rgba(135, 206, 235, 0.8)';
-                    this.ctx.lineWidth = 2;
+                    // 绘制格子边框（冰块应该是一个格子一个格子中间组成的）
+                    this.ctx.strokeStyle = `rgba(135, 206, 235, ${iceAlpha + 0.2})`;
+                    this.ctx.lineWidth = 1;
                     this.ctx.strokeRect(x, y, this.cellSize, this.cellSize);
 
-                    // 冰块内部高光
-                    this.ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+                    // 绘制格子高光
+                    this.ctx.fillStyle = `rgba(255, 255, 255, ${iceAlpha * 0.3})`;
                     this.ctx.fillRect(x + 2, y + 2, this.cellSize - 4, this.cellSize - 4);
 
-                    // 冰块纹理
-                    this.ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
+                    // 绘制格子纹理
+                    this.ctx.fillStyle = `rgba(255, 255, 255, ${iceAlpha * 0.15})`;
                     this.ctx.fillRect(x + 4, y + 4, this.cellSize - 8, this.cellSize - 8);
                 });
+
+                // 显示融化进度（在第一个格子上显示）
+                if (meltProgress > 0 && cells.length > 0) {
+                    const firstCell = cells[0];
+                    const x = this.gridOffsetX + firstCell.x * this.cellSize;
+                    const y = this.gridOffsetY + firstCell.y * this.cellSize;
+
+                    this.ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+                    this.ctx.font = '12px Arial';
+                    this.ctx.textAlign = 'center';
+                    this.ctx.fillText(`${meltProgress}%`, x + this.cellSize / 2, y + this.cellSize / 2 + 3);
+                }
             }
         });
     }
@@ -685,27 +875,61 @@ class MapEngine {
         const cells = this.collisionDetector.getBlockCells(block);
         const color = this.getBlockColor(block.color);
 
+        // 方块按照真正的形状渲染，是一个完整的整体
         cells.forEach(cell => {
             const x = this.gridOffsetX + cell.x * this.cellSize;
             const y = this.gridOffsetY + cell.y * this.cellSize;
 
-            // 方块主体
+            // 绘制方块主体
             this.ctx.fillStyle = color;
             this.ctx.fillRect(x, y, this.cellSize, this.cellSize);
-
-            // 方块边框
-            this.ctx.strokeStyle = 'rgba(0, 0, 0, 0.3)';
-            this.ctx.lineWidth = 2;
-            this.ctx.strokeRect(x, y, this.cellSize, this.cellSize);
-
-            // 方块高光
-            this.ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
-            this.ctx.fillRect(x + 2, y + 2, this.cellSize - 4, this.cellSize - 4);
-
-            // 方块阴影
-            this.ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
-            this.ctx.fillRect(x + 2, y + 2, this.cellSize - 4, 2);
-            this.ctx.fillRect(x + 2, y + 2, 2, this.cellSize - 4);
+        });
+        
+        // 绘制方块的最外边边框，方便区分不同图案
+        this.ctx.strokeStyle = 'rgba(0, 0, 0, 0.6)';
+        this.ctx.lineWidth = 2;
+        
+        cells.forEach(cell => {
+            const x = this.gridOffsetX + cell.x * this.cellSize;
+            const y = this.gridOffsetY + cell.y * this.cellSize;
+            
+            // 检查每个格子的四个边，只绘制外边框
+            const hasTop = cells.some(c => c.x === cell.x && c.y === cell.y - 1);
+            const hasBottom = cells.some(c => c.x === cell.x && c.y === cell.y + 1);
+            const hasLeft = cells.some(c => c.x === cell.x - 1 && c.y === cell.y);
+            const hasRight = cells.some(c => c.x === cell.x + 1 && c.y === cell.y);
+            
+            // 绘制上边框
+            if (!hasTop) {
+                this.ctx.beginPath();
+                this.ctx.moveTo(x, y);
+                this.ctx.lineTo(x + this.cellSize, y);
+                this.ctx.stroke();
+            }
+            
+            // 绘制下边框
+            if (!hasBottom) {
+                this.ctx.beginPath();
+                this.ctx.moveTo(x, y + this.cellSize);
+                this.ctx.lineTo(x + this.cellSize, y + this.cellSize);
+                this.ctx.stroke();
+            }
+            
+            // 绘制左边框
+            if (!hasLeft) {
+                this.ctx.beginPath();
+                this.ctx.moveTo(x, y);
+                this.ctx.lineTo(x, y + this.cellSize);
+                this.ctx.stroke();
+            }
+            
+            // 绘制右边框
+            if (!hasRight) {
+                this.ctx.beginPath();
+                this.ctx.moveTo(x + this.cellSize, y);
+                this.ctx.lineTo(x + this.cellSize, y + this.cellSize);
+                this.ctx.stroke();
+            }
         });
     }
 
@@ -747,18 +971,28 @@ class MapEngine {
      * 处理点击事件
      */
     handleClick(x, y) {
+        console.log(`[点击] 屏幕坐标: (${x}, ${y})`);
         const gridPos = this.screenToGrid(x, y);
+        console.log(`[点击] 网格坐标: (${gridPos.x}, ${gridPos.y})`);
 
-        if (!this.collisionDetector.isValidPosition(gridPos.x, gridPos.y)) return;
+        if (!this.collisionDetector.isValidPosition(gridPos.x, gridPos.y)) {
+            console.log(`[点击] 位置无效`);
+            return;
+        }
 
         const gridValue = this.grid[gridPos.y][gridPos.x];
+        console.log(`[点击] 网格值: ${gridValue}`);
 
         if (gridValue && this.blocks.has(gridValue)) {
             // 点击了方块
+            console.log(`[点击] 点击了方块: ${gridValue}`);
             this.selectBlock(gridValue);
         } else if (this.selectedBlock) {
             // 点击了空白位置，尝试移动
+            console.log(`[点击] 尝试移动方块: ${this.selectedBlock.id} 到 (${gridPos.x}, ${gridPos.y})`);
             this.moveBlock(this.selectedBlock.id, gridPos.x, gridPos.y);
+        } else {
+            console.log(`[点击] 没有选中方块`);
         }
     }
 

@@ -114,43 +114,70 @@ class MovementManager {
     }
 
     /**
-     * 执行移动
+     * 执行移动 - 一格一格地移动
      */
     executeMove(block, path, gameEngine) {
         if (path.length < 2) return;
-
+        
         const startPos = path[0];
         const endPos = path[path.length - 1];
-
-        // 更新方块位置
-        block.position = {...endPos};
-
-        // 更新游戏状态
-        gameEngine.updateGrid();
-        gameEngine.checkIceMelting();
-        gameEngine.checkGateExit(block);
-
-        // 播放移动动画
-        this.playMoveAnimation(block, startPos, endPos);
-    }
-
-    /**
-     * 播放移动动画
-     */
-    playMoveAnimation(block, startPos, endPos) {
-        if (!block.blockElement || !block.blockElement.element) return;
-
-        const element = block.blockElement.element;
-        const cellSize = GAME_CONFIG.CELL_SIZE;
-        const startX = startPos.x * cellSize;
-        const startY = startPos.y * cellSize;
-        const endX = endPos.x * cellSize;
-        const endY = endPos.y * cellSize;
-
-        // 使用GSAP播放动画
-        if (typeof gsap !== 'undefined') {
-            gsap.fromTo(element, {x: startX, y: startY}, {x: endX, y: endY, duration: 0.3, ease: "power2.out"});
+        
+        // 检查是否已有动画在运行
+        const animationId = `block_move_${block.id}`;
+        if (gameEngine.animations && gameEngine.animations.has(animationId)) {
+            gameEngine.animations.get(animationId).kill();
         }
+        
+        if (!block.blockElement || !block.blockElement.element) {
+            // 如果没有blockElement，直接更新位置
+            block.position = {...endPos};
+            gameEngine.updateGrid();
+            gameEngine.checkIceMelting();
+            gameEngine.checkGateExit(block);
+            return;
+        }
+        
+        const blockElement = block.blockElement.element;
+        block.isMoving = true;
+        
+        // 创建动画时间线
+        const walkTimeline = gsap.timeline({
+            onComplete: () => {
+                block.isMoving = false;
+                gameEngine.updateGrid();
+                gameEngine.checkIceMelting();
+                gameEngine.checkLayerReveal(block); // 检查层级显露
+                gameEngine.checkGateExit(block);
+                
+                if (gameEngine.animations) {
+                    gameEngine.animations.delete(animationId);
+                }
+            }
+        });
+        
+        if (gameEngine.animations) {
+            gameEngine.animations.set(animationId, walkTimeline);
+        }
+        
+        // 按路径逐步移动
+        path.forEach((step, index) => {
+            const stepDuration = 0.4; // 每步持续时间
+            const delay = index * stepDuration;
+            
+            // 更新逻辑位置
+            walkTimeline.call(() => {
+                block.position = {x: step.x, y: step.y};
+                gameEngine.updateGrid();
+            }, [], delay);
+            
+            // 更新渲染位置
+            walkTimeline.to(blockElement, {
+                x: step.x * GAME_CONFIG.CELL_SIZE, 
+                y: step.y * GAME_CONFIG.CELL_SIZE, 
+                duration: stepDuration, 
+                ease: "power2.out"
+            }, delay);
+        });
     }
 
     /**
