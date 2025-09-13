@@ -216,53 +216,46 @@ class MovementManager {
         
         // 计算每个方块到目标位置的距离
         for (const cell of blockCells) {
-            // cell是相对位置，需要转换为绝对位置
-            const absoluteX = block.position.x + cell.x;
-            const absoluteY = block.position.y + cell.y;
-            const distance = Math.abs(absoluteX - targetPos.x) + Math.abs(absoluteY - targetPos.y);
+            const distance = Math.abs(cell.x - targetPos.x) + Math.abs(cell.y - targetPos.y);
             if (distance < minDistance) {
                 minDistance = distance;
-                nearestCell = cell; // 保存相对位置
+                nearestCell = cell; // 保存绝对位置
             }
         }
         
-        console.log(`[智能移动] 最近方块: (${nearestCell.x}, ${nearestCell.y}), 距离: ${minDistance}`);
+        console.log(`[智能移动] 最近方块: 绝对位置(${nearestCell.x}, ${nearestCell.y}), 距离: ${minDistance}`);
         
         // 计算目标位置：让最近方块移动到目标位置
+        // nearestCell是绝对位置，需要转换为相对位置
+        const relativeX = nearestCell.x - block.position.x;
+        const relativeY = nearestCell.y - block.position.y;
         const targetPosition = {
-            x: targetPos.x - (nearestCell.x - block.position.x),
-            y: targetPos.y - (nearestCell.y - block.position.y)
+            x: targetPos.x - relativeX,
+            y: targetPos.y - relativeY
         };
         
         console.log(`[智能移动] 计算目标位置: (${targetPosition.x}, ${targetPosition.y})`);
         
-        // 3. 计算最佳对齐位置
-        const bestPositions = this.calculateBestAlignmentPositions(block, targetPosition, directions, collisionDetector);
-        console.log(`[智能移动] 找到 ${bestPositions.length} 个候选位置`);
+        // 3. 直接尝试移动到目标位置
+        // 边界检查
+        if (!collisionDetector.isValidPosition(targetPosition.x, targetPosition.y)) {
+            console.log(`[智能移动] 目标位置超出边界`);
+            return false;
+        }
         
-        // 3. 尝试每个候选位置，找到第一个可达的位置
-        for (const candidatePos of bestPositions) {
-            console.log(`[智能移动] 尝试位置: (${candidatePos.x}, ${candidatePos.y})`);
-            
-            // 边界检查
-            if (!collisionDetector.isValidPosition(candidatePos.x, candidatePos.y)) {
-                console.log(`[智能移动] 位置超出边界，跳过`);
-                continue;
-            }
-            
-            // 使用路径规划系统
-            const startPos = block.position;
-            const path = this.calculatePath(block, startPos, candidatePos, collisionDetector, grid, blocks, rocks);
-            
-            if (path && path.length > 0) {
-                console.log(`[智能移动] 找到路径，长度: ${path.length}`);
-                console.log(`[路径规划] 从 (${startPos.x}, ${startPos.y}) 到 (${candidatePos.x}, ${candidatePos.y})`);
-                console.log(`[路径规划] 路径详情: ${path.map(p => `(${p.x},${p.y})`).join(' → ')}`);
-                this.executeMove(block, path, gameEngine);
-                return true;
-            } else {
-                console.log(`[智能移动] 无法到达位置: (${candidatePos.x}, ${candidatePos.y})`);
-            }
+        // 使用路径规划系统
+        const startPos = block.position;
+        const path = this.calculatePath(block, startPos, targetPosition, collisionDetector, grid, blocks, rocks);
+        
+        if (path && path.length > 0) {
+            console.log(`[智能移动] 找到路径，长度: ${path.length}`);
+            console.log(`[路径规划] 从 (${startPos.x}, ${startPos.y}) 到 (${targetPosition.x}, ${targetPosition.y})`);
+            console.log(`[路径规划] 路径详情: ${path.map(p => `(${p.x},${p.y})`).join(' → ')}`);
+            this.executeMove(block, path, gameEngine);
+            return true;
+        } else {
+            console.log(`[智能移动] 无法到达目标位置: (${targetPosition.x}, ${targetPosition.y})`);
+            return false;
         }
         
         console.log(`[智能移动] 无法移动方块 ${block.id}`);
