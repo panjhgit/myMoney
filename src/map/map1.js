@@ -8,17 +8,19 @@
 const map1 = {
     level: 1, name: "完整俄罗斯方块", description: "包含所有俄罗斯方块形状的挑战关卡", difficulty: "中等",
 
-    // 门配置 - 四边各有一个门
+    // 门配置 - 重新设计避免重叠
     gates: [{
-        id: "gate_up_red", color: "red", position: {x: 2, y: 0}, size: {width: 3, height: 2}, direction: "up"
+        id: "gate_up_red", color: "red", position: {x: 1, y: 0}, length: 2, direction: "up"
     }, {
-        id: "gate_right_blue", color: "blue", position: {x: 6, y: 2}, size: {width: 2, height: 3}, direction: "right"
+        id: "gate_up_purple", color: "purple", position: {x: 4, y: 0}, length: 2, direction: "up"
     }, {
-        id: "gate_down_green", color: "green", position: {x: 2, y: 6}, size: {width: 3, height: 2}, direction: "down"
+        id: "gate_right_blue", color: "blue", position: {x: 7, y: 1}, length: 2, direction: "right"
     }, {
-        id: "gate_left_yellow", color: "yellow", position: {x: 0, y: 2}, size: {width: 2, height: 3}, direction: "left"
+        id: "gate_right_brown", color: "brown", position: {x: 7, y: 4}, length: 3, direction: "right"
     }, {
-        id: "gate_up_purple", color: "purple", position: {x: 5, y: 0}, size: {width: 2, height: 2}, direction: "up"
+        id: "gate_down_green", color: "green", position: {x: 1, y: 7}, length: 2, direction: "down"
+    }, {
+        id: "gate_left_yellow", color: "yellow", position: {x: 0, y: 3}, length: 2, direction: "left"
     }],
 
     // 俄罗斯方块配置 - 重新设计的2层结构

@@ -127,7 +127,7 @@ class MapEngine {
             id: gate.id,
             color: gate.color,
             position: gate.position,
-            size: gate.size,
+            length: gate.length,
             direction: gate.direction,
             layer: 0
         };
@@ -340,7 +340,7 @@ class MapEngine {
      */
     checkGateExit(block) {
         this.gates.forEach(gate => {
-            const exitResult = this.collisionDetector.canExitThroughGate(block, gate);
+            const exitResult = this.collisionDetector.canExitThroughGate(block, gate, this.grid, this.blocks);
             if (exitResult.canExit) {
                 this.exitThroughGate(block, gate);
             }
@@ -428,16 +428,16 @@ class MapEngine {
             switch (gate.direction) {
                 case 'up':
                     // 门在上方，检查方块是否在门下方
-                    return cell.x >= gate.position.x && cell.x < gate.position.x + gate.size.width && cell.y === gate.position.y + gate.size.height;
+                    return cell.x >= gate.position.x && cell.x < gate.position.x + gate.length && cell.y === gate.position.y + 1;
                 case 'down':
                     // 门在下方，检查方块是否在门上方
-                    return cell.x >= gate.position.x && cell.x < gate.position.x + gate.size.width && cell.y === gate.position.y - 1;
+                    return cell.x >= gate.position.x && cell.x < gate.position.x + gate.length && cell.y === gate.position.y - 1;
                 case 'left':
                     // 门在左侧，检查方块是否在门右侧
-                    return cell.y >= gate.position.y && cell.y < gate.position.y + gate.size.height && cell.x === gate.position.x + gate.size.width;
+                    return cell.y >= gate.position.y && cell.y < gate.position.y + gate.length && cell.x === gate.position.x + 1;
                 case 'right':
                     // 门在右侧，检查方块是否在门左侧
-                    return cell.y >= gate.position.y && cell.y < gate.position.y + gate.size.height && cell.x === gate.position.x - 1;
+                    return cell.y >= gate.position.y && cell.y < gate.position.y + gate.length && cell.x === gate.position.x - 1;
                 default:
                     return false;
             }
@@ -625,7 +625,7 @@ class MapEngine {
                     // 上方的门
                     startX = this.gridOffsetX + gate.position.x * this.cellSize;
                     startY = this.gridOffsetY - borderWidth / 2;
-                    endX = this.gridOffsetX + (gate.position.x + gate.size.width) * this.cellSize;
+                    endX = this.gridOffsetX + (gate.position.x + gate.length) * this.cellSize;
                     endY = this.gridOffsetY - borderWidth / 2;
                     break;
 
@@ -633,7 +633,7 @@ class MapEngine {
                     // 下方的门
                     startX = this.gridOffsetX + gate.position.x * this.cellSize;
                     startY = this.gridOffsetY + this.gridSize + borderWidth / 2;
-                    endX = this.gridOffsetX + (gate.position.x + gate.size.width) * this.cellSize;
+                    endX = this.gridOffsetX + (gate.position.x + gate.length) * this.cellSize;
                     endY = this.gridOffsetY + this.gridSize + borderWidth / 2;
                     break;
 
@@ -642,7 +642,7 @@ class MapEngine {
                     startX = this.gridOffsetX - borderWidth / 2;
                     startY = this.gridOffsetY + gate.position.y * this.cellSize;
                     endX = this.gridOffsetX - borderWidth / 2;
-                    endY = this.gridOffsetY + (gate.position.y + gate.size.height) * this.cellSize;
+                    endY = this.gridOffsetY + (gate.position.y + gate.length) * this.cellSize;
                     break;
 
                 case 'right':
@@ -650,7 +650,7 @@ class MapEngine {
                     startX = this.gridOffsetX + this.gridSize + borderWidth / 2;
                     startY = this.gridOffsetY + gate.position.y * this.cellSize;
                     endX = this.gridOffsetX + this.gridSize + borderWidth / 2;
-                    endY = this.gridOffsetY + (gate.position.y + gate.size.height) * this.cellSize;
+                    endY = this.gridOffsetY + (gate.position.y + gate.length) * this.cellSize;
                     break;
 
                 default:
@@ -1016,6 +1016,18 @@ class MapEngine {
         } else {
             console.log(`[点击] 没有选中方块`);
         }
+    }
+
+    /**
+     * 直接移动方块到目标位置
+     */
+    moveBlockDirectly(block, targetPos) {
+        // 计算移动路径（直接路径）
+        const startPos = block.position;
+        const path = [{x: startPos.x, y: startPos.y}, {x: targetPos.x, y: targetPos.y}];
+        
+        // 执行移动
+        this.movementManager.executeMove(block, path, this);
     }
 
     /**

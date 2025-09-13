@@ -146,8 +146,9 @@ class MovementManager {
             gameEngine.animations.get(animationId).kill();
         }
         
+        // 如果没有blockElement，直接更新位置
         if (!block.blockElement || !block.blockElement.element) {
-            // 如果没有blockElement，直接更新位置
+            console.log(`[移动] 没有blockElement，直接更新位置`);
             block.position = {...endPos};
             gameEngine.updateGrid();
             gameEngine.checkIceMelting();
@@ -233,9 +234,24 @@ class MovementManager {
         console.log(`[智能移动] 计算目标位置: (${targetPosition.x}, ${targetPosition.y})`);
         
         // 2. 直接尝试移动到目标位置
-        // 边界检查
+        // 边界检查 - 允许移动到边界外（出地图）
         if (!collisionDetector.isValidPosition(targetPosition.x, targetPosition.y)) {
-            console.log(`[智能移动] 目标位置超出边界`);
+            console.log(`[智能移动] 目标位置超出边界，尝试移动到边界外`);
+            // 如果目标位置超出边界，尝试移动到边界位置
+            const boundaryPos = this.getBoundaryPosition(targetPosition, collisionDetector.GRID_SIZE);
+            if (boundaryPos) {
+                targetPosition.x = boundaryPos.x;
+                targetPosition.y = boundaryPos.y;
+                console.log(`[智能移动] 调整目标位置到边界: (${targetPosition.x}, ${targetPosition.y})`);
+            } else {
+                console.log(`[智能移动] 无法调整到边界位置`);
+                return false;
+            }
+        }
+        
+        // 3. 检查目标位置是否是门的位置，如果是则不允许移动
+        if (this.isTargetPositionAGate(targetPosition, gameEngine)) {
+            console.log(`[智能移动] 目标位置是门的位置，不允许移动`);
             return false;
         }
         
@@ -253,6 +269,55 @@ class MovementManager {
             console.log(`[智能移动] 无法到达目标位置: (${targetPosition.x}, ${targetPosition.y})`);
             return false;
         }
+    }
+
+    /**
+     * 检查目标位置是否是门的位置
+     */
+    isTargetPositionAGate(targetPos, gameEngine) {
+        if (!gameEngine || !gameEngine.mapEngine || !gameEngine.mapEngine.mapData) {
+            return false;
+        }
+        
+        const gates = gameEngine.mapEngine.mapData.gates || [];
+        
+        for (const gate of gates) {
+            // 检查目标位置是否在门的范围内
+            let isInGate = false;
+            switch (gate.direction) {
+                case 'up':
+                case 'down':
+                    isInGate = targetPos.x >= gate.position.x && targetPos.x < gate.position.x + gate.length;
+                    break;
+                case 'left':
+                case 'right':
+                    isInGate = targetPos.y >= gate.position.y && targetPos.y < gate.position.y + gate.length;
+                    break;
+            }
+            
+            if (isInGate) {
+                console.log(`[智能移动] 目标位置 (${targetPos.x}, ${targetPos.y}) 是门 ${gate.id} 的位置`);
+                return true;
+            }
+        }
+        
+        return false;
+    }
+
+    /**
+     * 获取边界位置（当目标位置超出边界时）
+     */
+    getBoundaryPosition(targetPos, gridSize) {
+        let x = targetPos.x;
+        let y = targetPos.y;
+        
+        // 调整到边界内
+        if (x < 0) x = 0;
+        if (x >= gridSize) x = gridSize - 1;
+        if (y < 0) y = 0;
+        if (y >= gridSize) y = gridSize - 1;
+        
+        return {x, y};
     }
 
 }
