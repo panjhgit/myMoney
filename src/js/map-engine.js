@@ -815,13 +815,12 @@ class MapEngine {
             if (!this.collisionDetector.isBlockFullyRevealed(block, this.grid, this.blocks)) {
                 const cells = this.collisionDetector.getBlockCells(block);
 
-                // 根据融化进度调整透明度
-                const meltProgress = block.meltProgress || 0;
-                const iceAlpha = 0.8 - (meltProgress / 100) * 0.5; // 融化时变透明
+                // 冰块保持固定颜色，不显示融化进度
+                const meltProgress = block.meltProgress || 0; // 保留判断逻辑，但不用于UI
 
-                // 设置冰块样式（避免重复设置）
-                this.ctx.fillStyle = this.COLORS.ICE_BLUE + `${iceAlpha})`;
-                this.ctx.strokeStyle = this.COLORS.ICE_BORDER + `${iceAlpha + 0.2})`;
+                // 设置冰块样式（固定颜色）
+                this.ctx.fillStyle = this.COLORS.ICE_BLUE + '0.8)';
+                this.ctx.strokeStyle = this.COLORS.ICE_BORDER + '1.0)';
                 this.ctx.lineWidth = this.STYLES.LINE_WIDTH_THIN;
 
                 // 冰块是一个格子一个格子的（有网格线分隔）
@@ -834,12 +833,12 @@ class MapEngine {
                     // 绘制格子边框
                     this.drawRect(pos.x, pos.y, this.cellSize, this.cellSize, false, true);
 
-                    // 绘制格子高光
-                    this.ctx.fillStyle = this.COLORS.WHITE + `${iceAlpha * 0.3})`;
+                    // 绘制格子高光（固定颜色）
+                    this.ctx.fillStyle = this.COLORS.WHITE + '0.3)';
                     this.drawRectWithOffset(pos.x, pos.y, this.cellSize, this.cellSize, 2);
 
-                    // 绘制格子纹理
-                    this.ctx.fillStyle = this.COLORS.WHITE + `${iceAlpha * 0.15})`;
+                    // 绘制格子纹理（固定颜色）
+                    this.ctx.fillStyle = this.COLORS.WHITE + '0.15)';
                     this.drawRectWithOffset(pos.x, pos.y, this.cellSize, this.cellSize, 4);
                 });
 
@@ -860,12 +859,12 @@ class MapEngine {
             cells.forEach(cell => {
                 const pos = this.getCellScreenPosition(cell);
 
-                // 冰层效果 - 更淡的蓝色
-                this.ctx.fillStyle = this.COLORS.ICE_BLUE + '0.3)';
+                // 冰层效果 - 使用相同的冰块颜色
+                this.ctx.fillStyle = this.COLORS.ICE_BLUE + '0.8)';
                 this.drawRect(pos.x, pos.y, this.cellSize, this.cellSize);
 
                 // 冰层边框
-                this.ctx.strokeStyle = this.COLORS.ICE_BORDER + '0.5)';
+                this.ctx.strokeStyle = this.COLORS.ICE_BORDER + '1.0)';
                 this.ctx.lineWidth = this.STYLES.LINE_WIDTH_THIN;
                 this.drawRect(pos.x, pos.y, this.cellSize, this.cellSize, false, true);
             });
