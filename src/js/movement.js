@@ -17,6 +17,8 @@ class MovementManager {
      * 计算A*路径 - 返回能到达的最远位置
      */
     calculatePath(block, startPos, targetPos, collisionDetector, grid, blocks, rocks) {
+        console.log(`[A*算法] 开始计算路径: (${startPos.x}, ${startPos.y}) → (${targetPos.x}, ${targetPos.y})`);
+        
         const openList = [];
         const closedList = new Set();
         let bestNode = null; // 记录最接近目标的节点
@@ -64,7 +66,10 @@ class MovementManager {
                 if (!collisionDetector.isValidPosition(newX, newY)) continue;
 
                 const collisionResult = collisionDetector.checkCollision(block, newPos, grid, blocks, rocks, block.id);
-                if (collisionResult.collision) continue;
+                if (collisionResult.collision) {
+                    console.log(`[A*算法] 位置 (${newX}, ${newY}) 有碰撞: ${collisionResult.reason}`);
+                    continue;
+                }
 
                 const tentativeG = currentNode.g + 1;
 
@@ -204,8 +209,35 @@ class MovementManager {
         const directions = this.analyzeMovementDirection(block.position, targetPos);
         console.log(`[智能移动] 移动方向: ${directions.join(', ')}`);
         
-        // 2. 计算最佳对齐位置
-        const bestPositions = this.calculateBestAlignmentPositions(block, targetPos, directions, collisionDetector);
+        // 2. 找到最近的方块，让那个方块移动到目标位置
+        const blockCells = collisionDetector.getBlockCells(block);
+        let nearestCell = null;
+        let minDistance = Infinity;
+        
+        // 计算每个方块到目标位置的距离
+        for (const cell of blockCells) {
+            // cell是相对位置，需要转换为绝对位置
+            const absoluteX = block.position.x + cell.x;
+            const absoluteY = block.position.y + cell.y;
+            const distance = Math.abs(absoluteX - targetPos.x) + Math.abs(absoluteY - targetPos.y);
+            if (distance < minDistance) {
+                minDistance = distance;
+                nearestCell = cell; // 保存相对位置
+            }
+        }
+        
+        console.log(`[智能移动] 最近方块: (${nearestCell.x}, ${nearestCell.y}), 距离: ${minDistance}`);
+        
+        // 计算目标位置：让最近方块移动到目标位置
+        const targetPosition = {
+            x: targetPos.x - (nearestCell.x - block.position.x),
+            y: targetPos.y - (nearestCell.y - block.position.y)
+        };
+        
+        console.log(`[智能移动] 计算目标位置: (${targetPosition.x}, ${targetPosition.y})`);
+        
+        // 3. 计算最佳对齐位置
+        const bestPositions = this.calculateBestAlignmentPositions(block, targetPosition, directions, collisionDetector);
         console.log(`[智能移动] 找到 ${bestPositions.length} 个候选位置`);
         
         // 3. 尝试每个候选位置，找到第一个可达的位置
@@ -224,6 +256,8 @@ class MovementManager {
             
             if (path && path.length > 0) {
                 console.log(`[智能移动] 找到路径，长度: ${path.length}`);
+                console.log(`[路径规划] 从 (${startPos.x}, ${startPos.y}) 到 (${candidatePos.x}, ${candidatePos.y})`);
+                console.log(`[路径规划] 路径详情: ${path.map(p => `(${p.x},${p.y})`).join(' → ')}`);
                 this.executeMove(block, path, gameEngine);
                 return true;
             } else {
@@ -236,8 +270,74 @@ class MovementManager {
     }
 
     /**
-     * 分析移动方向 - 返回所有相关方向
+     * 根据移动方向计算方块的参考位置
      */
+    calculateReferencePosition(block, direction, collisionDetector) {
+        const blockBounds = collisionDetector.getBlockBounds(block);
+        const basePos = block.position;
+        
+        switch (direction) {
+            case 'up':
+                // 向上移动：使用最上面的位置
+                return {
+                    x: basePos.x,
+                    y: basePos.y
+                };
+                
+            case 'down':
+                // 向下移动：使用最下面的位置
+                return {
+                    x: basePos.x,
+                    y: basePos.y + blockBounds.height - 1
+                };
+                
+            case 'left':
+                // 向左移动：使用最左边的位置
+                return {
+                    x: basePos.x,
+                    y: basePos.y
+                };
+                
+            case 'right':
+                // 向右移动：使用最右边的位置
+                return {
+                    x: basePos.x + blockBounds.width - 1,
+                    y: basePos.y
+                };
+                
+            case 'up-left':
+                // 左上移动：使用左上角
+                return {
+                    x: basePos.x,
+                    y: basePos.y
+                };
+                
+            case 'up-right':
+                // 右上移动：使用右上角
+                return {
+                    x: basePos.x + blockBounds.width - 1,
+                    y: basePos.y
+                };
+                
+            case 'down-left':
+                // 左下移动：使用左下角
+                return {
+                    x: basePos.x,
+                    y: basePos.y + blockBounds.height - 1
+                };
+                
+            case 'down-right':
+                // 右下移动：使用右下角
+                return {
+                    x: basePos.x + blockBounds.width - 1,
+                    y: basePos.y + blockBounds.height - 1
+                };
+                
+            default:
+                // 默认使用左上角
+                return basePos;
+        }
+    }
     analyzeMovementDirection(currentPos, targetPos) {
         const dx = targetPos.x - currentPos.x;
         const dy = targetPos.y - currentPos.y;
@@ -287,10 +387,10 @@ class MovementManager {
                     break;
                     
                 case 'down':
-                    // 向下移动：直接移动到目标位置
+                    // 向下移动：让方块的底部边缘对齐到目标位置
                     positions.push({
                         x: targetPos.x,
-                        y: targetPos.y
+                        y: targetPos.y - blockBounds.height + 1
                     });
                     break;
                     
@@ -303,14 +403,52 @@ class MovementManager {
                     break;
                     
                 case 'right':
-                    // 向右移动：直接移动到目标位置
+                    // 向右移动：让方块的右边缘对齐到目标位置
                     positions.push({
-                        x: targetPos.x,
+                        x: targetPos.x - blockBounds.width + 1,
                         y: targetPos.y
                     });
                     break;
             }
         });
+        
+        // 添加对角线移动的对齐逻辑
+        if (directions.length === 2) {
+            const directionKey = directions.join('-');
+            switch (directionKey) {
+                case 'up-left':
+                    // 左上移动：使用左上角
+                    positions.push({
+                        x: targetPos.x,
+                        y: targetPos.y
+                    });
+                    break;
+                    
+                case 'up-right':
+                    // 右上移动：使用右上角
+                    positions.push({
+                        x: targetPos.x - blockBounds.width + 1,
+                        y: targetPos.y
+                    });
+                    break;
+                    
+                case 'down-left':
+                    // 左下移动：使用左下角
+                    positions.push({
+                        x: targetPos.x,
+                        y: targetPos.y - blockBounds.height + 1
+                    });
+                    break;
+                    
+                case 'down-right':
+                    // 右下移动：使用右下角
+                    positions.push({
+                        x: targetPos.x - blockBounds.width + 1,
+                        y: targetPos.y - blockBounds.height + 1
+                    });
+                    break;
+            }
+        }
         
         // 添加一些偏移位置，尝试找到缺口
         const offsets = [
