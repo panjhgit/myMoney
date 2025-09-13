@@ -5,14 +5,16 @@
  */
 
 class MapEngine {
+    /**
+     * 构造函数 - 初始化地图引擎
+     */
     constructor() {
         // 使用统一配置
         this.GRID_SIZE = GAME_CONFIG.GRID_SIZE;
         this.MAX_LAYERS = 10; // 最大层数
-        
+
         // 方向常量
-        this.DIRECTIONS = [
-            {dx: 0, dy: -1}, // 上
+        this.DIRECTIONS = [{dx: 0, dy: -1}, // 上
             {dx: 0, dy: 1},  // 下
             {dx: -1, dy: 0}, // 左
             {dx: 1, dy: 0}   // 右
@@ -60,19 +62,26 @@ class MapEngine {
         // 调试开关
         this.debugMode = true; // 设置为false关闭调试日志
 
-        // 调试日志方法
+        /**
+         * 调试日志方法
+         */
         this.debugLog = (...args) => {
             if (this.debugMode) {
                 console.log(...args);
             }
         };
 
-        // 工具方法
+        /**
+         * 解析格子键值为坐标对象
+         */
         this.parseCellKey = (cellKey) => {
             const [x, y] = cellKey.split(',').map(Number);
             return {x, y};
         };
 
+        /**
+         * 检查坐标是否在网格边界内
+         */
         this.isWithinBounds = (x, y) => {
             return x >= 0 && x < this.GRID_SIZE && y >= 0 && y < this.GRID_SIZE;
         };
@@ -85,6 +94,9 @@ class MapEngine {
         this.init();
     }
 
+    /**
+     * 初始化地图引擎
+     */
     init() {
         // 初始化所有层级
         for (let layer = 0; layer < this.MAX_LAYERS; layer++) {
@@ -116,10 +128,7 @@ class MapEngine {
     }
 
     /**
-     * 辅助方法：更新空间索引和层级占用格子
-     * @param {Array} cells - 格子数组
-     * @param {string} elementId - 元素ID
-     * @param {Object} layer - 层级对象
+     * 更新空间索引和层级占用格子
      */
     updateSpatialIndexAndLayer(cells, elementId, layer) {
         cells.forEach(cell => {
@@ -128,35 +137,27 @@ class MapEngine {
                 this.spatialIndex.set(cell, new Set());
             }
             this.spatialIndex.get(cell).add(elementId);
-            
+
             // 更新层级占用格子
             layer.occupiedCells.add(cell);
         });
     }
 
     /**
-     * 辅助方法：检查元素边界
-     * @param {Object} element - 元素对象
-     * @returns {boolean} 是否在边界内
+     * 检查元素边界
      */
     isElementInBounds(element) {
         if (element.type === 'tetris') {
             const maxX = Math.max(...element.shapeData.blocks.map(block => block[0]));
             const maxY = Math.max(...element.shapeData.blocks.map(block => block[1]));
-            return element.position.x >= 0 && element.position.y >= 0 && 
-                   element.position.x + maxX < this.GRID_SIZE && 
-                   element.position.y + maxY < this.GRID_SIZE;
+            return element.position.x >= 0 && element.position.y >= 0 && element.position.x + maxX < this.GRID_SIZE && element.position.y + maxY < this.GRID_SIZE;
         } else {
-            return element.position.x >= 0 && element.position.y >= 0 && 
-                   element.position.x < this.GRID_SIZE && 
-                   element.position.y < this.GRID_SIZE;
+            return element.position.x >= 0 && element.position.y >= 0 && element.position.x < this.GRID_SIZE && element.position.y < this.GRID_SIZE;
         }
     }
 
     /**
-     * 辅助方法：获取元素的占用格子
-     * @param {Object} element - 元素对象
-     * @returns {Array} 占用格子数组
+     * 获取元素的占用格子
      */
     getElementOccupiedCells(element) {
         switch (element.type) {
@@ -172,9 +173,7 @@ class MapEngine {
     }
 
     /**
-     * 辅助方法：从空间索引中移除元素
-     * @param {Array} cells - 格子数组
-     * @param {string} elementId - 元素ID
+     * 从空间索引中移除元素
      */
     removeFromSpatialIndex(cells, elementId) {
         cells.forEach(cell => {
@@ -189,7 +188,7 @@ class MapEngine {
     }
 
     /**
-     * 辅助方法：初始化空间索引
+     * 初始化空间索引
      */
     initializeSpatialIndex() {
         for (let x = 0; x < this.GRID_SIZE; x++) {
@@ -200,38 +199,28 @@ class MapEngine {
     }
 
     /**
-     * 辅助方法：检查是否为可移动的俄罗斯方块
-     * @param {Object} element - 元素对象
-     * @returns {boolean} 是否为可移动的俄罗斯方块
+     * 检查是否为可移动的俄罗斯方块
      */
     isMovableTetris(element) {
         return element && element.type === 'tetris' && element.movable;
     }
 
     /**
-     * 辅助方法：检查是否为不可移动的俄罗斯方块
-     * @param {Object} element - 元素对象
-     * @returns {boolean} 是否为不可移动的俄罗斯方块
+     * 检查是否为不可移动的俄罗斯方块
      */
     isImmobileTetris(element) {
         return element && element.type === 'tetris' && !element.movable;
     }
 
     /**
-     * 辅助方法：检查元素是否覆盖冰块
-     * @param {Object} element - 元素对象
-     * @param {Object} iceElement - 冰块元素
-     * @returns {boolean} 是否覆盖冰块
+     * 检查元素是否覆盖冰块
      */
     isElementCoveringIce(element, iceElement) {
         return element && element.type === 'tetris' && element.layer > iceElement.layer;
     }
 
     /**
-     * 辅助方法：检查元素是否在指定层级
-     * @param {Object} element - 元素对象
-     * @param {number} layer - 层级
-     * @returns {boolean} 是否在指定层级
+     * 检查元素是否在指定层级
      */
     isElementInLayer(element, layer) {
         return element && element.type === 'tetris' && element.layer === layer;
@@ -239,8 +228,6 @@ class MapEngine {
 
     /**
      * 根据关卡ID直接加载地图
-     * @param {number} levelId - 关卡ID
-     * @returns {boolean} 是否加载成功
      */
     loadMapByLevel(levelId) {
         console.log(`MapEngine: 开始加载关卡 ${levelId}`);
@@ -273,8 +260,6 @@ class MapEngine {
 
     /**
      * 加载地图数据
-     * @param {Object} mapData - 地图配置数据
-     * @returns {boolean} 是否加载成功
      */
     loadMap(mapData) {
         this.clearMap();
@@ -345,7 +330,6 @@ class MapEngine {
 
     /**
      * 添加门
-     * @param {Object} gate - 门配置 {id, color, position, size, direction}
      */
     addGate(gate) {
         const element = {
@@ -359,7 +343,6 @@ class MapEngine {
 
     /**
      * 添加俄罗斯方块
-     * @param {Object} block - 方块配置 {id, color, position, shape, layer}
      */
     addTetrisBlock(block) {
         // 使用 creature.js 中的 createCreature 函数
@@ -426,7 +409,6 @@ class MapEngine {
 
     /**
      * 添加冰层
-     * @param {Object} ice - 冰层配置 {id, position, layer, meltProgress}
      */
     addIceLayer(ice) {
         const iceElement = createIce(ice);
@@ -447,7 +429,6 @@ class MapEngine {
 
     /**
      * 添加石块
-     * @param {Object} rock - 石块配置 {id, position, layer}
      */
     addRock(rock) {
         const element = {
@@ -468,14 +449,11 @@ class MapEngine {
 
     /**
      * 添加元素到引擎
-     * @param {Object} element - 元素对象
      */
     addElement(element) {
         // 使用统一的边界检查
         if (!this.isElementInBounds(element)) {
-            const boundsInfo = element.type === 'tetris' ? 
-                `最大: ${Math.max(...element.shapeData.blocks.map(block => block[0]))},${Math.max(...element.shapeData.blocks.map(block => block[1]))}` : 
-                '';
+            const boundsInfo = element.type === 'tetris' ? `最大: ${Math.max(...element.shapeData.blocks.map(block => block[0]))},${Math.max(...element.shapeData.blocks.map(block => block[1]))}` : '';
             console.warn(`元素 ${element.id} 超出边界，跳过添加 (位置: ${element.position.x},${element.position.y}${boundsInfo ? ', ' + boundsInfo : ''})`);
             return;
         }
@@ -499,10 +477,7 @@ class MapEngine {
 
 
     /**
-     * 计算方块占据的所有格子（统一的位置计算方法）
-     * @param {Object} position - 位置 {x, y}
-     * @param {Object} shapeData - 形状数据 {blocks: [[x, y], ...]}
-     * @returns {Array} 格子坐标数组
+     * 计算方块占据的所有格子
      */
     calculateOccupiedCells(position, shapeData) {
         const cells = [];
@@ -525,16 +500,13 @@ class MapEngine {
     }
 
     /**
-     * 统一的位置更新方法（增强一致性保证）
-     * @param {Object} element - 元素对象
-     * @param {Object} newPosition - 新位置 {x, y}
+     * 统一的位置更新方法
      */
     updateElementPosition(element, newPosition) {
         const oldPosition = {...element.position}; // 深拷贝防止引用问题
 
         // 验证新位置的有效性
-        if (!newPosition || typeof newPosition.x !== 'number' || typeof newPosition.y !== 'number' || 
-            newPosition.x < 0 || newPosition.x >= this.GRID_SIZE || newPosition.y < 0 || newPosition.y >= this.GRID_SIZE) {
+        if (!newPosition || typeof newPosition.x !== 'number' || typeof newPosition.y !== 'number' || newPosition.x < 0 || newPosition.x >= this.GRID_SIZE || newPosition.y < 0 || newPosition.y >= this.GRID_SIZE) {
             this.debugLog(`无效位置更新请求: ${element.id} to (${newPosition.x},${newPosition.y})`);
             return false;
         }
@@ -573,16 +545,11 @@ class MapEngine {
     }
 
     /**
-     * 验证位置有效性（新增）
-     * @param {Object} position - 位置对象 {x, y}
-     * @returns {boolean} 是否有效
+     * 验证位置有效性
      */
 
     /**
-     * 更新层级占用格子信息（新增 - 确保数据一致性）
-     * @param {Object} element - 元素对象
-     * @param {Object} oldPosition - 旧位置
-     * @param {Object} newPosition - 新位置
+     * 更新层级占用格子信息
      */
     updateLayerOccupiedCells(element, oldPosition, newPosition) {
         const layerData = this.layers.get(element.layer);
@@ -602,10 +569,7 @@ class MapEngine {
     }
 
     /**
-     * 触发位置变化的相关效果（新增 - 统一处理位置变化的副作用）
-     * @param {Object} element - 元素对象
-     * @param {Object} oldPosition - 旧位置
-     * @param {Object} newPosition - 新位置
+     * 触发位置变化的相关效果
      */
     triggerPositionChangeEffects(element, oldPosition, newPosition) {
         // 检查冰块融化
@@ -624,8 +588,7 @@ class MapEngine {
     }
 
     /**
-     * 清理位置相关的路径缓存（新增）
-     * @param {Object} position - 位置对象
+     * 清理位置相关的路径缓存
      */
     clearPathCacheForPosition(position) {
         const keysToDelete = [];
@@ -642,8 +605,6 @@ class MapEngine {
 
     /**
      * 选择方块
-     * @param {string} elementId - 元素ID
-     * @returns {boolean} 是否成功选择
      */
     selectElement(elementId) {
         const element = this.elementRegistry.get(elementId);
@@ -686,8 +647,6 @@ class MapEngine {
 
     /**
      * 检查冰层是否被覆盖
-     * @param {Object} iceElement - 冰层元素
-     * @returns {boolean} 是否被覆盖
      */
     isIceCovered(iceElement) {
         // 使用 calculateOccupiedCells 计算冰块占据的所有格子
@@ -710,7 +669,6 @@ class MapEngine {
 
     /**
      * 完成冰层融化
-     * @param {Object} iceElement - 冰层元素
      */
     completeIceMelting(iceElement) {
         console.log(`冰层 ${iceElement.id} 融化完成`);
@@ -724,8 +682,7 @@ class MapEngine {
 
 
     /**
-     * 检查指定元素的出门条件（优化 - 只检测触碰的门）
-     * @param {Object} element - 要检查的元素
+     * 检查指定元素的出门条件
      */
     checkElementGateExit(element) {
         if (!element || element.type !== 'tetris' || !element.movable) return;
@@ -746,10 +703,7 @@ class MapEngine {
     }
 
     /**
-     * 查找方块触碰的门（新增 - 优化门检测）
-     * @param {Object} element - 方块元素
-     * @param {Array} elementCells - 方块占据的格子
-     * @returns {Array} 触碰的门列表
+     * 查找方块触碰的门
      */
     findTouchedGates(element, elementCells) {
         const touchedGates = [];
@@ -765,11 +719,7 @@ class MapEngine {
     }
 
     /**
-     * 检查方块是否触碰门（新增 - 精确触碰检测）
-     * @param {Object} element - 方块元素
-     * @param {Array} elementCells - 方块占据的格子
-     * @param {Object} gate - 门元素
-     * @returns {boolean} 是否触碰门
+     * 检查方块是否触碰门
      */
     isElementTouchingGate(element, elementCells, gate) {
         // 根据门的方向检查触碰
@@ -809,9 +759,6 @@ class MapEngine {
 
     /**
      * 检查是否可以出门
-     * @param {Object} element - 方块元素
-     * @param {Object} gate - 门元素
-     * @returns {boolean} 是否可以出门
      */
     canExitThroughGate(element, gate) {
         // 检查颜色匹配
@@ -841,9 +788,6 @@ class MapEngine {
 
     /**
      * 检查从方块到门的路径是否畅通
-     * @param {Object} element - 方块元素
-     * @param {Object} gate - 门元素
-     * @returns {boolean} 路径是否畅通
      */
     isPathClearToGate(element, gate) {
         console.log(`[路径检查] 检查方块${element.id}到门${gate.id}的路径`);
@@ -879,8 +823,6 @@ class MapEngine {
 
     /**
      * 计算方块的中心位置
-     * @param {Object} element - 方块元素
-     * @returns {Object} 中心位置 {x, y}
      */
     calculateElementCenter(element) {
         const bounds = this.calculateElementBounds(element.position, element.shapeData);
@@ -891,8 +833,6 @@ class MapEngine {
 
     /**
      * 计算门的中心位置
-     * @param {Object} gate - 门元素
-     * @returns {Object} 中心位置 {x, y}
      */
     calculateGateCenter(gate) {
         return {
@@ -902,10 +842,6 @@ class MapEngine {
 
     /**
      * 检查垂直方向的路径
-     * @param {Object} element - 方块元素
-     * @param {Object} gate - 门元素
-     * @param {string} direction - 方向 'up' 或 'down'
-     * @returns {boolean} 路径是否畅通
      */
     checkVerticalPath(element, gate, direction) {
         const elementCells = this.calculateOccupiedCells(element.position, element.shapeData);
@@ -939,10 +875,6 @@ class MapEngine {
 
     /**
      * 检查水平方向的路径
-     * @param {Object} element - 方块元素
-     * @param {Object} gate - 门元素
-     * @param {string} direction - 方向 'left' 或 'right'
-     * @returns {boolean} 路径是否畅通
      */
     checkHorizontalPath(element, gate, direction) {
         const elementCells = this.calculateOccupiedCells(element.position, element.shapeData);
@@ -976,9 +908,6 @@ class MapEngine {
 
     /**
      * 检查元素是否在门的位置
-     * @param {Object} element - 方块元素
-     * @param {Object} gate - 门元素
-     * @returns {boolean} 是否在门内
      */
     isElementAtGate(element, gate) {
         // 检查方块是否贴着门（相邻）
@@ -1028,8 +957,6 @@ class MapEngine {
 
     /**
      * 通过门离开
-     * @param {Object} element - 方块元素
-     * @param {Object} gate - 门元素
      */
     exitThroughGate(element, gate) {
         console.log(`方块 ${element.id} 通过 ${gate.color} 门离开`);
@@ -1084,8 +1011,6 @@ class MapEngine {
 
     /**
      * 检查方块是否在正确的门位置
-     * @param {Object} block - 方块元素
-     * @returns {boolean} 是否在正确的门位置
      */
     isBlockAtCorrectGate(block) {
         const gates = this.getAllElementsByType('gate');
@@ -1106,7 +1031,6 @@ class MapEngine {
 
     /**
      * 移除元素
-     * @param {string} elementId - 元素ID
      */
     removeElement(elementId) {
         const element = this.elementRegistry.get(elementId);
@@ -1133,8 +1057,6 @@ class MapEngine {
 
     /**
      * 获取指定类型的所有元素
-     * @param {string} type - 元素类型
-     * @returns {Array} 元素数组
      */
     getAllElementsByType(type) {
         const elements = [];
@@ -1148,9 +1070,6 @@ class MapEngine {
 
     /**
      * 查找指定位置的冰层
-     * @param {string} cellKey - 格子键
-     * @param {number} layer - 层级
-     * @returns {Object|null} 冰层元素
      */
     findIceAtCell(cellKey, layer) {
         const layerData = this.layers.get(layer);
@@ -1167,8 +1086,7 @@ class MapEngine {
     }
 
     /**
-     * 检查是否有下层方块显露（移动后调用）
-     * @param {Object} movedElement - 移动的方块元素
+     * 检查是否有下层方块显露
      */
     checkLayerReveal(movedElement) {
         // 检查所有下层方块，看是否有完全显露的
@@ -1192,10 +1110,7 @@ class MapEngine {
     }
 
     /**
-     * 检查下层方块是否完全显露（所有格子都没有被遮挡）
-     * @param {Object} hiddenElement - 隐藏的方块元素
-     * @param {number} layer - 层级
-     * @returns {boolean} 是否完全显露
+     * 检查下层方块是否完全显露
      */
     isElementFullyRevealed(hiddenElement, layer) {
         // 检查方块的所有占据格子（实时计算）
@@ -1215,8 +1130,6 @@ class MapEngine {
 
     /**
      * 检查指定位置是否有下层方块显露
-     * @param {number} x - 网格X坐标
-     * @param {number} y - 网格Y坐标
      */
     checkCellReveal(x, y) {
         // 检查所有层级，从第1层开始
@@ -1242,9 +1155,6 @@ class MapEngine {
 
     /**
      * 查找指定位置和层级的隐藏方块
-     * @param {string} cellKey - 格子键
-     * @param {number} layer - 层级
-     * @returns {Object|null} 隐藏的方块元素
      */
     findHiddenElementAtCell(cellKey, layer) {
         const layerData = this.layers.get(layer);
@@ -1265,10 +1175,6 @@ class MapEngine {
 
     /**
      * 检查指定位置是否被遮挡（使用初始位置）
-     * @param {number} x - 网格X坐标
-     * @param {number} y - 网格Y坐标
-     * @param {number} layer - 层级
-     * @returns {boolean} 是否被遮挡
      */
     isPositionCoveredInitial(x, y, layer) {
         // 检查上层（layer-1）是否有遮挡
@@ -1297,10 +1203,6 @@ class MapEngine {
 
     /**
      * 检查指定位置是否被遮挡
-     * @param {number} x - 网格X坐标
-     * @param {number} y - 网格Y坐标
-     * @param {number} layer - 层级
-     * @returns {boolean} 是否被遮挡
      */
     isPositionCovered(x, y, layer) {
         // 检查上层（layer-1）是否有遮挡
@@ -1329,9 +1231,7 @@ class MapEngine {
     }
 
     /**
-     * 显示部分显露的冰块（不参与碰撞检测）
-     * @param {Object} hiddenElement - 隐藏的方块元素
-     * @param {number} layer - 层级
+     * 显示部分显露的冰块
      */
     showPartialIce(hiddenElement, layer) {
         console.log(`部分显露冰块: ${hiddenElement.id} 在第${layer}层`);
@@ -1354,8 +1254,6 @@ class MapEngine {
 
     /**
      * 显露隐藏的方块
-     * @param {Object} hiddenElement - 隐藏的方块元素
-     * @param {number} fromLayer - 原层级
      */
     revealHiddenElement(hiddenElement, fromLayer) {
         console.log(`显露隐藏方块: ${hiddenElement.id} 从第${fromLayer}层移动到第0层`);
@@ -1408,7 +1306,6 @@ class MapEngine {
 
     /**
      * 播放方块显露动画
-     * @param {Object} element - 显露的方块元素
      */
     animateElementReveal(element) {
         if (!element.blockElement || !element.blockElement.element) {
@@ -1439,9 +1336,7 @@ class MapEngine {
     }
 
     /**
-     * 清理元素相关的缓存（增强版 - 修复级联失效问题）
-     * @param {string} elementId - 元素ID
-     * @param {Object} position - 元素位置（可选，用于清理位置相关缓存）
+     * 清理元素相关的缓存
      */
     clearCacheForElement(elementId, position = null) {
         const keysToDelete = [];
@@ -1469,10 +1364,7 @@ class MapEngine {
 
 
     /**
-     * 智能碰撞检测（新增 - 基于元素类型规则）
-     * @param {Object} movingElement - 移动的元素
-     * @param {Object} targetElement - 目标位置的元素
-     * @returns {Object} 碰撞检测结果 {collision: boolean, action: string, reason: string}
+     * 智能碰撞检测
      */
     checkSmartCollision(movingElement, targetElement) {
         if (!movingElement || !targetElement) {
@@ -1638,8 +1530,6 @@ class MapEngine {
 
     /**
      * 设置渲染上下文
-     * @param {CanvasRenderingContext2D} ctx - 画布上下文
-     * @param {Object} systemInfo - 系统信息
      */
     setRenderContext(ctx, systemInfo) {
         this.ctx = ctx;
@@ -1787,7 +1677,6 @@ class MapEngine {
 
     /**
      * 绘制坐标标签
-     * @param {CanvasRenderingContext2D} ctx - 画布上下文
      */
     drawCoordinateLabels(ctx) {
         ctx.save();
@@ -1819,10 +1708,7 @@ class MapEngine {
     }
 
     /**
-     * 在边框上绘制门 - 动态处理所有门
-     * @param {CanvasRenderingContext2D} ctx - 画布上下文
-     * @param {number} borderWidth - 边框宽度
-     * @param {number} borderAlpha - 边框透明度
+     * 在边框上绘制门
      */
     drawGatesOnBorder(ctx, borderWidth, borderAlpha) {
         // 获取所有门
@@ -1886,8 +1772,6 @@ class MapEngine {
 
     /**
      * 将十六进制颜色转换为RGB
-     * @param {string} hex - 十六进制颜色值
-     * @returns {string} RGB颜色值
      */
     hexToRgb(hex) {
         // 移除 # 号
@@ -2041,10 +1925,7 @@ class MapEngine {
     }
 
     /**
-     * 检查隐藏方块是否被上层遮挡（使用初始位置，不受移动影响）
-     * @param {Object} block - 隐藏方块
-     * @param {number} layer - 方块所在层级
-     * @returns {boolean} 是否被遮挡
+     * 检查隐藏方块是否被上层遮挡（使用初始位置）
      */
     isBlockCoveredByUpperLayersInitial(block, layer) {
         // 使用初始位置，不受移动影响
@@ -2314,8 +2195,7 @@ class MapEngine {
     }
 
     /**
-     * 绘制门的标签 - 动态处理所有门
-     * @param {Object} gate - 门对象
+     * 绘制门的标签
      */
     drawGateLabel(gate) {
         const borderWidth = Math.max(12, this.cellSize * 0.25); // 与边框保持一致
@@ -2561,8 +2441,6 @@ class MapEngine {
 
     /**
      * 获取门颜色
-     * @param {string} colorName - 颜色名称
-     * @returns {string} 颜色值
      */
     getGateColor(colorName) {
         const colors = {
@@ -2574,8 +2452,6 @@ class MapEngine {
 
     /**
      * 处理点击事件
-     * @param {number} x - 点击X坐标
-     * @param {number} y - 点击Y坐标
      */
     handleClick(x, y) {
         // 如果弹窗显示，处理弹窗点击
@@ -2618,8 +2494,6 @@ class MapEngine {
 
     /**
      * 处理弹窗点击事件
-     * @param {number} x - 点击X坐标
-     * @param {number} y - 点击Y坐标
      */
     handleDialogClick(x, y) {
         const screenWidth = this.systemInfo.windowWidth;
@@ -2659,10 +2533,7 @@ class MapEngine {
     }
 
     /**
-     * 计算目标位置（简化版本，直接使用点击位置）
-     * @param {Object} element - 方块元素
-     * @param {Object} clickPosition - 点击位置 {x, y}
-     * @returns {Object} 目标位置 {x, y}
+     * 计算目标位置
      */
     calculateTargetPosition(element, clickPosition) {
         const startPos = element.position;
@@ -2687,9 +2558,6 @@ class MapEngine {
 
     /**
      * 调整位置到边界内
-     * @param {Object} position - 目标位置
-     * @param {Object} shapeData - 形状数据
-     * @returns {Object} 调整后的位置
      */
     adjustPositionToBounds(position, shapeData) {
         const bounds = this.calculateElementBounds(position, shapeData);
@@ -2716,9 +2584,6 @@ class MapEngine {
 
     /**
      * 计算方块的边界尺寸
-     * @param {Object} position - 位置 {x, y}
-     * @param {Object} shapeData - 形状数据
-     * @returns {Object} 边界 {width, height}
      */
     calculateElementBounds(position, shapeData) {
         if (!shapeData || !shapeData.blocks) {
@@ -2744,9 +2609,7 @@ class MapEngine {
     }
 
     /**
-     * 移动元素到指定位置（边缘对齐版）
-     * @param {string} elementId - 元素ID
-     * @param {Object} clickPosition - 点击位置 {x, y}
+     * 移动元素到指定位置
      */
     moveElementToPosition(elementId, clickPosition) {
         // 强制清理所有缓存以确保最新计算结果
@@ -2788,11 +2651,7 @@ class MapEngine {
     }
 
     /**
-     * 寻找最近的可达位置（BFS算法 - 合并版本）
-     * @param {Object} element - 方块元素
-     * @param {Object} startPos - 起始位置
-     * @param {Object} targetPos - 目标位置
-     * @returns {Object|null} 最近的可达位置
+     * 寻找最近的可达位置
      */
     findNearestReachablePosition(element, startPos, targetPos) {
         console.log(`[最近位置] 开始寻找从(${startPos.x},${startPos.y})到(${targetPos.x},${targetPos.y})的最近可达位置`);
@@ -2867,11 +2726,7 @@ class MapEngine {
 
 
     /**
-     * 计算完整路径（重构版 - 功能完整）
-     * @param {Object} element - 方块元素
-     * @param {Object} startPos - 起始位置
-     * @param {Object} targetPos - 目标位置
-     * @returns {Array} 路径数组
+     * 计算完整路径
      */
     calculateCompletePath(element, startPos, targetPos) {
         console.log(`[路径计算] 开始: 从(${startPos.x},${startPos.y})到(${targetPos.x},${targetPos.y})`);
@@ -2906,11 +2761,7 @@ class MapEngine {
 
 
     /**
-     * A*路径计算算法（功能完整）
-     * @param {Object} element - 方块元素
-     * @param {Object} startPos - 起始位置
-     * @param {Object} targetPos - 目标位置
-     * @returns {Array} 路径数组
+     * A*路径计算算法
      */
     calculateAStarPath(element, startPos, targetPos) {
         console.log(`[A*] 开始A*搜索: 从(${startPos.x},${startPos.y})到(${targetPos.x},${targetPos.y})`);
@@ -3041,10 +2892,6 @@ class MapEngine {
 
     /**
      * 获取碰撞详情（调试用）
-     * @param {Object} element - 移动的元素
-     * @param {Object} position - 目标位置
-     * @param {string} excludeId - 排除的元素ID
-     * @returns {Object} 碰撞详情
      */
     getCollisionDetails(element, position, excludeId) {
         const occupiedCells = this.calculateOccupiedCells(position, element.shapeData);
@@ -3071,9 +2918,6 @@ class MapEngine {
 
     /**
      * 恢复空间索引（A*算法结束后）
-     * @param {Object} element - 移动的元素
-     * @param {Object} startPos - 起始位置
-     * @param {Map} removedCells - 被移除的格子数据
      */
     restoreSpatialIndex(element, startPos, removedCells) {
         // 恢复所有被修改的格子
@@ -3084,9 +2928,6 @@ class MapEngine {
 
     /**
      * 计算启发式函数（曼哈顿距离）
-     * @param {Object} pos1 - 位置1
-     * @param {Object} pos2 - 位置2
-     * @returns {number} 距离
      */
     calculateHeuristic(pos1, pos2) {
         return Math.abs(pos1.x - pos2.x) + Math.abs(pos1.y - pos2.y);
@@ -3094,8 +2935,6 @@ class MapEngine {
 
     /**
      * 重构路径
-     * @param {Object} targetNode - 目标节点
-     * @returns {Array} 路径数组
      */
     reconstructPath(targetNode) {
         const path = [];
@@ -3113,9 +2952,7 @@ class MapEngine {
 
 
     /**
-     * 执行移动动画（完整版）
-     * @param {Object} element - 方块元素
-     * @param {Array} path - 移动路径
+     * 执行移动动画
      */
     executeMoveWithAnimation(element, path) {
         if (!element.blockElement || !element.blockElement.element) {
@@ -3173,16 +3010,12 @@ class MapEngine {
 
     /**
      * 网格坐标系统 - 将屏幕坐标转换为网格坐标
-     * @param {number} screenX - 屏幕X坐标
-     * @param {number} screenY - 屏幕Y坐标
-     * @returns {Object} 网格坐标 {x, y}
      */
     screenToGrid(screenX, screenY) {
         const gridX = Math.floor((screenX - this.gridOffsetX) / this.cellSize);
         const gridY = Math.floor((screenY - this.gridOffsetY) / this.cellSize);
         return {x: gridX, y: gridY};
     }
-
 
 
     /**
@@ -3217,13 +3050,8 @@ class MapEngine {
     }
 
 
-
-
     /**
-     * 检查位置是否在边界内（检查整个方块）
-     * @param {Object} position - 位置 {x, y}
-     * @param {Object} shapeData - 形状数据
-     * @returns {boolean} 是否在边界内
+     * 检查位置是否在边界内
      */
     isPositionWithinBounds(position, shapeData) {
         const occupiedCells = this.calculateOccupiedCells(position, shapeData);
@@ -3239,11 +3067,7 @@ class MapEngine {
     }
 
     /**
-     * 检查方块在指定位置是否会碰撞（只检测第0层）
-     * @param {Object} element - 方块元素
-     * @param {Object} position - 目标位置 {x, y}
-     * @param {string} excludeId - 排除的元素ID（移动的方块）
-     * @returns {boolean} 是否碰撞
+     * 检查方块在指定位置是否会碰撞
      */
     checkCollisionAtPosition(element, position, excludeId) {
         if (element.type !== 'tetris') return false;
@@ -3297,10 +3121,7 @@ class MapEngine {
 
 
     /**
-     * 为单个元素更新空间索引（增强多层处理）
-     * @param {Object} element - 元素对象
-     * @param {Object} oldPosition - 旧位置
-     * @param {Object} newPosition - 新位置
+     * 为单个元素更新空间索引
      */
     updateSpatialIndexForElement(element, oldPosition, newPosition) {
         // 只对layer 0的元素更新空间索引
@@ -3335,8 +3156,7 @@ class MapEngine {
     }
 
     /**
-     * 检查层级显露（新增 - 修复多层边缘情况）
-     * @param {Array} affectedCells - 受影响的格子
+     * 检查层级显露
      */
     checkForLayerReveal(affectedCells) {
         // 遍历所有下层元素，检查是否需要显露
@@ -3373,8 +3193,6 @@ class MapEngine {
             });
         }
     }
-
-
 }
 
 // 导出引擎类
