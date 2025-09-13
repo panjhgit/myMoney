@@ -34,6 +34,24 @@ class MapEngine {
         // 动画管理
         this.animations = new Map();
 
+        // 颜色常量
+        this.COLORS = {
+            WHITE: 'rgba(255, 255, 255, ',
+            BLACK: 'rgba(0, 0, 0, ',
+            ICE_BLUE: 'rgba(173, 216, 230, ',
+            ICE_BORDER: 'rgba(135, 206, 235, ',
+            ROCK_GRAY: 'rgba(128, 128, 128, 0.3)',
+            SHADOW: 'rgba(0, 0, 0, 0.6)'
+        };
+
+        // 样式常量
+        this.STYLES = {
+            LINE_WIDTH_THIN: 1,
+            LINE_WIDTH_THICK: 2,
+            FONT_SMALL: '12px Arial',
+            TEXT_ALIGN_CENTER: 'center'
+        };
+
         // 元素类型碰撞规则配置
         this.collisionRules = {
             'tetris': {
@@ -702,7 +720,7 @@ class MapEngine {
 
         // 绘制网格线 - 深灰色
         this.ctx.strokeStyle = 'rgba(64, 64, 64, 0.6)';
-        this.ctx.lineWidth = 1;
+        this.ctx.lineWidth = this.STYLES.LINE_WIDTH_THIN;
 
         for (let row = 0; row <= this.GRID_SIZE; row++) {
             const y = startY + row * this.cellSize;
@@ -766,15 +784,15 @@ class MapEngine {
 
             // 石块边框
             this.ctx.strokeStyle = '#654321';
-            this.ctx.lineWidth = 2;
+            this.ctx.lineWidth = this.STYLES.LINE_WIDTH_THICK;
             this.ctx.strokeRect(screenX, screenY, this.cellSize, this.cellSize);
 
             // 石块纹理
-        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+            this.ctx.fillStyle = this.COLORS.BLACK + '0.3)';
             this.ctx.fillRect(screenX + 2, screenY + 2, this.cellSize - 4, this.cellSize - 4);
 
             // 石块高光
-            this.ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
+            this.ctx.fillStyle = this.COLORS.WHITE + '0.2)';
             this.ctx.fillRect(screenX + 4, screenY + 4, this.cellSize - 8, this.cellSize - 8);
         });
     }
@@ -792,40 +810,37 @@ class MapEngine {
                 const iceAlpha = 0.8 - (meltProgress / 100) * 0.5; // 融化时变透明
 
                 // 设置冰块样式（避免重复设置）
-                this.ctx.fillStyle = `rgba(173, 216, 230, ${iceAlpha})`;
-                this.ctx.strokeStyle = `rgba(135, 206, 235, ${iceAlpha + 0.2})`;
-                this.ctx.lineWidth = 1;
+                this.ctx.fillStyle = this.COLORS.ICE_BLUE + `${iceAlpha})`;
+                this.ctx.strokeStyle = this.COLORS.ICE_BORDER + `${iceAlpha + 0.2})`;
+                this.ctx.lineWidth = this.STYLES.LINE_WIDTH_THIN;
 
                 // 冰块是一个格子一个格子的（有网格线分隔）
                 cells.forEach(cell => {
-                    const x = this.gridOffsetX + cell.x * this.cellSize;
-                    const y = this.gridOffsetY + cell.y * this.cellSize;
+                    const pos = this.getCellScreenPosition(cell);
 
                     // 绘制冰块主体
-                    this.ctx.fillRect(x, y, this.cellSize, this.cellSize);
+                    this.ctx.fillRect(pos.x, pos.y, this.cellSize, this.cellSize);
 
                     // 绘制格子边框
-                    this.ctx.strokeRect(x, y, this.cellSize, this.cellSize);
+                    this.ctx.strokeRect(pos.x, pos.y, this.cellSize, this.cellSize);
 
                     // 绘制格子高光
-                    this.ctx.fillStyle = `rgba(255, 255, 255, ${iceAlpha * 0.3})`;
-                    this.ctx.fillRect(x + 2, y + 2, this.cellSize - 4, this.cellSize - 4);
+                    this.ctx.fillStyle = this.COLORS.WHITE + `${iceAlpha * 0.3})`;
+                    this.ctx.fillRect(pos.x + 2, pos.y + 2, this.cellSize - 4, this.cellSize - 4);
 
                     // 绘制格子纹理
-                    this.ctx.fillStyle = `rgba(255, 255, 255, ${iceAlpha * 0.15})`;
-                    this.ctx.fillRect(x + 4, y + 4, this.cellSize - 8, this.cellSize - 8);
+                    this.ctx.fillStyle = this.COLORS.WHITE + `${iceAlpha * 0.15})`;
+                    this.ctx.fillRect(pos.x + 4, pos.y + 4, this.cellSize - 8, this.cellSize - 8);
                 });
 
                 // 显示融化进度（在第一个格子上显示）
                 if (meltProgress > 0 && cells.length > 0) {
-                    const firstCell = cells[0];
-                    const x = this.gridOffsetX + firstCell.x * this.cellSize;
-                    const y = this.gridOffsetY + firstCell.y * this.cellSize;
+                    const pos = this.getCellScreenPosition(cells[0]);
 
-                    this.ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-                    this.ctx.font = '12px Arial';
-        this.ctx.textAlign = 'center';
-                    this.ctx.fillText(`${meltProgress}%`, x + this.cellSize / 2, y + this.cellSize / 2 + 3);
+                    this.ctx.fillStyle = this.COLORS.BLACK + '0.7)';
+                    this.ctx.font = this.STYLES.FONT_SMALL;
+                    this.ctx.textAlign = this.STYLES.TEXT_ALIGN_CENTER;
+                    this.ctx.fillText(`${meltProgress}%`, pos.x + this.cellSize / 2, pos.y + this.cellSize / 2 + 3);
                 }
             }
         });
@@ -840,17 +855,16 @@ class MapEngine {
             if (block.layer > 0) {
                 const cells = this.collisionDetector.getBlockCells(block);
                 cells.forEach(cell => {
-                    const x = this.gridOffsetX + cell.x * this.cellSize;
-                    const y = this.gridOffsetY + cell.y * this.cellSize;
+                    const pos = this.getCellScreenPosition(cell);
 
                     // 冰层效果 - 更淡的蓝色
-                    this.ctx.fillStyle = 'rgba(173, 216, 230, 0.3)';
-                    this.ctx.fillRect(x, y, this.cellSize, this.cellSize);
+                    this.ctx.fillStyle = this.COLORS.ICE_BLUE + '0.3)';
+                    this.ctx.fillRect(pos.x, pos.y, this.cellSize, this.cellSize);
 
                     // 冰层边框
-                    this.ctx.strokeStyle = 'rgba(135, 206, 235, 0.5)';
-                    this.ctx.lineWidth = 1;
-                    this.ctx.strokeRect(x, y, this.cellSize, this.cellSize);
+                    this.ctx.strokeStyle = this.COLORS.ICE_BORDER + '0.5)';
+                    this.ctx.lineWidth = this.STYLES.LINE_WIDTH_THIN;
+                    this.ctx.strokeRect(pos.x, pos.y, this.cellSize, this.cellSize);
                 });
             }
         });
@@ -868,6 +882,16 @@ class MapEngine {
     }
 
     /**
+     * 计算格子屏幕坐标
+     */
+    getCellScreenPosition(cell) {
+        return {
+            x: this.gridOffsetX + cell.x * this.cellSize,
+            y: this.gridOffsetY + cell.y * this.cellSize
+        };
+    }
+
+    /**
      * 绘制单个俄罗斯方块
      */
     drawTetrisBlock(block) {
@@ -876,16 +900,15 @@ class MapEngine {
 
         // 绘制方块主体和边框
         this.ctx.fillStyle = color;
-        this.ctx.strokeStyle = 'rgba(0, 0, 0, 0.6)';
-        this.ctx.lineWidth = 2;
+        this.ctx.strokeStyle = this.COLORS.SHADOW;
+        this.ctx.lineWidth = this.STYLES.LINE_WIDTH_THICK;
         
         cells.forEach(cell => {
-            const x = this.gridOffsetX + cell.x * this.cellSize;
-            const y = this.gridOffsetY + cell.y * this.cellSize;
+            const pos = this.getCellScreenPosition(cell);
 
             // 绘制方块主体
-            this.ctx.fillRect(x, y, this.cellSize, this.cellSize);
-
+            this.ctx.fillRect(pos.x, pos.y, this.cellSize, this.cellSize);
+            
             // 检查每个格子的四个边，只绘制外边框
             const hasTop = cells.some(c => c.x === cell.x && c.y === cell.y - 1);
             const hasBottom = cells.some(c => c.x === cell.x && c.y === cell.y + 1);
@@ -895,26 +918,26 @@ class MapEngine {
             // 绘制外边框
             if (!hasTop) {
                 this.ctx.beginPath();
-                this.ctx.moveTo(x, y);
-                this.ctx.lineTo(x + this.cellSize, y);
+                this.ctx.moveTo(pos.x, pos.y);
+                this.ctx.lineTo(pos.x + this.cellSize, pos.y);
                 this.ctx.stroke();
             }
             if (!hasBottom) {
-            this.ctx.beginPath();
-                this.ctx.moveTo(x, y + this.cellSize);
-                this.ctx.lineTo(x + this.cellSize, y + this.cellSize);
-            this.ctx.stroke();
+                this.ctx.beginPath();
+                this.ctx.moveTo(pos.x, pos.y + this.cellSize);
+                this.ctx.lineTo(pos.x + this.cellSize, pos.y + this.cellSize);
+                this.ctx.stroke();
             }
             if (!hasLeft) {
                 this.ctx.beginPath();
-                this.ctx.moveTo(x, y);
-                this.ctx.lineTo(x, y + this.cellSize);
+                this.ctx.moveTo(pos.x, pos.y);
+                this.ctx.lineTo(pos.x, pos.y + this.cellSize);
                 this.ctx.stroke();
             }
             if (!hasRight) {
                 this.ctx.beginPath();
-                this.ctx.moveTo(x + this.cellSize, y);
-                this.ctx.lineTo(x + this.cellSize, y + this.cellSize);
+                this.ctx.moveTo(pos.x + this.cellSize, pos.y);
+                this.ctx.lineTo(pos.x + this.cellSize, pos.y + this.cellSize);
                 this.ctx.stroke();
             }
         });
@@ -927,7 +950,7 @@ class MapEngine {
         if (!this.ctx) return;
 
         // 绘制游戏状态信息
-        this.ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+        this.ctx.fillStyle = this.COLORS.WHITE + '0.9)';
         this.ctx.font = '16px Arial';
         this.ctx.textAlign = 'left';
 
