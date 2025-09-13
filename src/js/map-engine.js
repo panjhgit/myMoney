@@ -172,8 +172,9 @@ class MapEngine {
             return;
         }
 
+        // 使用原始方块ID而不是动态生成的ID
         const element = {
-            id: blockElement.id,
+            id: block.id, // 使用原始ID
             type: 'tetris',
             color: blockElement.color,
             position: block.position,
@@ -200,6 +201,20 @@ class MapEngine {
     }
 
     /**
+     * 按层级获取方块
+     */
+    getBlocksByLayer(layer) {
+        return Array.from(this.blocks.values()).filter(block => block.layer === layer);
+    }
+
+    /**
+     * 获取所有下层方块（layer > 0）
+     */
+    getLowerLayerBlocks() {
+        return Array.from(this.blocks.values()).filter(block => block.layer > 0);
+    }
+
+    /**
      * 更新网格数据
      */
     updateGrid() {
@@ -208,27 +223,28 @@ class MapEngine {
         // 清空网格
         this.grid.forEach(row => row.fill(null));
 
-        // 按层级顺序填充网格
+        // 按层级顺序填充网格（第0层优先显示）
         for (let layer = 0; layer < this.MAX_LAYERS; layer++) {
-            let layerBlockCount = 0;
-            // 添加方块
-            this.blocks.forEach(block => {
-                if (block.layer === layer) {
-                    layerBlockCount++;
+            const layerBlocks = this.getBlocksByLayer(layer);
+            
+            if (layerBlocks.length > 0) {
+                console.log(`[更新网格] 第${layer}层: ${layerBlocks.length}个方块`);
+                
+                // 添加方块
+                layerBlocks.forEach(block => {
                     const cells = this.collisionDetector.getBlockCells(block);
                     cells.forEach(cell => {
                         if (this.collisionDetector.isValidPosition(cell.x, cell.y)) {
-                            this.grid[cell.y][cell.x] = block.id;
+                            // 第0层方块优先显示，第1层及以下只在空白位置填充
+                            if (layer === 0 || this.grid[cell.y][cell.x] === null) {
+                                this.grid[cell.y][cell.x] = block.id;
+                            }
                         }
                     });
-                }
-            });
-
-            if (layerBlockCount > 0) {
-                console.log(`[更新网格] 第${layer}层: ${layerBlockCount}个方块`);
+                });
             }
 
-            // 添加石块
+            // 添加石块（只在第0层）
             if (layer === 0) {
                 this.rocks.forEach(rockKey => {
                     const [x, y] = rockKey.split(',').map(Number);
@@ -294,26 +310,24 @@ class MapEngine {
      */
     checkIceMelting() {
         // 检查所有下层方块（冰块）
-        for (let layer = 1; layer < this.MAX_LAYERS; layer++) {
-            this.blocks.forEach(block => {
-                if (block.layer === layer) {
-                    // 检查方块是否被覆盖
-                    const isCovered = !this.collisionDetector.isBlockFullyRevealed(block, this.grid, this.blocks);
+        const lowerBlocks = this.getLowerLayerBlocks();
+        
+        lowerBlocks.forEach(block => {
+            // 检查方块是否被覆盖
+            const isCovered = !this.collisionDetector.isBlockFullyRevealed(block, this.grid, this.blocks);
 
-                    if (!isCovered && block.meltProgress < 100) {
-                        // 开始融化
-                        if (!block.meltProgress) {
-                            block.meltProgress = 0;
-                        }
-                        block.meltProgress += 2; // 每帧融化2%
-
-                        if (block.meltProgress >= 100) {
-                            this.completeIceMelting(block);
-                        }
-                    }
+            if (!isCovered && block.meltProgress < 100) {
+                // 开始融化
+                if (!block.meltProgress) {
+                    block.meltProgress = 0;
                 }
-            });
-        }
+                block.meltProgress += 2; // 每帧融化2%
+
+                if (block.meltProgress >= 100) {
+                    this.completeIceMelting(block);
+                }
+            }
+        });
     }
 
     /**
@@ -331,19 +345,19 @@ class MapEngine {
         console.log(`[层级显露] 检查方块 ${movedBlock.id} 移动后的下层显露`);
 
         // 检查所有下层方块，看是否有完全显露的
-        for (let layer = 1; layer < this.MAX_LAYERS; layer++) {
-            this.blocks.forEach(block => {
-                if (block.layer === layer && block.id !== movedBlock.id) {
-                    // 检查这个下层方块是否完全显露
-                    const isFullyRevealed = this.collisionDetector.isBlockFullyRevealed(block, this.grid, this.blocks);
+        const lowerBlocks = this.getLowerLayerBlocks();
+        
+        lowerBlocks.forEach(block => {
+            if (block.id !== movedBlock.id) {
+                // 检查这个下层方块是否完全显露
+                const isFullyRevealed = this.collisionDetector.isBlockFullyRevealed(block, this.grid, this.blocks);
 
-                    if (isFullyRevealed) {
-                        console.log(`[层级显露] 方块 ${block.id} 完全显露，开始融化`);
-                        this.revealBlock(block);
-                    }
+                if (isFullyRevealed) {
+                    console.log(`[层级显露] 方块 ${block.id} 完全显露，开始融化`);
+                    this.revealBlock(block);
                 }
-            });
-        }
+            }
+        });
     }
 
     /**
@@ -724,18 +738,12 @@ class MapEngine {
 
         for (let row = 0; row <= this.GRID_SIZE; row++) {
             const y = startY + row * this.cellSize;
-            this.ctx.beginPath();
-            this.ctx.moveTo(startX, y);
-            this.ctx.lineTo(startX + boardWidth, y);
-            this.ctx.stroke();
+            this.drawLine(startX, y, startX + boardWidth, y);
         }
 
         for (let col = 0; col <= this.GRID_SIZE; col++) {
             const x = startX + col * this.cellSize;
-            this.ctx.beginPath();
-            this.ctx.moveTo(x, startY);
-            this.ctx.lineTo(x, startY + boardHeight);
-            this.ctx.stroke();
+            this.drawLine(x, startY, x, startY + boardHeight);
         }
     }
 
@@ -780,20 +788,20 @@ class MapEngine {
 
             // 石块主体 - 棕色
             this.ctx.fillStyle = '#8B4513';
-            this.ctx.fillRect(screenX, screenY, this.cellSize, this.cellSize);
+            this.drawRect(screenX, screenY, this.cellSize, this.cellSize);
 
             // 石块边框
             this.ctx.strokeStyle = '#654321';
             this.ctx.lineWidth = this.STYLES.LINE_WIDTH_THICK;
-            this.ctx.strokeRect(screenX, screenY, this.cellSize, this.cellSize);
+            this.drawRect(screenX, screenY, this.cellSize, this.cellSize, false, true);
 
             // 石块纹理
             this.ctx.fillStyle = this.COLORS.BLACK + '0.3)';
-            this.ctx.fillRect(screenX + 2, screenY + 2, this.cellSize - 4, this.cellSize - 4);
+            this.drawRectWithOffset(screenX, screenY, this.cellSize, this.cellSize, 2);
 
             // 石块高光
             this.ctx.fillStyle = this.COLORS.WHITE + '0.2)';
-            this.ctx.fillRect(screenX + 4, screenY + 4, this.cellSize - 8, this.cellSize - 8);
+            this.drawRectWithOffset(screenX, screenY, this.cellSize, this.cellSize, 4);
         });
     }
 
@@ -801,8 +809,10 @@ class MapEngine {
      * 绘制冰块（淡色渲染）
      */
     drawIceBlocks() {
-        this.blocks.forEach(block => {
-            if (block.layer > 0 && !this.collisionDetector.isBlockFullyRevealed(block, this.grid, this.blocks)) {
+        const lowerBlocks = this.getLowerLayerBlocks();
+        
+        lowerBlocks.forEach(block => {
+            if (!this.collisionDetector.isBlockFullyRevealed(block, this.grid, this.blocks)) {
                 const cells = this.collisionDetector.getBlockCells(block);
 
                 // 根据融化进度调整透明度
@@ -819,29 +829,21 @@ class MapEngine {
                     const pos = this.getCellScreenPosition(cell);
 
                     // 绘制冰块主体
-                    this.ctx.fillRect(pos.x, pos.y, this.cellSize, this.cellSize);
+                    this.drawRect(pos.x, pos.y, this.cellSize, this.cellSize);
 
                     // 绘制格子边框
-                    this.ctx.strokeRect(pos.x, pos.y, this.cellSize, this.cellSize);
+                    this.drawRect(pos.x, pos.y, this.cellSize, this.cellSize, false, true);
 
                     // 绘制格子高光
                     this.ctx.fillStyle = this.COLORS.WHITE + `${iceAlpha * 0.3})`;
-                    this.ctx.fillRect(pos.x + 2, pos.y + 2, this.cellSize - 4, this.cellSize - 4);
+                    this.drawRectWithOffset(pos.x, pos.y, this.cellSize, this.cellSize, 2);
 
                     // 绘制格子纹理
                     this.ctx.fillStyle = this.COLORS.WHITE + `${iceAlpha * 0.15})`;
-                    this.ctx.fillRect(pos.x + 4, pos.y + 4, this.cellSize - 8, this.cellSize - 8);
+                    this.drawRectWithOffset(pos.x, pos.y, this.cellSize, this.cellSize, 4);
                 });
 
-                // 显示融化进度（在第一个格子上显示）
-                if (meltProgress > 0 && cells.length > 0) {
-                    const pos = this.getCellScreenPosition(cells[0]);
-
-                    this.ctx.fillStyle = this.COLORS.BLACK + '0.7)';
-                    this.ctx.font = this.STYLES.FONT_SMALL;
-                    this.ctx.textAlign = this.STYLES.TEXT_ALIGN_CENTER;
-                    this.ctx.fillText(`${meltProgress}%`, pos.x + this.cellSize / 2, pos.y + this.cellSize / 2 + 3);
-                }
+                // 融化进度不显示给用户，避免暴露游戏信息
             }
         });
     }
@@ -851,22 +853,22 @@ class MapEngine {
      */
     drawIceLayers() {
         // 绘制冰层效果，显示被遮挡的方块
-        this.blocks.forEach(block => {
-            if (block.layer > 0) {
-                const cells = this.collisionDetector.getBlockCells(block);
-                cells.forEach(cell => {
-                    const pos = this.getCellScreenPosition(cell);
+        const lowerBlocks = this.getLowerLayerBlocks();
+        
+        lowerBlocks.forEach(block => {
+            const cells = this.collisionDetector.getBlockCells(block);
+            cells.forEach(cell => {
+                const pos = this.getCellScreenPosition(cell);
 
-                    // 冰层效果 - 更淡的蓝色
-                    this.ctx.fillStyle = this.COLORS.ICE_BLUE + '0.3)';
-                    this.ctx.fillRect(pos.x, pos.y, this.cellSize, this.cellSize);
+                // 冰层效果 - 更淡的蓝色
+                this.ctx.fillStyle = this.COLORS.ICE_BLUE + '0.3)';
+                this.drawRect(pos.x, pos.y, this.cellSize, this.cellSize);
 
-                    // 冰层边框
-                    this.ctx.strokeStyle = this.COLORS.ICE_BORDER + '0.5)';
-                    this.ctx.lineWidth = this.STYLES.LINE_WIDTH_THIN;
-                    this.ctx.strokeRect(pos.x, pos.y, this.cellSize, this.cellSize);
-                });
-            }
+                // 冰层边框
+                this.ctx.strokeStyle = this.COLORS.ICE_BORDER + '0.5)';
+                this.ctx.lineWidth = this.STYLES.LINE_WIDTH_THIN;
+                this.drawRect(pos.x, pos.y, this.cellSize, this.cellSize, false, true);
+            });
         });
     }
 
@@ -874,10 +876,11 @@ class MapEngine {
      * 绘制俄罗斯方块（包括被冰块包裹的方块）
      */
     drawTetrisBlocks() {
-        this.blocks.forEach(block => {
-            if (block.layer === 0) {
-                this.drawTetrisBlock(block);
-            }
+        // 只绘制第0层方块（可移动的方块）
+        const topLayerBlocks = this.getBlocksByLayer(0);
+        
+        topLayerBlocks.forEach(block => {
+            this.drawTetrisBlock(block);
         });
     }
 
@@ -892,6 +895,36 @@ class MapEngine {
     }
 
     /**
+     * Canvas绘制工具函数
+     */
+    drawLine(x1, y1, x2, y2) {
+        this.ctx.beginPath();
+        this.ctx.moveTo(x1, y1);
+        this.ctx.lineTo(x2, y2);
+        this.ctx.stroke();
+    }
+
+    drawRect(x, y, width, height, fill = true, stroke = true) {
+        if (fill) {
+            this.ctx.fillRect(x, y, width, height);
+        }
+        if (stroke) {
+            this.ctx.strokeRect(x, y, width, height);
+        }
+    }
+
+    drawRectWithOffset(x, y, width, height, offset, fill = true) {
+        if (fill) {
+            this.ctx.fillRect(x + offset, y + offset, width - offset * 2, height - offset * 2);
+        }
+    }
+
+    setTextStyle(font, align = 'left') {
+        this.ctx.font = font;
+        this.ctx.textAlign = align;
+    }
+
+    /**
      * 绘制单个俄罗斯方块
      */
     drawTetrisBlock(block) {
@@ -903,11 +936,15 @@ class MapEngine {
         this.ctx.strokeStyle = this.COLORS.SHADOW;
         this.ctx.lineWidth = this.STYLES.LINE_WIDTH_THICK;
         
+        // 先绘制所有格子的填充（不绘制边框）
         cells.forEach(cell => {
             const pos = this.getCellScreenPosition(cell);
-
-            // 绘制方块主体
-            this.ctx.fillRect(pos.x, pos.y, this.cellSize, this.cellSize);
+            this.drawRect(pos.x, pos.y, this.cellSize, this.cellSize, true, false);
+        });
+        
+        // 然后绘制外边框（整体边框）
+        cells.forEach(cell => {
+            const pos = this.getCellScreenPosition(cell);
             
             // 检查每个格子的四个边，只绘制外边框
             const hasTop = cells.some(c => c.x === cell.x && c.y === cell.y - 1);
@@ -917,28 +954,16 @@ class MapEngine {
             
             // 绘制外边框
             if (!hasTop) {
-                this.ctx.beginPath();
-                this.ctx.moveTo(pos.x, pos.y);
-                this.ctx.lineTo(pos.x + this.cellSize, pos.y);
-                this.ctx.stroke();
+                this.drawLine(pos.x, pos.y, pos.x + this.cellSize, pos.y);
             }
             if (!hasBottom) {
-                this.ctx.beginPath();
-                this.ctx.moveTo(pos.x, pos.y + this.cellSize);
-                this.ctx.lineTo(pos.x + this.cellSize, pos.y + this.cellSize);
-                this.ctx.stroke();
+                this.drawLine(pos.x, pos.y + this.cellSize, pos.x + this.cellSize, pos.y + this.cellSize);
             }
             if (!hasLeft) {
-                this.ctx.beginPath();
-                this.ctx.moveTo(pos.x, pos.y);
-                this.ctx.lineTo(pos.x, pos.y + this.cellSize);
-                this.ctx.stroke();
+                this.drawLine(pos.x, pos.y, pos.x, pos.y + this.cellSize);
             }
             if (!hasRight) {
-                this.ctx.beginPath();
-                this.ctx.moveTo(pos.x + this.cellSize, pos.y);
-                this.ctx.lineTo(pos.x + this.cellSize, pos.y + this.cellSize);
-                this.ctx.stroke();
+                this.drawLine(pos.x + this.cellSize, pos.y, pos.x + this.cellSize, pos.y + this.cellSize);
             }
         });
     }
@@ -951,8 +976,7 @@ class MapEngine {
 
         // 绘制游戏状态信息
         this.ctx.fillStyle = this.COLORS.WHITE + '0.9)';
-        this.ctx.font = '16px Arial';
-        this.ctx.textAlign = 'left';
+        this.setTextStyle('16px Arial', 'left');
 
         const infoY = 30;
         this.ctx.fillText(`关卡: ${this.currentLevel}`, 20, infoY);
@@ -965,7 +989,7 @@ class MapEngine {
         // 绘制移动提示
         if (this.selectedBlock) {
             this.ctx.fillStyle = 'rgba(255, 255, 0, 0.8)';
-            this.ctx.font = '14px Arial';
+            this.setTextStyle('14px Arial', 'left');
             this.ctx.fillText('点击目标位置移动方块', 20, this.systemInfo.windowHeight - 20);
         }
     }
