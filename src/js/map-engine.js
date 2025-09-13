@@ -791,8 +791,10 @@ class MapEngine {
                 const meltProgress = block.meltProgress || 0;
                 const iceAlpha = 0.8 - (meltProgress / 100) * 0.5; // 融化时变透明
 
-                // 冰块效果 - 淡蓝色半透明
+                // 设置冰块样式（避免重复设置）
                 this.ctx.fillStyle = `rgba(173, 216, 230, ${iceAlpha})`;
+                this.ctx.strokeStyle = `rgba(135, 206, 235, ${iceAlpha + 0.2})`;
+                this.ctx.lineWidth = 1;
 
                 // 冰块是一个格子一个格子的（有网格线分隔）
                 cells.forEach(cell => {
@@ -800,12 +802,9 @@ class MapEngine {
                     const y = this.gridOffsetY + cell.y * this.cellSize;
 
                     // 绘制冰块主体
-                    this.ctx.fillStyle = `rgba(173, 216, 230, ${iceAlpha})`;
                     this.ctx.fillRect(x, y, this.cellSize, this.cellSize);
 
-                    // 绘制格子边框（冰块应该是一个格子一个格子中间组成的）
-                    this.ctx.strokeStyle = `rgba(135, 206, 235, ${iceAlpha + 0.2})`;
-                    this.ctx.lineWidth = 1;
+                    // 绘制格子边框
                     this.ctx.strokeRect(x, y, this.cellSize, this.cellSize);
 
                     // 绘制格子高光
