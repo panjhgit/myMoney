@@ -9,6 +9,14 @@ class MapEngine {
         // 使用统一配置
         this.GRID_SIZE = GAME_CONFIG.GRID_SIZE;
         this.MAX_LAYERS = 10; // 最大层数
+        
+        // 方向常量
+        this.DIRECTIONS = [
+            {dx: 0, dy: -1}, // 上
+            {dx: 0, dy: 1},  // 下
+            {dx: -1, dy: 0}, // 左
+            {dx: 1, dy: 0}   // 右
+        ];
 
         // 核心数据结构
         this.layers = new Map(); // 分层存储：layerId -> LayerData
@@ -57,6 +65,16 @@ class MapEngine {
             if (this.debugMode) {
                 console.log(...args);
             }
+        };
+
+        // 工具方法
+        this.parseCellKey = (cellKey) => {
+            const [x, y] = cellKey.split(',').map(Number);
+            return {x, y};
+        };
+
+        this.isWithinBounds = (x, y) => {
+            return x >= 0 && x < this.GRID_SIZE && y >= 0 && y < this.GRID_SIZE;
         };
 
         // 动画相关属性
@@ -145,9 +163,9 @@ class MapEngine {
             case 'tetris':
                 return this.calculateOccupiedCells(element.position, element.shapeData);
             case 'gate':
-                return this.calculateGateCells(element);
+                return this.calculateOccupiedCells(element.position, element.size);
             case 'rock':
-                return this.calculateRockCells(element);
+                return this.calculateOccupiedCells(element.position, element.shapeData);
             default:
                 return [`${element.position.x},${element.position.y}`];
         }
@@ -515,7 +533,8 @@ class MapEngine {
         const oldPosition = {...element.position}; // 深拷贝防止引用问题
 
         // 验证新位置的有效性
-        if (!this.isValidPosition(newPosition)) {
+        if (!newPosition || typeof newPosition.x !== 'number' || typeof newPosition.y !== 'number' || 
+            newPosition.x < 0 || newPosition.x >= this.GRID_SIZE || newPosition.y < 0 || newPosition.y >= this.GRID_SIZE) {
             this.debugLog(`无效位置更新请求: ${element.id} to (${newPosition.x},${newPosition.y})`);
             return false;
         }
@@ -558,9 +577,6 @@ class MapEngine {
      * @param {Object} position - 位置对象 {x, y}
      * @returns {boolean} 是否有效
      */
-    isValidPosition(position) {
-        return position && typeof position.x === 'number' && typeof position.y === 'number' && position.x >= 0 && position.x < this.GRID_SIZE && position.y >= 0 && position.y < this.GRID_SIZE;
-    }
 
     /**
      * 更新层级占用格子信息（新增 - 确保数据一致性）
@@ -761,28 +777,28 @@ class MapEngine {
             case 'up':
                 // 门向上，检查方块是否在门下方
                 return elementCells.some(cell => {
-                    const [x, y] = cell.split(',').map(Number);
+                    const {x, y} = this.parseCellKey(cell);
                     return y === gate.position.y + gate.size.height && x >= gate.position.x && x < gate.position.x + gate.size.width;
                 });
 
             case 'down':
                 // 门向下，检查方块是否在门内或门下方
                 return elementCells.some(cell => {
-                    const [x, y] = cell.split(',').map(Number);
+                    const {x, y} = this.parseCellKey(cell);
                     return (y >= gate.position.y && y <= gate.position.y + gate.size.height) && x >= gate.position.x && x < gate.position.x + gate.size.width;
                 });
 
             case 'left':
                 // 门向左，检查方块是否在门内或门右侧
                 return elementCells.some(cell => {
-                    const [x, y] = cell.split(',').map(Number);
+                    const {x, y} = this.parseCellKey(cell);
                     return (x >= gate.position.x && x <= gate.position.x + gate.size.width) && y >= gate.position.y && y < gate.position.y + gate.size.height;
                 });
 
             case 'right':
                 // 门向右，检查方块是否在门内或门左侧
                 return elementCells.some(cell => {
-                    const [x, y] = cell.split(',').map(Number);
+                    const {x, y} = this.parseCellKey(cell);
                     return (x >= gate.position.x && x <= gate.position.x + gate.size.width) && y >= gate.position.y && y < gate.position.y + gate.size.height;
                 });
 
@@ -896,7 +912,7 @@ class MapEngine {
 
         // 检查方块是否在门的正确一侧
         for (const cellKey of elementCells) {
-            const [x, y] = cellKey.split(',').map(Number);
+            const {x, y} = this.parseCellKey(cellKey);
 
             if (direction === 'up') {
                 // 门向上，方块应该在门下方
@@ -933,7 +949,7 @@ class MapEngine {
 
         // 检查方块是否在门的正确一侧
         for (const cellKey of elementCells) {
-            const [x, y] = cellKey.split(',').map(Number);
+            const {x, y} = this.parseCellKey(cellKey);
 
             if (direction === 'left') {
                 // 门向左，方块应该在门右侧
@@ -976,7 +992,7 @@ class MapEngine {
             case 'up':
                 // 检查方块是否在门下方，贴着门
                 return elementCells.some(cell => {
-                    const [x, y] = cell.split(',').map(Number);
+                    const {x, y} = this.parseCellKey(cell);
                     // 方块在门下方，且水平位置与门重叠
                     return y === gate.position.y + gate.size.height && x >= gate.position.x && x < gate.position.x + gate.size.width;
                 });
@@ -984,7 +1000,7 @@ class MapEngine {
             case 'down':
                 // 检查方块是否贴着门下方
                 return elementCells.some(cell => {
-                    const [x, y] = cell.split(',').map(Number);
+                    const {x, y} = this.parseCellKey(cell);
                     // 方块在门下方，且水平位置与门重叠
                     return y === gate.position.y + gate.size.height && x >= gate.position.x && x < gate.position.x + gate.size.width;
                 });
@@ -992,7 +1008,7 @@ class MapEngine {
             case 'left':
                 // 检查方块是否在门右侧，贴着门
                 return elementCells.some(cell => {
-                    const [x, y] = cell.split(',').map(Number);
+                    const {x, y} = this.parseCellKey(cell);
                     // 方块在门右侧，且垂直位置与门重叠
                     return x === gate.position.x + gate.size.width && y >= gate.position.y && y < gate.position.y + gate.size.height;
                 });
@@ -1000,7 +1016,7 @@ class MapEngine {
             case 'right':
                 // 检查方块是否在门左侧，贴着门
                 return elementCells.some(cell => {
-                    const [x, y] = cell.split(',').map(Number);
+                    const {x, y} = this.parseCellKey(cell);
                     // 方块在门左侧，且垂直位置与门重叠
                     return x === gate.position.x - 1 && y >= gate.position.y && y < gate.position.y + gate.size.height;
                 });
@@ -1186,7 +1202,7 @@ class MapEngine {
         const occupiedCells = this.calculateOccupiedCells(hiddenElement.position, hiddenElement.shapeData);
 
         for (const cellKey of occupiedCells) {
-            const [x, y] = cellKey.split(',').map(Number);
+            const {x, y} = this.parseCellKey(cellKey);
 
             // 检查这个格子是否被上层遮挡
             if (this.isPositionCovered(x, y, layer)) {
@@ -2001,7 +2017,7 @@ class MapEngine {
                     const occupiedCells = this.calculateOccupiedCells(block.position, block.shapeData);
 
                     occupiedCells.forEach(cellKey => {
-                        const [x, y] = cellKey.split(',').map(Number);
+                        const {x, y} = this.parseCellKey(cellKey);
                         const screenX = startX + x * this.cellSize;
                         const screenY = startY + y * this.cellSize;
 
@@ -2040,7 +2056,7 @@ class MapEngine {
 
         // 检查方块的每个格子是否被上层遮挡
         for (const cellKey of occupiedCells) {
-            const [x, y] = cellKey.split(',').map(Number);
+            const {x, y} = this.parseCellKey(cellKey);
 
             // 检查这个位置是否被上层遮挡（使用初始位置）
             const isCovered = this.isPositionCoveredInitial(x, y, layer);
@@ -2772,7 +2788,7 @@ class MapEngine {
     }
 
     /**
-     * 寻找最近的可达位置（当无法到达目标时使用）
+     * 寻找最近的可达位置（BFS算法 - 合并版本）
      * @param {Object} element - 方块元素
      * @param {Object} startPos - 起始位置
      * @param {Object} targetPos - 目标位置
@@ -2781,50 +2797,54 @@ class MapEngine {
     findNearestReachablePosition(element, startPos, targetPos) {
         console.log(`[最近位置] 开始寻找从(${startPos.x},${startPos.y})到(${targetPos.x},${targetPos.y})的最近可达位置`);
 
-        // 使用BFS寻找最近的可达位置
-        const visited = new Set();
         const queue = [{position: startPos, distance: 0}];
+        const visited = new Set();
         visited.add(`${startPos.x},${startPos.y}`);
 
-        const directions = [{dx: 0, dy: -1}, // 上
-            {dx: 0, dy: 1},  // 下
-            {dx: -1, dy: 0}, // 左
-            {dx: 1, dy: 0}   // 右
-        ];
+        let bestPosition = startPos;
+        let bestDistance = this.calculateHeuristic(startPos, targetPos);
 
-        let nearestPosition = null;
-        let minDistance = Infinity;
+        const directions = this.DIRECTIONS;
 
-        while (queue.length > 0) {
-            const current = queue.shift();
-            const currentPos = current.position;
-            const currentDistance = current.distance;
+        const maxDepth = this.GRID_SIZE * 2;
+        let iterations = 0;
 
-            // 计算到目标的距离
-            const distanceToTarget = Math.abs(currentPos.x - targetPos.x) + Math.abs(currentPos.y - targetPos.y);
+        while (queue.length > 0 && iterations < maxDepth) {
+            iterations++;
+            const {position, distance} = queue.shift();
 
-            // 如果这个位置比之前找到的更接近目标，更新最近位置
-            if (distanceToTarget < minDistance) {
-                minDistance = distanceToTarget;
-                nearestPosition = currentPos;
+            // 检查是否更接近目标
+            const currentDistance = this.calculateHeuristic(position, targetPos);
+            if (currentDistance < bestDistance) {
+                bestPosition = position;
+                bestDistance = currentDistance;
             }
 
-            // 如果已经到达目标位置，直接返回
-            if (distanceToTarget === 0) {
-                return currentPos;
+            // 如果已经到达目标，直接返回
+            if (currentDistance === 0) {
+                console.log(`[最近位置] 找到目标位置! 迭代次数: ${iterations}`);
+                return position;
             }
 
-            // 检查四个方向
+            // 检查深度限制
+            if (distance >= maxDepth) {
+                continue;
+            }
+
+            // 尝试四个方向
             for (const dir of directions) {
-                const newX = currentPos.x + dir.dx;
-                const newY = currentPos.y + dir.dy;
+                const newX = position.x + dir.dx;
+                const newY = position.y + dir.dy;
                 const newPos = {x: newX, y: newY};
                 const newKey = `${newX},${newY}`;
 
-                if (visited.has(newKey)) continue;
+                // 跳过已访问的位置
+                if (visited.has(newKey)) {
+                    continue;
+                }
 
                 // 检查边界
-                if (newX < 0 || newX >= this.GRID_SIZE || newY < 0 || newY >= this.GRID_SIZE) {
+                if (newX < 0 || newY < 0 || newX >= this.GRID_SIZE || newY >= this.GRID_SIZE) {
                     continue;
                 }
 
@@ -2833,13 +2853,16 @@ class MapEngine {
                     continue;
                 }
 
+                // 标记为已访问
                 visited.add(newKey);
-                queue.push({position: newPos, distance: currentDistance + 1});
+
+                // 添加到队列
+                queue.push({position: newPos, distance: distance + 1});
             }
         }
 
-        console.log(`[最近位置] 找到最近可达位置: (${nearestPosition.x},${nearestPosition.y}), 距离目标: ${minDistance}`);
-        return nearestPosition;
+        console.log(`[最近位置] 找到最近位置: (${bestPosition.x},${bestPosition.y}), 距离: ${bestDistance}, 迭代次数: ${iterations}`);
+        return bestPosition;
     }
 
 
@@ -2869,134 +2892,18 @@ class MapEngine {
 
         // 如果A*失败，使用BFS寻找最近可达位置
         console.log(`[路径计算] A*失败，寻找最近可达位置`);
-        const nearestPos = this.findNearestPositionBFS(element, startPos, targetPos);
+        const nearestPos = this.findNearestReachablePosition(element, startPos, targetPos);
 
         if (nearestPos.x !== startPos.x || nearestPos.y !== startPos.y) {
             console.log(`[路径计算] 找到最近位置: (${nearestPos.x},${nearestPos.y})`);
             // 递归调用时不要再次修改空间索引
-            return this.calculateAStarPathDirect(element, startPos, nearestPos);
+            return this.calculateAStarPath(element, startPos, nearestPos);
         }
 
         console.log(`[路径计算] 无法找到任何可达位置`);
         return [];
     }
 
-    /**
-     * A*路径计算算法（不修改空间索引的版本）
-     * @param {Object} element - 方块元素
-     * @param {Object} startPos - 起始位置
-     * @param {Object} targetPos - 目标位置
-     * @returns {Array} 路径数组
-     */
-    calculateAStarPathDirect(element, startPos, targetPos) {
-        console.log(`[A*Direct] 开始A*搜索: 从(${startPos.x},${startPos.y})到(${targetPos.x},${targetPos.y})`);
-
-        // 开放列表和关闭列表
-        const openList = [];
-        const closedList = new Set();
-
-        // 起始节点
-        const startNode = {
-            position: startPos, g: 0, h: this.calculateHeuristic(startPos, targetPos), f: 0, parent: null
-        };
-        startNode.f = startNode.g + startNode.h;
-        openList.push(startNode);
-
-        const directions = [{dx: 0, dy: -1}, // 上
-            {dx: 0, dy: 1},  // 下
-            {dx: -1, dy: 0}, // 左
-            {dx: 1, dy: 0}   // 右
-        ];
-
-        let iterations = 0;
-        const maxIterations = 100;
-
-        while (openList.length > 0 && iterations < maxIterations) {
-            iterations++;
-
-            // 找到f值最小的节点
-            let currentIndex = 0;
-            for (let i = 1; i < openList.length; i++) {
-                if (openList[i].f < openList[currentIndex].f) {
-                    currentIndex = i;
-                }
-            }
-
-            const currentNode = openList.splice(currentIndex, 1)[0];
-            const currentPos = currentNode.position;
-            const currentKey = `${currentPos.x},${currentPos.y}`;
-
-            // 添加到关闭列表
-            closedList.add(currentKey);
-
-            // 如果到达目标
-            if (currentPos.x === targetPos.x && currentPos.y === targetPos.y) {
-                console.log(`[A*Direct] 找到路径! 迭代次数: ${iterations}`);
-                return this.reconstructPath(currentNode);
-            }
-
-            // 检查四个方向
-            for (const dir of directions) {
-                const newX = currentPos.x + dir.dx;
-                const newY = currentPos.y + dir.dy;
-                const newPos = {x: newX, y: newY};
-                const newKey = `${newX},${newY}`;
-
-                // 跳过已关闭的节点
-                if (closedList.has(newKey)) {
-                    continue;
-                }
-
-                // 检查边界
-                if (newX < 0 || newY < 0 || newX >= this.GRID_SIZE || newY >= this.GRID_SIZE) {
-                    continue;
-                }
-
-                // 检查碰撞
-                const hasCollision = this.checkCollisionAtPosition(element, newPos, element.id);
-                if (hasCollision) {
-                    continue;
-                }
-
-                // 计算g值
-                const tentativeG = currentNode.g + 1;
-
-                // 检查是否已在开放列表中
-                let existingNode = null;
-                let existingIndex = -1;
-                for (let i = 0; i < openList.length; i++) {
-                    if (openList[i].position.x === newX && openList[i].position.y === newY) {
-                        existingNode = openList[i];
-                        existingIndex = i;
-                        break;
-                    }
-                }
-
-                if (existingNode) {
-                    // 如果找到更好的路径，更新节点
-                    if (tentativeG < existingNode.g) {
-                        existingNode.g = tentativeG;
-                        existingNode.f = existingNode.g + existingNode.h;
-                        existingNode.parent = currentNode;
-                    }
-                } else {
-                    // 创建新节点
-                    const newNode = {
-                        position: newPos,
-                        g: tentativeG,
-                        h: this.calculateHeuristic(newPos, targetPos),
-                        f: 0,
-                        parent: currentNode
-                    };
-                    newNode.f = newNode.g + newNode.h;
-                    openList.push(newNode);
-                }
-            }
-        }
-
-        console.log(`[A*Direct] 未找到路径! 迭代次数: ${iterations}`);
-        return [];
-    }
 
     /**
      * A*路径计算算法（功能完整）
@@ -3034,11 +2941,7 @@ class MapEngine {
         openList.push(startNode);
 
         // 四个方向
-        const directions = [{dx: 0, dy: -1}, // 上
-            {dx: 0, dy: 1},  // 下
-            {dx: -1, dy: 0}, // 左
-            {dx: 1, dy: 0}   // 右
-        ];
+        const directions = this.DIRECTIONS;
 
         let iterations = 0;
         const maxIterations = this.GRID_SIZE * this.GRID_SIZE;
@@ -3208,89 +3111,6 @@ class MapEngine {
         return path;
     }
 
-    /**
-     * BFS寻找最近可达位置
-     * @param {Object} element - 方块元素
-     * @param {Object} startPos - 起始位置
-     * @param {Object} targetPos - 目标位置
-     * @returns {Object} 最近可达位置
-     */
-    findNearestPositionBFS(element, startPos, targetPos) {
-        console.log(`[BFS最近] 开始搜索: 从(${startPos.x},${startPos.y})到(${targetPos.x},${targetPos.y})`);
-
-        const queue = [{position: startPos, distance: 0}];
-        const visited = new Set();
-        visited.add(`${startPos.x},${startPos.y}`);
-
-        let bestPosition = startPos;
-        let bestDistance = this.calculateHeuristic(startPos, targetPos);
-
-        const directions = [{dx: 0, dy: -1}, // 上
-            {dx: 0, dy: 1},  // 下
-            {dx: -1, dy: 0}, // 左
-            {dx: 1, dy: 0}   // 右
-        ];
-
-        const maxDepth = this.GRID_SIZE * 2;
-        let iterations = 0;
-
-        while (queue.length > 0 && iterations < maxDepth) {
-            iterations++;
-            const {position, distance} = queue.shift();
-
-            // 检查是否更接近目标
-            const currentDistance = this.calculateHeuristic(position, targetPos);
-            if (currentDistance < bestDistance) {
-                bestPosition = position;
-                bestDistance = currentDistance;
-            }
-
-            // 如果已经到达目标，直接返回
-            if (currentDistance === 0) {
-                console.log(`[BFS最近] 找到目标位置! 迭代次数: ${iterations}`);
-                return position;
-            }
-
-            // 检查深度限制
-            if (distance >= maxDepth) {
-                continue;
-            }
-
-            // 尝试四个方向
-            for (const dir of directions) {
-                const newX = position.x + dir.dx;
-                const newY = position.y + dir.dy;
-                const newPos = {x: newX, y: newY};
-                const newKey = `${newX},${newY}`;
-
-                // 跳过已访问的位置
-                if (visited.has(newKey)) {
-                    continue;
-                }
-
-                // 检查边界
-                if (newX < 0 || newY < 0 || newX >= this.GRID_SIZE || newY >= this.GRID_SIZE) {
-                    continue;
-                }
-
-                // 检查碰撞
-                const hasCollision = this.checkCollisionAtPosition(element, newPos, element.id);
-                console.log(`[BFS] 检查位置(${newX},${newY}) 碰撞结果: ${hasCollision}`);
-                if (hasCollision) {
-                    continue;
-                }
-
-                // 标记为已访问
-                visited.add(newKey);
-
-                // 添加到队列
-                queue.push({position: newPos, distance: distance + 1});
-            }
-        }
-
-        console.log(`[BFS最近] 找到最近位置: (${bestPosition.x},${bestPosition.y}), 距离: ${bestDistance}, 迭代次数: ${iterations}`);
-        return bestPosition;
-    }
 
     /**
      * 执行移动动画（完整版）
@@ -3364,41 +3184,6 @@ class MapEngine {
     }
 
 
-    /**
-     * 计算门占据的所有格子
-     * @param {Object} gate - 门元素
-     * @returns {Array<string>} 格子键数组
-     */
-    calculateGateCells(gate) {
-        const cells = [];
-        const size = gate.size || {width: 1, height: 1};
-
-        for (let x = gate.position.x; x < gate.position.x + size.width; x++) {
-            for (let y = gate.position.y; y < gate.position.y + size.height; y++) {
-                cells.push(`${x},${y}`);
-            }
-        }
-
-        return cells;
-    }
-
-    /**
-     * 计算岩石占据的所有格子
-     * @param {Object} rock - 岩石元素
-     * @returns {Array<string>} 格子键数组
-     */
-    calculateRockCells(rock) {
-        const cells = [];
-        const size = rock.size || {width: 1, height: 1};
-
-        for (let x = rock.position.x; x < rock.position.x + size.width; x++) {
-            for (let y = rock.position.y; y < rock.position.y + size.height; y++) {
-                cells.push(`${x},${y}`);
-            }
-        }
-
-        return cells;
-    }
 
     /**
      * 清理空间索引 - 移除所有非layer 0的元素
@@ -3432,9 +3217,6 @@ class MapEngine {
     }
 
 
-    isWithinBounds(x, y) {
-        return x >= 0 && x < this.GRID_SIZE && y >= 0 && y < this.GRID_SIZE;
-    }
 
 
     /**
@@ -3447,7 +3229,7 @@ class MapEngine {
         const occupiedCells = this.calculateOccupiedCells(position, shapeData);
 
         for (const cellKey of occupiedCells) {
-            const [x, y] = cellKey.split(',').map(Number);
+            const {x, y} = this.parseCellKey(cellKey);
             if (!this.isWithinBounds(x, y)) {
                 return false;
             }
