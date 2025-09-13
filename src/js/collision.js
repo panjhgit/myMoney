@@ -139,36 +139,20 @@ class CollisionDetector {
         let canSlideOut = false;
         switch (gate.direction) {
             case 'up':
-                // 检查方块是否贴着上边界且能够向上滑出
-                canSlideOut = blockCells.some(cell => {
-                    const isAtGatePosition = cell.y === 0; // 棋盘上边界是 y=0
-                    const isInGateX = cell.x >= gate.position.x && cell.x < gate.position.x + gate.length;
-                    return isAtGatePosition && isInGateX;
-                });
+                // 检查方块是否可以向上移动直到贴着门
+                canSlideOut = this.canSlideToGate(block, gate, 'up', grid, blocks);
                 break;
             case 'down':
-                // 检查方块是否贴着下边界且能够向下滑出
-                canSlideOut = blockCells.some(cell => {
-                    const isAtGatePosition = cell.y === 7; // 棋盘下边界是 y=7
-                    const isInGateX = cell.x >= gate.position.x && cell.x < gate.position.x + gate.length;
-                    return isAtGatePosition && isInGateX;
-                });
+                // 检查方块是否可以向下移动直到贴着门
+                canSlideOut = this.canSlideToGate(block, gate, 'down', grid, blocks);
                 break;
             case 'left':
-                // 检查方块是否贴着左边界且能够向左滑出
-                canSlideOut = blockCells.some(cell => {
-                    const isAtGatePosition = cell.x === 0; // 棋盘左边界是 x=0
-                    const isInGateY = cell.y >= gate.position.y && cell.y < gate.position.y + gate.length;
-                    return isAtGatePosition && isInGateY;
-                });
+                // 检查方块是否可以向左移动直到贴着门
+                canSlideOut = this.canSlideToGate(block, gate, 'left', grid, blocks);
                 break;
             case 'right':
-                // 检查方块是否贴着右边界且能够向右滑出
-                canSlideOut = blockCells.some(cell => {
-                    const isAtGatePosition = cell.x === 7; // 棋盘右边界是 x=7
-                    const isInGateY = cell.y >= gate.position.y && cell.y < gate.position.y + gate.length;
-                    return isAtGatePosition && isInGateY;
-                });
+                // 检查方块是否可以向右移动直到贴着门
+                canSlideOut = this.canSlideToGate(block, gate, 'right', grid, blocks);
                 break;
             default:
                 return false;
@@ -250,6 +234,146 @@ class CollisionDetector {
         }
         
         return cells;
+    }
+
+    /**
+     * 检查方块是否可以滑动到门的位置
+     */
+    canSlideToGate(block, gate, direction, grid, blocks) {
+        const blockCells = this.getBlockCells(block);
+        
+        switch (direction) {
+            case 'up':
+                // 检查方块是否可以向上移动直到贴着门
+                for (let step = 0; step <= 7; step++) {
+                    const newCells = blockCells.map(cell => ({x: cell.x, y: cell.y - step}));
+                    
+                    // 检查是否贴着门
+                    const isAtGate = newCells.some(cell => {
+                        const isAtGatePosition = cell.y === 0; // 棋盘上边界是 y=0
+                        const isInGateX = cell.x >= gate.position.x && cell.x < gate.position.x + gate.length;
+                        return isAtGatePosition && isInGateX;
+                    });
+                    
+                    if (isAtGate) {
+                        // 检查移动路径上是否有障碍物
+                        for (let i = 1; i <= step; i++) {
+                            const pathCells = blockCells.map(cell => ({x: cell.x, y: cell.y - i}));
+                            for (const pathCell of pathCells) {
+                                if (grid && grid[pathCell.y] && grid[pathCell.y][pathCell.x]) {
+                                    const gridValue = grid[pathCell.y][pathCell.x];
+                                    if (gridValue && gridValue !== block.id) {
+                                        console.log(`[滑动检查] 向上移动路径 (${pathCell.x}, ${pathCell.y}) 被 ${gridValue} 阻挡`);
+                                        return false;
+                                    }
+                                }
+                            }
+                        }
+                        console.log(`[滑动检查] 方块可以向上滑动 ${step} 步到达门`);
+                        return true;
+                    }
+                }
+                break;
+                
+            case 'down':
+                // 检查方块是否可以向下移动直到贴着门
+                for (let step = 0; step <= 7; step++) {
+                    const newCells = blockCells.map(cell => ({x: cell.x, y: cell.y + step}));
+                    
+                    // 检查是否贴着门
+                    const isAtGate = newCells.some(cell => {
+                        const isAtGatePosition = cell.y === 7; // 棋盘下边界是 y=7
+                        const isInGateX = cell.x >= gate.position.x && cell.x < gate.position.x + gate.length;
+                        return isAtGatePosition && isInGateX;
+                    });
+                    
+                    if (isAtGate) {
+                        // 检查移动路径上是否有障碍物
+                        for (let i = 1; i <= step; i++) {
+                            const pathCells = blockCells.map(cell => ({x: cell.x, y: cell.y + i}));
+                            for (const pathCell of pathCells) {
+                                if (grid && grid[pathCell.y] && grid[pathCell.y][pathCell.x]) {
+                                    const gridValue = grid[pathCell.y][pathCell.x];
+                                    if (gridValue && gridValue !== block.id) {
+                                        console.log(`[滑动检查] 向下移动路径 (${pathCell.x}, ${pathCell.y}) 被 ${gridValue} 阻挡`);
+                                        return false;
+                                    }
+                                }
+                            }
+                        }
+                        console.log(`[滑动检查] 方块可以向下滑动 ${step} 步到达门`);
+                        return true;
+                    }
+                }
+                break;
+                
+            case 'left':
+                // 检查方块是否可以向左移动直到贴着门
+                for (let step = 0; step <= 7; step++) {
+                    const newCells = blockCells.map(cell => ({x: cell.x - step, y: cell.y}));
+                    
+                    // 检查是否贴着门
+                    const isAtGate = newCells.some(cell => {
+                        const isAtGatePosition = cell.x === 0; // 棋盘左边界是 x=0
+                        const isInGateY = cell.y >= gate.position.y && cell.y < gate.position.y + gate.length;
+                        return isAtGatePosition && isInGateY;
+                    });
+                    
+                    if (isAtGate) {
+                        // 检查移动路径上是否有障碍物
+                        for (let i = 1; i <= step; i++) {
+                            const pathCells = blockCells.map(cell => ({x: cell.x - i, y: cell.y}));
+                            for (const pathCell of pathCells) {
+                                if (grid && grid[pathCell.y] && grid[pathCell.y][pathCell.x]) {
+                                    const gridValue = grid[pathCell.y][pathCell.x];
+                                    if (gridValue && gridValue !== block.id) {
+                                        console.log(`[滑动检查] 向左移动路径 (${pathCell.x}, ${pathCell.y}) 被 ${gridValue} 阻挡`);
+                                        return false;
+                                    }
+                                }
+                            }
+                        }
+                        console.log(`[滑动检查] 方块可以向左滑动 ${step} 步到达门`);
+                        return true;
+                    }
+                }
+                break;
+                
+            case 'right':
+                // 检查方块是否可以向右移动直到贴着门
+                for (let step = 0; step <= 7; step++) {
+                    const newCells = blockCells.map(cell => ({x: cell.x + step, y: cell.y}));
+                    
+                    // 检查是否贴着门
+                    const isAtGate = newCells.some(cell => {
+                        const isAtGatePosition = cell.x === 7; // 棋盘右边界是 x=7
+                        const isInGateY = cell.y >= gate.position.y && cell.y < gate.position.y + gate.length;
+                        return isAtGatePosition && isInGateY;
+                    });
+                    
+                    if (isAtGate) {
+                        // 检查移动路径上是否有障碍物
+                        for (let i = 1; i <= step; i++) {
+                            const pathCells = blockCells.map(cell => ({x: cell.x + i, y: cell.y}));
+                            for (const pathCell of pathCells) {
+                                if (grid && grid[pathCell.y] && grid[pathCell.y][pathCell.x]) {
+                                    const gridValue = grid[pathCell.y][pathCell.x];
+                                    if (gridValue && gridValue !== block.id) {
+                                        console.log(`[滑动检查] 向右移动路径 (${pathCell.x}, ${pathCell.y}) 被 ${gridValue} 阻挡`);
+                                        return false;
+                                    }
+                                }
+                            }
+                        }
+                        console.log(`[滑动检查] 方块可以向右滑动 ${step} 步到达门`);
+                        return true;
+                    }
+                }
+                break;
+        }
+        
+        console.log(`[滑动检查] 方块无法滑动到门的位置`);
+        return false;
     }
 
     /**
