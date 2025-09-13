@@ -205,11 +205,7 @@ class MovementManager {
     smartMoveBlock(block, targetPos, collisionDetector, grid, blocks, rocks, gameEngine) {
         console.log(`[智能移动] 方块 ${block.id} 尝试移动到 (${targetPos.x}, ${targetPos.y})`);
         
-        // 1. 分析移动方向
-        const directions = this.analyzeMovementDirection(block.position, targetPos);
-        console.log(`[智能移动] 移动方向: ${directions.join(', ')}`);
-        
-        // 2. 找到最近的方块，让那个方块移动到目标位置
+        // 1. 找到最近的方块，让那个方块移动到目标位置
         const blockCells = collisionDetector.getBlockCells(block);
         let nearestCell = null;
         let minDistance = Infinity;
@@ -236,7 +232,7 @@ class MovementManager {
         
         console.log(`[智能移动] 计算目标位置: (${targetPosition.x}, ${targetPosition.y})`);
         
-        // 3. 直接尝试移动到目标位置
+        // 2. 直接尝试移动到目标位置
         // 边界检查
         if (!collisionDetector.isValidPosition(targetPosition.x, targetPosition.y)) {
             console.log(`[智能移动] 目标位置超出边界`);
@@ -257,218 +253,8 @@ class MovementManager {
             console.log(`[智能移动] 无法到达目标位置: (${targetPosition.x}, ${targetPosition.y})`);
             return false;
         }
-        
-        console.log(`[智能移动] 无法移动方块 ${block.id}`);
-        return false;
     }
 
-    /**
-     * 根据移动方向计算方块的参考位置
-     */
-    calculateReferencePosition(block, direction, collisionDetector) {
-        const blockBounds = collisionDetector.getBlockBounds(block);
-        const basePos = block.position;
-        
-        switch (direction) {
-            case 'up':
-                // 向上移动：使用最上面的位置
-                return {
-                    x: basePos.x,
-                    y: basePos.y
-                };
-                
-            case 'down':
-                // 向下移动：使用最下面的位置
-                return {
-                    x: basePos.x,
-                    y: basePos.y + blockBounds.height - 1
-                };
-                
-            case 'left':
-                // 向左移动：使用最左边的位置
-                return {
-                    x: basePos.x,
-                    y: basePos.y
-                };
-                
-            case 'right':
-                // 向右移动：使用最右边的位置
-                return {
-                    x: basePos.x + blockBounds.width - 1,
-                    y: basePos.y
-                };
-                
-            case 'up-left':
-                // 左上移动：使用左上角
-                return {
-                    x: basePos.x,
-                    y: basePos.y
-                };
-                
-            case 'up-right':
-                // 右上移动：使用右上角
-                return {
-                    x: basePos.x + blockBounds.width - 1,
-                    y: basePos.y
-                };
-                
-            case 'down-left':
-                // 左下移动：使用左下角
-                return {
-                    x: basePos.x,
-                    y: basePos.y + blockBounds.height - 1
-                };
-                
-            case 'down-right':
-                // 右下移动：使用右下角
-                return {
-                    x: basePos.x + blockBounds.width - 1,
-                    y: basePos.y + blockBounds.height - 1
-                };
-                
-            default:
-                // 默认使用左上角
-                return basePos;
-        }
-    }
-    analyzeMovementDirection(currentPos, targetPos) {
-        const dx = targetPos.x - currentPos.x;
-        const dy = targetPos.y - currentPos.y;
-        
-        const directions = [];
-        
-        // 添加水平方向
-        if (dx > 0) {
-            directions.push('right');
-        } else if (dx < 0) {
-            directions.push('left');
-        }
-        
-        // 添加垂直方向
-        if (dy > 0) {
-            directions.push('down');
-        } else if (dy < 0) {
-            directions.push('up');
-        }
-        
-        // 如果没有移动，返回空数组
-        return directions;
-    }
-
-    /**
-     * 计算最佳对齐位置 - 支持多方向移动
-     */
-    calculateBestAlignmentPositions(block, targetPos, directions, collisionDetector) {
-        const blockBounds = collisionDetector.getBlockBounds(block);
-        const positions = [];
-        
-        // 首先尝试直接对齐到目标位置
-        positions.push({
-            x: targetPos.x,
-            y: targetPos.y
-        });
-        
-        // 根据每个方向计算对齐策略
-        directions.forEach(direction => {
-            switch (direction) {
-                case 'up':
-                    // 向上移动：让方块的顶部边缘对齐到目标位置
-                    positions.push({
-                        x: targetPos.x,
-                        y: targetPos.y
-                    });
-                    break;
-                    
-                case 'down':
-                    // 向下移动：让方块的底部边缘对齐到目标位置
-                    positions.push({
-                        x: targetPos.x,
-                        y: targetPos.y - blockBounds.height + 1
-                    });
-                    break;
-                    
-                case 'left':
-                    // 向左移动：让方块的左边缘对齐到目标位置
-                    positions.push({
-                        x: targetPos.x,
-                        y: targetPos.y
-                    });
-                    break;
-                    
-                case 'right':
-                    // 向右移动：让方块的右边缘对齐到目标位置
-                    positions.push({
-                        x: targetPos.x - blockBounds.width + 1,
-                        y: targetPos.y
-                    });
-                    break;
-            }
-        });
-        
-        // 添加对角线移动的对齐逻辑
-        if (directions.length === 2) {
-            const directionKey = directions.join('-');
-            switch (directionKey) {
-                case 'up-left':
-                    // 左上移动：使用左上角
-                    positions.push({
-                        x: targetPos.x,
-                        y: targetPos.y
-                    });
-                    break;
-                    
-                case 'up-right':
-                    // 右上移动：使用右上角
-                    positions.push({
-                        x: targetPos.x - blockBounds.width + 1,
-                        y: targetPos.y
-                    });
-                    break;
-                    
-                case 'down-left':
-                    // 左下移动：使用左下角
-                    positions.push({
-                        x: targetPos.x,
-                        y: targetPos.y - blockBounds.height + 1
-                    });
-                    break;
-                    
-                case 'down-right':
-                    // 右下移动：使用右下角
-                    positions.push({
-                        x: targetPos.x - blockBounds.width + 1,
-                        y: targetPos.y - blockBounds.height + 1
-                    });
-                    break;
-            }
-        }
-        
-        // 添加一些偏移位置，尝试找到缺口
-        const offsets = [
-            {x: -1, y: 0}, {x: 1, y: 0}, {x: 0, y: -1}, {x: 0, y: 1},
-            {x: -1, y: -1}, {x: 1, y: -1}, {x: -1, y: 1}, {x: 1, y: 1}
-        ];
-        
-        offsets.forEach(offset => {
-            positions.push({
-                x: targetPos.x + offset.x,
-                y: targetPos.y + offset.y
-            });
-        });
-        
-        // 去重
-        const uniquePositions = [];
-        const seen = new Set();
-        positions.forEach(pos => {
-            const key = `${pos.x},${pos.y}`;
-            if (!seen.has(key)) {
-                seen.add(key);
-                uniquePositions.push(pos);
-            }
-        });
-        
-        return uniquePositions;
-    }
 }
 
 // 导出到全局作用域

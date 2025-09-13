@@ -187,10 +187,16 @@ class MainMenu {
   }
   
   setupEventListeners() {
-    this.canvas.addEventListener('click', (e) => this.handleClick(e));
-    this.canvas.addEventListener('touchstart', (e) => this.handleTouchStart(e), { passive: false });
-    this.canvas.addEventListener('touchmove', (e) => this.handleTouchMove(e), { passive: false });
-    this.canvas.addEventListener('touchend', (e) => this.handleTouchEnd(e), { passive: false });
+    // 保存事件处理函数的引用，以便后续移除
+    this.boundHandleClick = (e) => this.handleClick(e);
+    this.boundHandleTouchStart = (e) => this.handleTouchStart(e);
+    this.boundHandleTouchMove = (e) => this.handleTouchMove(e);
+    this.boundHandleTouchEnd = (e) => this.handleTouchEnd(e);
+    
+    this.canvas.addEventListener('click', this.boundHandleClick);
+    this.canvas.addEventListener('touchstart', this.boundHandleTouchStart, { passive: false });
+    this.canvas.addEventListener('touchmove', this.boundHandleTouchMove, { passive: false });
+    this.canvas.addEventListener('touchend', this.boundHandleTouchEnd, { passive: false });
   }
   
   handleTouchStart(event) {
@@ -237,6 +243,12 @@ class MainMenu {
   
   
   handleClick(event) {
+    // 检查游戏状态，如果不在菜单状态，则不处理点击事件
+    if (typeof window !== 'undefined' && window.gameState && window.gameState !== 'menu') {
+      console.log(`[菜单点击] 游戏状态为 ${window.gameState}，忽略菜单点击事件`);
+      return;
+    }
+    
     // 在抖音小游戏中，直接使用事件坐标
     let clickX, clickY;
     
@@ -253,13 +265,17 @@ class MainMenu {
     // 调整坐标以考虑滚动
     const adjustedY = clickY + this.scrollY;
     
+    console.log(`[菜单点击] 点击坐标: (${clickX}, ${clickY}), 调整后Y: ${adjustedY}`);
+    
     // 检查关卡点击
     for (let level of this.levels) {
       if (this.isPointInLevel(clickX, adjustedY, level)) {
         if (level.unlocked) {
+          console.log(`[菜单点击] 关卡 ${level.id} 被点击，开始关卡`);
           this.animateLevelClick(level);
           setTimeout(() => this.startLevel(level.id), 300);
         } else {
+          console.log(`[菜单点击] 关卡 ${level.id} 被点击，但未解锁`);
           this.animateLockedLevel(level);
         }
         return;
@@ -268,8 +284,11 @@ class MainMenu {
     
     // 检查 Play 按钮点击
     if (this.isPointInPlayButton(clickX, clickY)) {
+      console.log(`[菜单点击] Play按钮被点击，开始关卡 ${this.currentLevel}`);
       this.animatePlayButtonClick();
       setTimeout(() => this.startLevel(this.currentLevel), 300);
+    } else {
+      console.log(`[菜单点击] 点击空白区域，无操作`);
     }
   }
   
@@ -373,8 +392,15 @@ class MainMenu {
     // 考虑绘制时的偏移（-30, -30）
     const drawX = level.x - 30;
     const drawY = level.y - 30;
-    return x >= drawX && x <= drawX + 60 && 
-           y >= drawY && y <= drawY + 60;
+    const isInLevel = x >= drawX && x <= drawX + 60 && 
+                      y >= drawY && y <= drawY + 60;
+    
+    // 添加调试日志
+    if (isInLevel) {
+      console.log(`[点击检测] 关卡 ${level.id} 被点击: 点击坐标(${x}, ${y}), 关卡区域(${drawX}, ${drawY}) 到 (${drawX + 60}, ${drawY + 60})`);
+    }
+    
+    return isInLevel;
   }
   
   isPointInPlayButton(x, y) {

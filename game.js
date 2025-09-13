@@ -63,14 +63,31 @@ function startGame(levelId) {
   
   // 销毁主菜单实例并移除事件监听器
   if (mainMenu) {
+    console.log('[游戏切换] 开始移除菜单事件监听器');
     // 移除主菜单的事件监听器
     if (mainMenu.canvas) {
-      mainMenu.canvas.removeEventListener('click', mainMenu.handleClick);
-      mainMenu.canvas.removeEventListener('touchstart', mainMenu.handleTouchStart);
-      mainMenu.canvas.removeEventListener('touchmove', mainMenu.handleTouchMove);
-      mainMenu.canvas.removeEventListener('touchend', mainMenu.handleTouchEnd);
+      // 在抖音小游戏中，Canvas 对象没有 cloneNode 方法
+      // 使用保存的函数引用移除事件监听器
+      try {
+        if (mainMenu.boundHandleClick) {
+          mainMenu.canvas.removeEventListener('click', mainMenu.boundHandleClick);
+        }
+        if (mainMenu.boundHandleTouchStart) {
+          mainMenu.canvas.removeEventListener('touchstart', mainMenu.boundHandleTouchStart);
+        }
+        if (mainMenu.boundHandleTouchMove) {
+          mainMenu.canvas.removeEventListener('touchmove', mainMenu.boundHandleTouchMove);
+        }
+        if (mainMenu.boundHandleTouchEnd) {
+          mainMenu.canvas.removeEventListener('touchend', mainMenu.boundHandleTouchEnd);
+        }
+        console.log('[游戏切换] 菜单事件监听器已移除');
+      } catch (error) {
+        console.log('[游戏切换] 移除事件监听器时出错:', error);
+      }
     }
     mainMenu = null;
+    console.log('[游戏切换] 菜单实例已销毁');
   }
   
   // 直接销毁旧的地图引擎实例
