@@ -4,7 +4,6 @@ var CreatureStates = {
 };
 
 // 生物配置常量 - 直接使用统一配置，避免重复定义
-// var CREATURE_CONFIG = GAME_CONFIG.CREATURE_CONFIG; // 已删除，直接使用 GAME_CONFIG.CREATURE_CONFIG
 
 // 创建俄罗斯方块风格的小人 - 适配抖音小游戏Canvas环境
 var createCreature = function (row, col, colorData) {
@@ -412,20 +411,6 @@ var getColorFromGradient = function (gradientString) {
     return '#666666';
 };
 
-// 移动生物（已删除，使用统一的moveElementToPosition）
-var moveCreature = function (creature, newRow, newCol) {
-    console.warn('moveCreature 已废弃，请使用 MapEngine.moveElementToPosition');
-};
-
-// 选择生物（已删除，使用统一的selectElement）
-var selectCreature = function (creature) {
-    console.warn('selectCreature 已废弃，请使用 MapEngine.selectElement');
-};
-
-// 取消选择生物（已删除，使用统一的selectElement）
-var deselectCreature = function (creature) {
-    console.warn('deselectCreature 已废弃，请使用 MapEngine.selectElement');
-};
 
 // 销毁生物
 var destroyCreature = function (creature) {
@@ -441,21 +426,18 @@ if (typeof window !== 'undefined') {
     window.createCreature = createCreature;
     window.drawCreature = drawCreature;
     window.drawEyes = drawEyes;
-    // window.CREATURE_CONFIG = CREATURE_CONFIG; // 已删除，使用 GAME_CONFIG.CREATURE_CONFIG
 }
 
 if (typeof global !== 'undefined') {
     global.createCreature = createCreature;
     global.drawCreature = drawCreature;
     global.drawEyes = drawEyes;
-    // global.CREATURE_CONFIG = CREATURE_CONFIG; // 已删除，使用 GAME_CONFIG.CREATURE_CONFIG
 }
 
 if (typeof this !== 'undefined') {
     this.createCreature = createCreature;
     this.drawCreature = drawCreature;
     this.drawEyes = drawEyes;
-    // this.CREATURE_CONFIG = CREATURE_CONFIG; // 已删除，使用 GAME_CONFIG.CREATURE_CONFIG
 }
 
 

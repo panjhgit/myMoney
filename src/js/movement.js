@@ -14,17 +14,19 @@ class MovementManager {
     }
 
     /**
-     * 计算A*路径
+     * 计算A*路径 - 返回能到达的最远位置
      */
     calculatePath(block, startPos, targetPos, collisionDetector, grid, blocks, rocks) {
         const openList = [];
         const closedList = new Set();
+        let bestNode = null; // 记录最接近目标的节点
 
         const startNode = {
             position: startPos, g: 0, h: this.calculateHeuristic(startPos, targetPos), f: 0, parent: null
         };
         startNode.f = startNode.g + startNode.h;
         openList.push(startNode);
+        bestNode = startNode; // 初始最佳节点
 
         while (openList.length > 0) {
             // 找到f值最小的节点
@@ -44,6 +46,11 @@ class MovementManager {
             // 如果到达目标
             if (currentPos.x === targetPos.x && currentPos.y === targetPos.y) {
                 return this.reconstructPath(currentNode);
+            }
+
+            // 更新最佳节点（距离目标最近的节点）
+            if (currentNode.h < bestNode.h) {
+                bestNode = currentNode;
             }
 
             // 检查四个方向
@@ -88,6 +95,12 @@ class MovementManager {
                     openList.push(newNode);
                 }
             }
+        }
+
+        // 如果无法到达目标，返回能到达的最远位置的路径
+        if (bestNode && bestNode !== startNode) {
+            console.log(`[路径规划] 无法到达目标，返回最接近位置的路径`);
+            return this.reconstructPath(bestNode);
         }
 
         return [];
@@ -180,21 +193,150 @@ class MovementManager {
         });
     }
 
+
     /**
-     * 计算目标位置（处理边界）
+     * 智能移动方块到最佳位置
      */
-    calculateTargetPosition(block, clickPosition, collisionDetector) {
-        const bounds = collisionDetector.getBlockBounds(block);
-        let targetX = clickPosition.x;
-        let targetY = clickPosition.y;
+    smartMoveBlock(block, targetPos, collisionDetector, grid, blocks, rocks, gameEngine) {
+        console.log(`[智能移动] 方块 ${block.id} 尝试移动到 (${targetPos.x}, ${targetPos.y})`);
+        
+        // 1. 分析移动方向
+        const directions = this.analyzeMovementDirection(block.position, targetPos);
+        console.log(`[智能移动] 移动方向: ${directions.join(', ')}`);
+        
+        // 2. 计算最佳对齐位置
+        const bestPositions = this.calculateBestAlignmentPositions(block, targetPos, directions, collisionDetector);
+        console.log(`[智能移动] 找到 ${bestPositions.length} 个候选位置`);
+        
+        // 3. 尝试每个候选位置，找到第一个可达的位置
+        for (const candidatePos of bestPositions) {
+            console.log(`[智能移动] 尝试位置: (${candidatePos.x}, ${candidatePos.y})`);
+            
+            // 边界检查
+            if (!collisionDetector.isValidPosition(candidatePos.x, candidatePos.y)) {
+                console.log(`[智能移动] 位置超出边界，跳过`);
+                continue;
+            }
+            
+            // 使用路径规划系统
+            const startPos = block.position;
+            const path = this.calculatePath(block, startPos, candidatePos, collisionDetector, grid, blocks, rocks);
+            
+            if (path && path.length > 0) {
+                console.log(`[智能移动] 找到路径，长度: ${path.length}`);
+                this.executeMove(block, path, gameEngine);
+                return true;
+            } else {
+                console.log(`[智能移动] 无法到达位置: (${candidatePos.x}, ${candidatePos.y})`);
+            }
+        }
+        
+        console.log(`[智能移动] 无法移动方块 ${block.id}`);
+        return false;
+    }
 
-        // 调整到边界内
-        if (targetX < 0) targetX = 0;
-        if (targetY < 0) targetY = 0;
-        if (targetX + bounds.width > this.GRID_SIZE) targetX = this.GRID_SIZE - bounds.width;
-        if (targetY + bounds.height > this.GRID_SIZE) targetY = this.GRID_SIZE - bounds.height;
+    /**
+     * 分析移动方向 - 返回所有相关方向
+     */
+    analyzeMovementDirection(currentPos, targetPos) {
+        const dx = targetPos.x - currentPos.x;
+        const dy = targetPos.y - currentPos.y;
+        
+        const directions = [];
+        
+        // 添加水平方向
+        if (dx > 0) {
+            directions.push('right');
+        } else if (dx < 0) {
+            directions.push('left');
+        }
+        
+        // 添加垂直方向
+        if (dy > 0) {
+            directions.push('down');
+        } else if (dy < 0) {
+            directions.push('up');
+        }
+        
+        // 如果没有移动，返回空数组
+        return directions;
+    }
 
-        return {x: targetX, y: targetY};
+    /**
+     * 计算最佳对齐位置 - 支持多方向移动
+     */
+    calculateBestAlignmentPositions(block, targetPos, directions, collisionDetector) {
+        const blockBounds = collisionDetector.getBlockBounds(block);
+        const positions = [];
+        
+        // 首先尝试直接对齐到目标位置
+        positions.push({
+            x: targetPos.x,
+            y: targetPos.y
+        });
+        
+        // 根据每个方向计算对齐策略
+        directions.forEach(direction => {
+            switch (direction) {
+                case 'up':
+                    // 向上移动：让方块的顶部边缘对齐到目标位置
+                    positions.push({
+                        x: targetPos.x,
+                        y: targetPos.y
+                    });
+                    break;
+                    
+                case 'down':
+                    // 向下移动：直接移动到目标位置
+                    positions.push({
+                        x: targetPos.x,
+                        y: targetPos.y
+                    });
+                    break;
+                    
+                case 'left':
+                    // 向左移动：让方块的左边缘对齐到目标位置
+                    positions.push({
+                        x: targetPos.x,
+                        y: targetPos.y
+                    });
+                    break;
+                    
+                case 'right':
+                    // 向右移动：直接移动到目标位置
+                    positions.push({
+                        x: targetPos.x,
+                        y: targetPos.y
+                    });
+                    break;
+            }
+        });
+        
+        // 添加一些偏移位置，尝试找到缺口
+        const offsets = [
+            {x: -1, y: 0}, {x: 1, y: 0}, {x: 0, y: -1}, {x: 0, y: 1},
+            {x: -1, y: -1}, {x: 1, y: -1}, {x: -1, y: 1}, {x: 1, y: 1}
+        ];
+        
+        offsets.forEach(offset => {
+            positions.push({
+                x: targetPos.x + offset.x,
+                y: targetPos.y + offset.y
+            });
+        });
+        
+        // 去重
+        const uniquePositions = [];
+        const seen = new Set();
+        positions.forEach(pos => {
+            const key = `${pos.x},${pos.y}`;
+            if (!seen.has(key)) {
+                seen.add(key);
+                uniquePositions.push(pos);
+            }
+        });
+        
+        return uniquePositions;
     }
 }
 

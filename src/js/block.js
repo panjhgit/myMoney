@@ -8,8 +8,6 @@ var BlockStates = {
     idle: 'idle', moving: 'moving', selected: 'selected', exiting: 'exiting', eliminated: 'eliminated'
 };
 
-// 方块配置常量 - 直接使用统一配置，避免重复定义
-// var BLOCK_CONFIG = { ... }; // 已删除，直接使用 GAME_CONFIG 中的配置
 
 // 颜色配置
 var BLOCK_COLORS = {
@@ -372,7 +370,6 @@ var drawIce = function (ctx, ice, startX, startY) {
 // 确保在抖音小游戏环境中可用
 if (typeof window !== 'undefined') {
     window.BlockStates = BlockStates;
-    // window.BLOCK_CONFIG = BLOCK_CONFIG; // 已删除，使用 GAME_CONFIG
     window.BLOCK_COLORS = BLOCK_COLORS;
     window.BLOCK_SHAPES = BLOCK_SHAPES;
     window.EYE_TYPES = EYE_TYPES;
@@ -380,15 +377,8 @@ if (typeof window !== 'undefined') {
     window.drawBlock = drawBlock;
     window.createIce = createIce;
     window.drawIce = drawIce;
-    // window.selectBlock = selectBlock; // 已废弃
-    // window.deselectBlock = deselectBlock; // 已废弃
-    // window.moveBlock = moveBlock; // 已废弃
-    // window.exitBlock = exitBlock; // 已废弃
-    // window.updateBlockPosition = updateBlockPosition; // 已废弃
-    // window.destroyBlock = destroyBlock; // 已废弃
 } else if (typeof global !== 'undefined') {
     global.BlockStates = BlockStates;
-    // global.BLOCK_CONFIG = BLOCK_CONFIG; // 已删除，使用 GAME_CONFIG
     global.BLOCK_COLORS = BLOCK_COLORS;
     global.BLOCK_SHAPES = BLOCK_SHAPES;
     global.EYE_TYPES = EYE_TYPES;
@@ -396,16 +386,9 @@ if (typeof window !== 'undefined') {
     global.drawBlock = drawBlock;
     global.createIce = createIce;
     global.drawIce = drawIce;
-    // global.selectBlock = selectBlock; // 已废弃
-    // global.deselectBlock = deselectBlock; // 已废弃
-    // global.moveBlock = moveBlock; // 已废弃
-    // global.exitBlock = exitBlock; // 已废弃
-    // global.updateBlockPosition = updateBlockPosition; // 已废弃
-    // global.destroyBlock = destroyBlock; // 已废弃
 } else {
     // 在抖音小游戏环境中，直接设置为全局变量
     this.BlockStates = BlockStates;
-    // this.BLOCK_CONFIG = BLOCK_CONFIG; // 已删除，使用 GAME_CONFIG
     this.BLOCK_COLORS = BLOCK_COLORS;
     this.BLOCK_SHAPES = BLOCK_SHAPES;
     this.EYE_TYPES = EYE_TYPES;
@@ -413,10 +396,4 @@ if (typeof window !== 'undefined') {
     this.drawBlock = drawBlock;
     this.createIce = createIce;
     this.drawIce = drawIce;
-    // this.selectBlock = selectBlock; // 已废弃
-    // this.deselectBlock = deselectBlock; // 已废弃
-    // this.moveBlock = moveBlock; // 已废弃
-    // this.exitBlock = exitBlock; // 已废弃
-    // this.updateBlockPosition = updateBlockPosition; // 已废弃
-    // this.destroyBlock = destroyBlock; // 已废弃
 }

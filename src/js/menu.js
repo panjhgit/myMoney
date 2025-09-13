@@ -720,23 +720,6 @@ class MainMenu {
     this.ctx.restore();
   }
   
-  
-  // 绘制圆角矩形
-  drawRoundedRect(x, y, width, height, radius) {
-    this.ctx.beginPath();
-    this.ctx.moveTo(x + radius, y);
-    this.ctx.lineTo(x + width - radius, y);
-    this.ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
-    this.ctx.lineTo(x + width, y + height - radius);
-    this.ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
-    this.ctx.lineTo(x + radius, y + height);
-    this.ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
-    this.ctx.lineTo(x, y + radius);
-    this.ctx.quadraticCurveTo(x, y, x + radius, y);
-    this.ctx.closePath();
-    this.ctx.fill();
-  }
-  
   drawLevelDecorations(level) {
     // 四个半透明圆形 - 调整位置适应新尺寸
     this.ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
@@ -854,26 +837,7 @@ class MainMenu {
     this.drawPlayButton();
   }
 
-  // 检查是否有活跃动画
-  hasActiveAnimations() {
-    // 检查滚动动画
-    if (Math.abs(this.scrollVelocity) > 0.1) {
-      return true;
-    }
-    
-    // 检查GSAP动画（简单检查）
-    if (this.animationState.playButton.scale < 0.99) {
-      return true;
-    }
-    
-    return false;
-  }
-
-  // 触发重绘（事件驱动）
-  /**
-   * 检查是否有活跃的动画
-   * @returns {boolean} 是否有动画在运行
-   */
+  // 检查是否有活跃的动画
   hasActiveAnimations() {
     return this.isScrolling || this.scrollVelocity !== 0;
   }

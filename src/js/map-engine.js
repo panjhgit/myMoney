@@ -69,17 +69,6 @@ class MapEngine {
             }
         };
 
-        // 调试开关
-        this.debugMode = true;
-
-        /**
-         * 调试日志方法
-         */
-        this.debugLog = (...args) => {
-            if (this.debugMode) {
-                console.log(...args);
-            }
-        };
 
         this.init();
     }
@@ -280,30 +269,6 @@ class MapEngine {
         return true;
     }
 
-    /**
-     * 移动方块到指定位置
-     */
-    moveBlock(blockId, targetX, targetY) {
-        const block = this.blocks.get(blockId);
-        if (!block) return false;
-
-        const startPos = {...block.position};
-        const targetPos = this.movementManager.calculateTargetPosition(block, {
-            x: targetX, y: targetY
-        }, this.collisionDetector);
-
-        // 使用A*算法计算路径
-        const path = this.movementManager.calculatePath(block, startPos, targetPos, this.collisionDetector, this.grid, this.blocks, this.rocks);
-
-        if (path.length === 0) {
-            console.log('无法找到路径');
-        return false;
-    }
-
-        // 执行移动
-        this.movementManager.executeMove(block, path, this);
-        return true;
-    }
 
     /**
      * 检查冰块融化
@@ -897,11 +862,11 @@ class MapEngine {
      * Canvas绘制工具函数
      */
     drawLine(x1, y1, x2, y2) {
-        this.ctx.beginPath();
+            this.ctx.beginPath();
         this.ctx.moveTo(x1, y1);
         this.ctx.lineTo(x2, y2);
-        this.ctx.stroke();
-    }
+                this.ctx.stroke();
+            }
 
     drawRect(x, y, width, height, fill = true, stroke = true) {
         if (fill) {
@@ -1001,10 +966,25 @@ class MapEngine {
     }
 
     /**
+     * 检查是否有方块正在移动
+     */
+    isAnyBlockMoving() {
+        return Array.from(this.blocks.values()).some(block => block.isMoving);
+    }
+
+
+    /**
      * 处理点击事件
      */
     handleClick(x, y) {
         console.log(`[点击] 屏幕坐标: (${x}, ${y})`);
+        
+        // 检查是否有方块正在移动
+        if (this.isAnyBlockMoving()) {
+            console.log(`[点击] 有方块正在移动中，请等待移动完成`);
+            return;
+        }
+        
         const gridPos = this.screenToGrid(x, y);
         console.log(`[点击] 网格坐标: (${gridPos.x}, ${gridPos.y})`);
 
@@ -1018,13 +998,22 @@ class MapEngine {
 
         if (gridValue && this.blocks.has(gridValue)) {
             // 点击了方块
-            console.log(`[点击] 点击了方块: ${gridValue}`);
-            this.selectBlock(gridValue);
+            const clickedBlock = this.blocks.get(gridValue);
+            console.log(`[点击] 点击了方块: ${gridValue}, layer=${clickedBlock.layer}, movable=${clickedBlock.movable}`);
+            
+            if (clickedBlock.movable) {
+                // 如果点击的是可移动方块，选择它
+                this.selectBlock(gridValue);
+            } else if (this.selectedBlock) {
+                // 如果点击的是不可移动方块（如冰块），但已有选中方块，尝试移动
+                console.log(`[点击] 点击了不可移动方块，尝试移动已选中的方块: ${this.selectedBlock.id} 到 (${gridPos.x}, ${gridPos.y})`);
+                this.movementManager.smartMoveBlock(this.selectedBlock, gridPos, this.collisionDetector, this.grid, this.blocks, this.rocks, this);
+            }
         } else if (this.selectedBlock) {
-            // 点击了空白位置，尝试移动
-            console.log(`[点击] 尝试移动方块: ${this.selectedBlock.id} 到 (${gridPos.x}, ${gridPos.y})`);
-            this.moveBlock(this.selectedBlock.id, gridPos.x, gridPos.y);
-            } else {
+            // 点击了空白位置，尝试智能移动
+            console.log(`[点击] 尝试智能移动方块: ${this.selectedBlock.id} 到 (${gridPos.x}, ${gridPos.y})`);
+            this.movementManager.smartMoveBlock(this.selectedBlock, gridPos, this.collisionDetector, this.grid, this.blocks, this.rocks, this);
+        } else {
             console.log(`[点击] 没有选中方块`);
         }
     }
