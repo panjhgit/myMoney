@@ -263,8 +263,8 @@ class MapEngine {
 
         if (path.length === 0) {
             console.log('无法找到路径');
-            return false;
-        }
+        return false;
+    }
 
         // 执行移动
         this.movementManager.executeMove(block, path, this);
@@ -388,17 +388,17 @@ class MapEngine {
             return;
         }
 
-        // 检查是否所有方块都已经在正确的位置（通过门）
-        const allBlocksAtTarget = movableBlocks.every(block => {
-            return this.isBlockAtCorrectGate(block);
-        });
+            // 检查是否所有方块都已经在正确的位置（通过门）
+            const allBlocksAtTarget = movableBlocks.every(block => {
+                return this.isBlockAtCorrectGate(block);
+            });
 
-        if (allBlocksAtTarget) {
-            console.log('所有可移动方块都已到达目标位置，关卡完成！');
-            this.gameState = 'completed';
-            this.onGameComplete();
-        } else {
-            console.log('还有可移动方块未到达目标位置，继续游戏');
+            if (allBlocksAtTarget) {
+                console.log('所有可移动方块都已到达目标位置，关卡完成！');
+                this.gameState = 'completed';
+                this.onGameComplete();
+            } else {
+                console.log('还有可移动方块未到达目标位置，继续游戏');
         }
     }
 
@@ -770,7 +770,7 @@ class MapEngine {
             this.ctx.strokeRect(screenX, screenY, this.cellSize, this.cellSize);
 
             // 石块纹理
-            this.ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
             this.ctx.fillRect(screenX + 2, screenY + 2, this.cellSize - 4, this.cellSize - 4);
 
             // 石块高光
@@ -825,7 +825,7 @@ class MapEngine {
 
                     this.ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
                     this.ctx.font = '12px Arial';
-                    this.ctx.textAlign = 'center';
+        this.ctx.textAlign = 'center';
                     this.ctx.fillText(`${meltProgress}%`, x + this.cellSize / 2, y + this.cellSize / 2 + 3);
                 }
             }
@@ -875,55 +875,43 @@ class MapEngine {
         const cells = this.collisionDetector.getBlockCells(block);
         const color = this.getBlockColor(block.color);
 
-        // 方块按照真正的形状渲染，是一个完整的整体
-        cells.forEach(cell => {
-            const x = this.gridOffsetX + cell.x * this.cellSize;
-            const y = this.gridOffsetY + cell.y * this.cellSize;
-
-            // 绘制方块主体
-            this.ctx.fillStyle = color;
-            this.ctx.fillRect(x, y, this.cellSize, this.cellSize);
-        });
-        
-        // 绘制方块的最外边边框，方便区分不同图案
+        // 绘制方块主体和边框
+        this.ctx.fillStyle = color;
         this.ctx.strokeStyle = 'rgba(0, 0, 0, 0.6)';
         this.ctx.lineWidth = 2;
         
         cells.forEach(cell => {
             const x = this.gridOffsetX + cell.x * this.cellSize;
             const y = this.gridOffsetY + cell.y * this.cellSize;
-            
+
+            // 绘制方块主体
+            this.ctx.fillRect(x, y, this.cellSize, this.cellSize);
+
             // 检查每个格子的四个边，只绘制外边框
             const hasTop = cells.some(c => c.x === cell.x && c.y === cell.y - 1);
             const hasBottom = cells.some(c => c.x === cell.x && c.y === cell.y + 1);
             const hasLeft = cells.some(c => c.x === cell.x - 1 && c.y === cell.y);
             const hasRight = cells.some(c => c.x === cell.x + 1 && c.y === cell.y);
             
-            // 绘制上边框
+            // 绘制外边框
             if (!hasTop) {
                 this.ctx.beginPath();
                 this.ctx.moveTo(x, y);
                 this.ctx.lineTo(x + this.cellSize, y);
                 this.ctx.stroke();
             }
-            
-            // 绘制下边框
             if (!hasBottom) {
-                this.ctx.beginPath();
+            this.ctx.beginPath();
                 this.ctx.moveTo(x, y + this.cellSize);
                 this.ctx.lineTo(x + this.cellSize, y + this.cellSize);
-                this.ctx.stroke();
+            this.ctx.stroke();
             }
-            
-            // 绘制左边框
             if (!hasLeft) {
                 this.ctx.beginPath();
                 this.ctx.moveTo(x, y);
                 this.ctx.lineTo(x, y + this.cellSize);
                 this.ctx.stroke();
             }
-            
-            // 绘制右边框
             if (!hasRight) {
                 this.ctx.beginPath();
                 this.ctx.moveTo(x + this.cellSize, y);
@@ -991,7 +979,7 @@ class MapEngine {
             // 点击了空白位置，尝试移动
             console.log(`[点击] 尝试移动方块: ${this.selectedBlock.id} 到 (${gridPos.x}, ${gridPos.y})`);
             this.moveBlock(this.selectedBlock.id, gridPos.x, gridPos.y);
-        } else {
+            } else {
             console.log(`[点击] 没有选中方块`);
         }
     }
