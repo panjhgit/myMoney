@@ -8,7 +8,8 @@ require('./src/js/config.js'); // 加载统一配置
 require('./src/js/gsap.min.js');
 require('./src/js/block.js'); // 需要先加载，因为包含EYE_TYPES等常量
 require('./src/js/creature.js');
-// GameEngine已删除，现在直接使用MapEngine
+require('./src/js/collision.js'); // 碰撞检测模块
+require('./src/js/movement.js'); // 移动逻辑模块
 require('./src/js/menu.js');
 require('./src/js/map-engine.js');
 require('./src/map/map1.js');
@@ -200,8 +201,7 @@ function drawGame() {
   
   // 绘制地图网格和元素
   if (mapEngine) {
-    mapEngine.drawMapGrid();
-    mapEngine.drawMapElements();
+    mapEngine.render();
   }
 }
 
