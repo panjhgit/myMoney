@@ -161,11 +161,22 @@ class MovementManager {
         
         // 创建动画时间线
         const walkTimeline = gsap.timeline({
+            onUpdate: () => {
+                // 🔧 优化：动画进行时持续重绘
+                if (typeof markNeedsRedraw === 'function') {
+                    markNeedsRedraw();
+                }
+            },
             onComplete: () => {
                 block.isMoving = false;
                 gameEngine.updateGrid();
                 gameEngine.processIceBlocks(block); // 统一处理冰块
                 gameEngine.checkGateExit(block);
+                
+                // 🔧 优化：动画完成后触发重绘
+                if (typeof markNeedsRedraw === 'function') {
+                    markNeedsRedraw();
+                }
                 
                 if (gameEngine.animations) {
                     gameEngine.animations.delete(animationId);

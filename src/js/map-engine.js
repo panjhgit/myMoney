@@ -266,6 +266,12 @@ class MapEngine {
 
         this.selectedBlock = block;
         console.log(`[选择] 成功选择方块: ${blockId}`);
+        
+        // 🔧 优化：选择方块后触发重绘
+        if (typeof markNeedsRedraw === 'function') {
+            markNeedsRedraw();
+        }
+        
         return true;
     }
 
@@ -974,6 +980,11 @@ class MapEngine {
      */
     handleClick(x, y) {
         console.log(`[点击] 屏幕坐标: (${x}, ${y})`);
+        
+        // 🔧 优化：触发重绘
+        if (typeof markNeedsRedraw === 'function') {
+            markNeedsRedraw();
+        }
         
         // 检查是否有方块正在移动
         if (this.isAnyBlockMoving()) {

@@ -177,7 +177,7 @@ function draw() {
     scheduleNextDraw();
   } else if (gameState === 'game' && mapEngine) {
     drawGame();
-    // 游戏状态需要持续重绘来处理交互
+    // 🔧 修复：游戏状态需要持续循环以支持动画
     scheduleNextDraw();
   } else {
     drawDefault();
@@ -202,21 +202,12 @@ function scheduleNextDraw() {
   }
 }
 
-// 标记需要重绘（在用户交互或动画时调用）
-function markNeedsRedraw() {
-  needsRedraw = true;
-}
 
 // 游戏绘制函数
 function drawGame() {
   // 清空画布
   ctx.fillStyle = '#FFFFFF'; // 改回白色背景
   ctx.fillRect(0, 0, systemInfo.windowWidth, systemInfo.windowHeight);
-  
-  // 🔧 修复：在游戏循环中持续处理冰块融化
-  if (mapEngine) {
-    mapEngine.processIceBlocks(null, true); // 持续处理冰块融化（游戏循环模式）
-  }
   
   // 绘制地图状态信息
   drawGameInfo();
