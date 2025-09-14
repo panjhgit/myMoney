@@ -117,10 +117,7 @@ function startGame(levelId) {
   console.log(`关卡 ${levelId} 开始，地图：${mapData.name}`);
   
   // 创建地图引擎实例
-  mapEngine = new MapEngine();
-  
-  // 设置渲染上下文
-  mapEngine.setRenderContext(ctx, systemInfo);
+  mapEngine = new MapEngine(canvas, ctx, systemInfo);
   
   // 设置关卡完成回调
   window.onLevelComplete = (completedLevelId) => {

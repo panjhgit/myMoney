@@ -4,7 +4,7 @@
  */
 
 class MapEngine {
-    constructor() {
+    constructor(canvas, ctx, systemInfo) {
         // 基础配置
         this.GRID_SIZE = GAME_CONFIG.GRID_SIZE;
         this.MAX_LAYERS = 10;
@@ -15,7 +15,7 @@ class MapEngine {
         this.boardHeight = 0;
 
         // 核心数据结构
-        this.grid = Array(this.GRID_SIZE).fill().map(() => Array(this.GRID_SIZE).fill(null));
+        this.grid = null; // 将在加载地图时初始化
         this.blocks = new Map(); // blockId -> Block
         this.gates = new Map(); // gateId -> Gate
         this.rocks = new Set(); // rock positions
@@ -32,13 +32,17 @@ class MapEngine {
         this.gridOffsetX = 0;
         this.gridOffsetY = 0;
 
-        // 模块
-        this.collisionDetector = new CollisionDetector(this.GRID_SIZE);
-        this.collisionDetector.setMapEngine(this); // 设置引用
-        this.movementManager = new MovementManager(this.GRID_SIZE);
+        // 模块 - 将在加载地图时初始化
+        this.collisionDetector = null;
+        this.movementManager = null;
 
         // 动画管理
         this.animations = new Map();
+
+        // 如果提供了参数，立即设置渲染上下文
+        if (ctx && systemInfo) {
+            this.setRenderContext(ctx, systemInfo);
+        }
 
         // 颜色常量
         this.COLORS = {
@@ -117,7 +121,9 @@ class MapEngine {
      * 清空地图
      */
     clearMap() {
-        this.grid.forEach(row => row.fill(null));
+        if (this.grid) {
+            this.grid.forEach(row => row.fill(null));
+        }
         this.blocks.clear();
         this.gates.clear();
         this.rocks.clear();
@@ -179,7 +185,9 @@ class MapEngine {
      */
     updateGrid() {
         // 清空网格
-        this.grid.forEach(row => row.fill(null));
+        if (this.grid) {
+            this.grid.forEach(row => row.fill(null));
+        }
 
         // 按层级顺序填充网格（第0层优先显示）
         for (let layer = 0; layer < this.MAX_LAYERS; layer++) {
@@ -421,30 +429,8 @@ class MapEngine {
             systemInfo.windowHeight = 667;
         }
 
-        // 使用统一配置的格子大小范围
-        const maxCellSize = GAME_CONFIG.MAX_CELL_SIZE;
-
-        // 计算理想的网格尺寸
-        const idealGridSize = this.GRID_SIZE * maxCellSize;
-
-        // 根据屏幕尺寸调整
-        const maxWidth = windowWidth * 0.9; // 使用更多宽度
-        const maxHeight = windowHeight * 0.8; // 使用更多高度
-
-        // 选择较小的限制，确保网格完全可见
-        this.gridSize = Math.min(idealGridSize, maxWidth, maxHeight);
-
-        // 使用固定格子大小，确保与方块大小一致
-        this.cellSize = GAME_CONFIG.CELL_SIZE;
-        this.gridSize = this.cellSize * this.GRID_SIZE;
-
-        // 居中定位
-        this.gridOffsetX = (windowWidth - this.gridSize) / 2;
-        this.gridOffsetY = (windowHeight - this.gridSize) / 2 + 20; // 减少顶部偏移
-
-        // 确保偏移值也是有限的
-        this.gridOffsetX = isFinite(this.gridOffsetX) ? this.gridOffsetX : 0;
-        this.gridOffsetY = isFinite(this.gridOffsetY) ? this.gridOffsetY : 0;
+        // 统一计算网格尺寸 - 基于棋盘矩阵
+        this.calculateGridDimensions(windowWidth, windowHeight);
 
         console.log('渲染上下文已设置:', {
             windowWidth,
@@ -454,6 +440,43 @@ class MapEngine {
             gridOffsetX: this.gridOffsetX,
             gridOffsetY: this.gridOffsetY
         });
+    }
+
+    /**
+     * 统一计算网格尺寸
+     */
+    calculateGridDimensions(windowWidth, windowHeight) {
+        // 使用固定格子大小
+        this.cellSize = GAME_CONFIG.CELL_SIZE;
+        
+        // 基于棋盘矩阵计算网格尺寸
+        if (this.boardMatrix) {
+            const matrixWidth = this.boardMatrix[0] ? this.boardMatrix[0].length : this.GRID_SIZE;
+            const matrixHeight = this.boardMatrix.length;
+            this.GRID_SIZE = Math.max(matrixWidth, matrixHeight);
+        }
+        
+        // 计算网格总尺寸
+        this.gridSize = this.cellSize * this.GRID_SIZE;
+        
+        // 根据屏幕尺寸调整
+        const maxWidth = windowWidth * 0.9;
+        const maxHeight = windowHeight * 0.8;
+        
+        // 如果网格太大，缩放格子大小
+        if (this.gridSize > maxWidth || this.gridSize > maxHeight) {
+            const scale = Math.min(maxWidth / this.gridSize, maxHeight / this.gridSize);
+            this.cellSize = Math.floor(this.cellSize * scale);
+            this.gridSize = this.cellSize * this.GRID_SIZE;
+        }
+        
+        // 居中定位
+        this.gridOffsetX = (windowWidth - this.gridSize) / 2;
+        this.gridOffsetY = (windowHeight - this.gridSize) / 2 + 20;
+        
+        // 确保偏移值有限
+        this.gridOffsetX = isFinite(this.gridOffsetX) ? this.gridOffsetX : 0;
+        this.gridOffsetY = isFinite(this.gridOffsetY) ? this.gridOffsetY : 0;
     }
 
     /**
@@ -635,22 +658,13 @@ class MapEngine {
             const screenX = this.gridOffsetX + x * this.cellSize;
             const screenY = this.gridOffsetY + y * this.cellSize;
 
-            // 石块主体 - 灰黑色
-            this.ctx.fillStyle = '#404040';
-            this.drawRect(screenX, screenY, this.cellSize, this.cellSize);
-
-            // 石块边框
-            this.ctx.strokeStyle = '#2A2A2A';
-            this.ctx.lineWidth = this.STYLES.LINE_WIDTH_THICK;
-            this.drawRect(screenX, screenY, this.cellSize, this.cellSize, false, true);
-
-            // 石块纹理
-            this.ctx.fillStyle = this.COLORS.BLACK + '0.3)';
-            this.drawRectWithOffset(screenX, screenY, this.cellSize, this.cellSize, 2);
-
-            // 石块高光
-            this.ctx.fillStyle = this.COLORS.WHITE + '0.2)';
-            this.drawRectWithOffset(screenX, screenY, this.cellSize, this.cellSize, 4);
+            this.drawCellWithStyle(screenX, screenY, {
+                fillColor: '#404040',
+                strokeColor: '#2A2A2A',
+                strokeWidth: this.STYLES.LINE_WIDTH_THICK,
+                textureColor: this.COLORS.BLACK + '0.3)',
+                highlightColor: this.COLORS.WHITE + '0.2)'
+            });
         });
     }
 
@@ -659,39 +673,23 @@ class MapEngine {
      */
     drawIceBlocks() {
         const lowerBlocks = this.getLowerLayerBlocks();
-
+        
         lowerBlocks.forEach(block => {
             if (!this.collisionDetector.isBlockFullyRevealed(block, this.grid, this.blocks)) {
                 const cells = this.collisionDetector.getBlockCells(block);
 
-                // 冰块保持固定颜色，不显示融化进度
-                const meltProgress = block.meltProgress || 0; // 保留判断逻辑，但不用于UI
-
-                // 设置冰块样式（固定颜色）
-                this.ctx.fillStyle = this.COLORS.ICE_BLUE + '0.8)';
-                this.ctx.strokeStyle = this.COLORS.ICE_BORDER + '1.0)';
-                this.ctx.lineWidth = this.STYLES.LINE_WIDTH_THIN;
-
-                // 冰块是一个格子一个格子的（有网格线分隔）
+                // 冰块样式
                 cells.forEach(cell => {
                     const pos = this.getCellScreenPosition(cell);
 
-                    // 绘制冰块主体
-                    this.drawRect(pos.x, pos.y, this.cellSize, this.cellSize);
-
-                    // 绘制格子边框
-                    this.drawRect(pos.x, pos.y, this.cellSize, this.cellSize, false, true);
-
-                    // 绘制格子高光（固定颜色）
-                    this.ctx.fillStyle = this.COLORS.WHITE + '0.3)';
-                    this.drawRectWithOffset(pos.x, pos.y, this.cellSize, this.cellSize, 2);
-
-                    // 绘制格子纹理（固定颜色）
-                    this.ctx.fillStyle = this.COLORS.WHITE + '0.15)';
-                    this.drawRectWithOffset(pos.x, pos.y, this.cellSize, this.cellSize, 4);
+                    this.drawCellWithStyle(pos.x, pos.y, {
+                        fillColor: this.COLORS.ICE_BLUE + '0.8)',
+                        strokeColor: this.COLORS.ICE_BORDER + '1.0)',
+                        strokeWidth: this.STYLES.LINE_WIDTH_THIN,
+                        textureColor: this.COLORS.WHITE + '0.3)',
+                        highlightColor: this.COLORS.WHITE + '0.15)'
+                    });
                 });
-
-                // 融化进度不显示给用户，避免暴露游戏信息
             }
         });
     }
@@ -763,6 +761,34 @@ class MapEngine {
     drawRectWithOffset(x, y, width, height, offset, fill = true) {
         if (fill) {
             this.ctx.fillRect(x + offset, y + offset, width - offset * 2, height - offset * 2);
+        }
+    }
+
+    /**
+     * 统一绘制带样式的格子
+     */
+    drawCellWithStyle(x, y, style) {
+        // 主体
+        this.ctx.fillStyle = style.fillColor;
+        this.drawRect(x, y, this.cellSize, this.cellSize);
+
+        // 边框
+        if (style.strokeColor) {
+            this.ctx.strokeStyle = style.strokeColor;
+            this.ctx.lineWidth = style.strokeWidth || this.STYLES.LINE_WIDTH_THIN;
+            this.drawRect(x, y, this.cellSize, this.cellSize, false, true);
+        }
+
+        // 纹理
+        if (style.textureColor) {
+            this.ctx.fillStyle = style.textureColor;
+            this.drawRectWithOffset(x, y, this.cellSize, this.cellSize, 2);
+        }
+
+        // 高光
+        if (style.highlightColor) {
+            this.ctx.fillStyle = style.highlightColor;
+            this.drawRectWithOffset(x, y, this.cellSize, this.cellSize, 4);
         }
     }
 
@@ -902,9 +928,9 @@ class MapEngine {
 
         // 解析棋盘元素
         this.parseBoardElements();
-
-        // 更新网格尺寸
-        this.updateGridSizeFromBoard();
+        
+        // 更新网格和碰撞检测器
+        this.updateGridFromBoard();
 
         console.log('棋盘加载完成:', {
             width: this.boardWidth, height: this.boardHeight, gates: this.gates.size, gridSize: this.GRID_SIZE
@@ -1064,32 +1090,57 @@ class MapEngine {
     }
 
     /**
-     * 更新网格尺寸基于棋盘矩阵
+     * 基于棋盘矩阵更新网格和碰撞检测器
      */
-    updateGridSizeFromBoard() {
+    updateGridFromBoard() {
         if (this.boardMatrix) {
-            this.GRID_SIZE = Math.max(this.boardMatrix[0].length, this.boardMatrix.length);
-            this.grid = Array(this.boardMatrix.length).fill().map(() => Array(this.boardMatrix[0].length).fill(null));
-            this.collisionDetector = new CollisionDetector(this.GRID_SIZE);
-            this.collisionDetector.setMapEngine(this); // 设置引用
-            this.movementManager = new MovementManager(this.GRID_SIZE);
-            console.log('网格尺寸已更新:', {
-                gridSize: this.GRID_SIZE, matrixWidth: this.boardMatrix[0].length, matrixHeight: this.boardMatrix.length
+            const matrixWidth = this.boardMatrix[0] ? this.boardMatrix[0].length : this.GRID_SIZE;
+            const matrixHeight = this.boardMatrix.length;
+            this.GRID_SIZE = Math.max(matrixWidth, matrixHeight);
+            
+            // 初始化网格数组
+            this.grid = Array(matrixHeight).fill().map(() => Array(matrixWidth).fill(null));
+            
+            // 初始化碰撞检测器和移动管理器（只在首次创建时）
+            if (!this.collisionDetector) {
+                this.collisionDetector = new CollisionDetector(this.GRID_SIZE);
+                this.collisionDetector.setMapEngine(this);
+            }
+            
+            if (!this.movementManager) {
+                this.movementManager = new MovementManager(this.GRID_SIZE);
+            }
+            
+            console.log('网格已更新:', {
+                gridSize: this.GRID_SIZE, 
+                matrixWidth: matrixWidth, 
+                matrixHeight: matrixHeight
             });
         }
     }
 
     /**
-     * 检查位置是否是有效的棋盘区域
+     * 检查位置是否是有效的棋盘区域（包括可游戏区域和门区域）
      * @param {number} x - X坐标
      * @param {number} y - Y坐标
      * @returns {boolean} 是否有效
      */
     isValidBoardPosition(x, y) {
         if (!this.boardMatrix) return false;
-
+        
         const value = this.getCellValue(x, y);
-        return value === GAME_CONFIG.BOARD_SYSTEM.ELEMENT_TYPES.BOARD;
+        
+        // 可游戏区域
+        if (value === GAME_CONFIG.BOARD_SYSTEM.ELEMENT_TYPES.BOARD) {
+            return true;
+        }
+        
+        // 门区域 (2-9) 也是可移动的
+        if (value >= 2 && value <= 9) {
+            return true;
+        }
+        
+        return false;
     }
 
     /**
