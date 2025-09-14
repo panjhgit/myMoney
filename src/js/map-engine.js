@@ -138,38 +138,46 @@ class MapEngine {
      * 添加方块
      */
     addBlock(block) {
-        if (typeof createCreature === 'undefined') {
-            console.error('createCreature 函数未找到');
+        if (typeof createBlock === 'undefined') {
+            console.error('createBlock 函数未找到');
             return;
         }
 
-        let colorData = block.colorData;
-        if (!colorData && typeof BLOCK_COLORS !== 'undefined') {
-            colorData = BLOCK_COLORS[block.color];
-        }
+        // 使用新的方块创建系统
+        const blockElement = createBlock(
+            block.id,
+            block.blockType || block.shape, // 支持旧的shape参数
+            block.color,
+            block.position,
+            block.layer || 0,
+            {
+                isIce: block.isIce || false,
+                alpha: block.alpha || 1,
+                scale: block.scale || 1
+            }
+        );
 
-        if (!colorData) {
-            console.error('无法找到颜色数据:', block.color);
-            return;
-        }
-
-        const blockElement = createCreature(block.position.y, block.position.x, colorData);
         if (!blockElement) {
             console.error('方块创建失败:', block);
             return;
         }
 
-        // 使用原始方块ID而不是动态生成的ID
+        // 使用新的方块结构
         const element = {
-            id: block.id, // 使用原始ID
+            id: block.id,
             type: 'tetris',
             color: blockElement.color,
             position: block.position,
             initialPosition: {...block.position},
-            shapeData: blockElement.shapeData,
+            typeData: blockElement.typeData,
+            shapeData: {
+                blocks: blockElement.typeData.blocks,
+                description: blockElement.typeData.description
+            },
             layer: block.layer || 0,
             movable: (block.layer || 0) === 0, // 只有第0层才能移动
-            blockElement: blockElement
+            blockElement: blockElement,
+            isIce: blockElement.isIce || false
         };
 
         this.blocks.set(element.id, element);
@@ -808,7 +816,20 @@ class MapEngine {
         // 只绘制第0层方块（可移动的方块）
         const topLayerBlocks = this.getBlocksByLayer(0);
         
+        console.log('绘制方块:', {
+            totalBlocks: this.blocks.size,
+            topLayerBlocks: topLayerBlocks.length,
+            blocks: Array.from(this.blocks.values()).map(b => ({
+                id: b.id,
+                layer: b.layer,
+                position: b.position,
+                hasShapeData: !!b.shapeData,
+                hasTypeData: !!b.typeData
+            }))
+        });
+        
         topLayerBlocks.forEach(block => {
+            console.log('绘制方块:', block.id, block.position, block.shapeData);
             this.drawTetrisBlock(block);
         });
     }
@@ -859,6 +880,13 @@ class MapEngine {
     drawTetrisBlock(block) {
         const cells = this.collisionDetector.getBlockCells(block);
         const color = this.getBlockColor(block.color);
+
+        console.log('drawTetrisBlock:', {
+            blockId: block.id,
+            cells: cells,
+            color: color,
+            shapeData: block.shapeData
+        });
 
         // 绘制方块主体和边框
         this.ctx.fillStyle = color;

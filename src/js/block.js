@@ -1,238 +1,346 @@
 /**
  * 方块元素系统 - 适配抖音小游戏Canvas环境
- * 基于原有小人系统的俄罗斯方块风格实现
+ * 重新设计的俄罗斯方块风格实现，支持8种方块类型
  */
 
 // 方块状态常量
 var BlockStates = {
-    idle: 'idle', moving: 'moving', selected: 'selected', exiting: 'exiting', eliminated: 'eliminated'
+    idle: 'idle', 
+    moving: 'moving', 
+    selected: 'selected', 
+    exiting: 'exiting', 
+    eliminated: 'eliminated'
 };
 
-
-// 颜色配置
+// 颜色配置 - 随机分配的颜色
 var BLOCK_COLORS = {
     red: {
         name: 'red',
         gradient: 'linear-gradient(135deg, #FF6B6B, #FF8E8E)',
         glowColor: 'rgba(255, 107, 107, 0.6)',
-        shape: 'single',
-        blocks: [[0, 0]]
-    }, blue: {
+        hex: '#FF6B6B'
+    },
+    blue: {
         name: 'blue',
         gradient: 'linear-gradient(135deg, #45B7D1, #6BC5D8)',
         glowColor: 'rgba(69, 183, 209, 0.6)',
-        shape: 'line2',
-        blocks: [[0, 0], [1, 0]]
-    }, green: {
+        hex: '#45B7D1'
+    },
+    green: {
         name: 'green',
         gradient: 'linear-gradient(135deg, #96CEB4, #A8E6CF)',
         glowColor: 'rgba(150, 206, 180, 0.6)',
-        shape: 'line3',
-        blocks: [[0, 0], [1, 0], [2, 0]]
-    }, yellow: {
+        hex: '#96CEB4'
+    },
+    yellow: {
         name: 'yellow',
         gradient: 'linear-gradient(135deg, #FFEAA7, #FFF3CD)',
         glowColor: 'rgba(255, 234, 167, 0.6)',
-        shape: 'square',
-        blocks: [[0, 0], [1, 0], [0, 1], [1, 1]]
-    }, purple: {
+        hex: '#FFEAA7'
+    },
+    purple: {
         name: 'purple',
         gradient: 'linear-gradient(135deg, #DDA0DD, #E6B3E6)',
         glowColor: 'rgba(221, 160, 221, 0.6)',
-        shape: 'lshape',
-        blocks: [[0, 0], [0, 1], [0, 2], [1, 2]]
-    }, orange: {
+        hex: '#DDA0DD'
+    },
+    orange: {
         name: 'orange',
         gradient: 'linear-gradient(135deg, #FFA500, #FFB347)',
         glowColor: 'rgba(255, 165, 0, 0.6)',
-        shape: 'tshape',
-        blocks: [[0, 0], [1, 0], [2, 0], [1, 1]]
-    }, cyan: {
-        name: 'cyan',
-        gradient: 'linear-gradient(135deg, #00CED1, #40E0D0)',
-        glowColor: 'rgba(0, 206, 209, 0.6)',
-        shape: 'zshape',
-        blocks: [[0, 0], [1, 0], [1, 1], [2, 1]]
-    }, magenta: {
-        name: 'magenta',
-        gradient: 'linear-gradient(135deg, #FF69B4, #FFB6C1)',
-        glowColor: 'rgba(255, 105, 180, 0.6)',
-        shape: 'bigl',
-        blocks: [[0, 0], [0, 1], [0, 2], [1, 2], [2, 2]]
-    }, // 添加 cross 形状的颜色定义
-    cross: {
-        name: 'cross',
-        gradient: 'linear-gradient(135deg, #FF6B6B, #FF8E8E)',
-        glowColor: 'rgba(255, 107, 107, 0.6)',
-        shape: 'cross',
-        blocks: [[1, 0], [0, 1], [1, 1], [2, 1], [1, 2]]
-    }, // 添加 H 形状的颜色定义
-    hshape: {
-        name: 'hshape',
-        gradient: 'linear-gradient(135deg, #8B4513, #A0522D)',
-        glowColor: 'rgba(139, 69, 19, 0.6)',
-        shape: 'hshape',
-        blocks: [[0, 0], [2, 0], [0, 1], [1, 1], [2, 1], [0, 2], [2, 2]]
+        hex: '#FFA500'
     }
 };
 
-// 眼睛类型配置 - 几何形状眼睛
-var EYE_TYPES = {
-    circle: {
-        name: 'circle', shape: 'circle', size: 1.0, pupilSize: 0.5, eyebrowStyle: 'curved', description: '圆形眼睛'
-    }, square: {
-        name: 'square', shape: 'square', size: 1.0, pupilSize: 0.4, eyebrowStyle: 'curved', description: '正方形眼睛'
-    }, triangle: {
-        name: 'triangle', shape: 'triangle', size: 1.4, // 再大一点
-        pupilSize: 0.4, eyebrowStyle: 'curved', description: '三角形眼睛'
-    }, star: {
-        name: 'star', shape: 'star', size: 1.4, // 再大一点
-        pupilSize: 0.3, eyebrowStyle: 'curved', description: '五角星眼睛'
-    }
-};
-
-// 形状配置 - 基于原代码的俄罗斯方块形状
-var BLOCK_SHAPES = {
-    '1x1': {
-        name: '1x1', blocks: [[0, 0]], eyePosition: 'center', eyeType: 'circle', description: '单个方块'
-    }, '1x2': {
-        name: '1x2', blocks: [[0, 0], [0, 1]], eyePosition: 'top', eyeType: 'square', description: '2个方块直线'
-    }, '1x3': {
-        name: '1x3', blocks: [[0, 0], [0, 1], [0, 2]], eyePosition: 'top', eyeType: 'triangle', description: '3个方块直线'
-    }, '2x1': {
-        name: '2x1', blocks: [[0, 0], [1, 0]], eyePosition: 'left', eyeType: 'star', description: '2个方块横线'
-    }, '2x2': {
-        name: '2x2',
+// 方块类型定义 - 8种方块类型，每种方向定义为独立对象
+var BLOCK_TYPES = {
+    // 1. 单格方块 (Single)
+    single: {
+        name: 'single',
+        description: '单格方块',
+        blocks: [[0, 0]],
+        width: 1,
+        height: 1
+    },
+    
+    // 2. 直线方块 (Line2) - 水平方向
+    line2_h: {
+        name: 'line2_h',
+        description: '直线方块(水平)',
+        blocks: [[0, 0], [1, 0]],
+        width: 2,
+        height: 1
+    },
+    
+    // 2. 直线方块 (Line2) - 垂直方向
+    line2_v: {
+        name: 'line2_v',
+        description: '直线方块(垂直)',
+        blocks: [[0, 0], [0, 1]],
+        width: 1,
+        height: 2
+    },
+    
+    // 3. 长直线方块 (Line3) - 水平方向
+    line3_h: {
+        name: 'line3_h',
+        description: '长直线方块(水平)',
+        blocks: [[0, 0], [1, 0], [2, 0]],
+        width: 3,
+        height: 1
+    },
+    
+    // 3. 长直线方块 (Line3) - 垂直方向
+    line3_v: {
+        name: 'line3_v',
+        description: '长直线方块(垂直)',
+        blocks: [[0, 0], [0, 1], [0, 2]],
+        width: 1,
+        height: 3
+    },
+    
+    // 4. 正方形方块 (Square)
+    square: {
+        name: 'square',
+        description: '正方形方块',
         blocks: [[0, 0], [1, 0], [0, 1], [1, 1]],
-        eyePosition: 'top-left',
-        eyeType: 'circle',
-        description: '2x2方块'
-    }, 'I-shape': {
-        name: 'I-shape',
-        blocks: [[0, 0], [0, 1], [0, 2], [0, 3]],
-        eyePosition: 'top',
-        eyeType: 'triangle',
-        description: 'I形方块'
-    }, 'L-shape': {
-        name: 'L-shape',
+        width: 2,
+        height: 2
+    },
+    
+    // 5. L形方块 (L-Shape) - 向上
+    lshape_up: {
+        name: 'lshape_up',
+        description: 'L形方块(向上)',
         blocks: [[0, 0], [0, 1], [0, 2], [1, 2]],
-        eyePosition: 'top',
-        eyeType: 'square',
-        description: 'L形方块'
-    }, 'T-shape': {
-        name: 'T-shape',
+        width: 2,
+        height: 3
+    },
+    
+    // 5. L形方块 (L-Shape) - 向右
+    lshape_right: {
+        name: 'lshape_right',
+        description: 'L形方块(向右)',
+        blocks: [[0, 0], [1, 0], [2, 0], [0, 1]],
+        width: 3,
+        height: 2
+    },
+    
+    // 5. L形方块 (L-Shape) - 向下
+    lshape_down: {
+        name: 'lshape_down',
+        description: 'L形方块(向下)',
+        blocks: [[0, 0], [1, 0], [1, 1], [1, 2]],
+        width: 2,
+        height: 3
+    },
+    
+    // 5. L形方块 (L-Shape) - 向左
+    lshape_left: {
+        name: 'lshape_left',
+        description: 'L形方块(向左)',
+        blocks: [[2, 0], [0, 1], [1, 1], [2, 1]],
+        width: 3,
+        height: 2
+    },
+    
+    // 6. T形方块 (T-Shape) - 向上
+    tshape_up: {
+        name: 'tshape_up',
+        description: 'T形方块(向上)',
         blocks: [[0, 0], [1, 0], [2, 0], [1, 1]],
-        eyePosition: 'top',
-        eyeType: 'triangle',
-        description: 'T形方块'
-    }, 'S-shape': {
-        name: 'S-shape',
-        blocks: [[0, 0], [1, 0], [1, 1], [2, 1]],
-        eyePosition: 'top',
-        eyeType: 'star',
-        description: 'S形方块'
-    }, 'Z-shape': {
-        name: 'Z-shape',
-        blocks: [[0, 1], [1, 1], [1, 0], [2, 0]],
-        eyePosition: 'top',
-        eyeType: 'star',
-        description: 'Z形方块'
-    }, 'bigL': {
-        name: 'bigL',
-        blocks: [[0, 0], [0, 1], [0, 2], [1, 2], [2, 2]],
-        eyePosition: 'top',
-        eyeType: 'square',
-        description: '大L形方块'
-    }, 'cross': {
-        name: 'cross',
-        blocks: [[1, 0], [0, 1], [1, 1], [2, 1], [1, 2]],
-        eyePosition: 'center',
-        eyeType: 'circle',
-        description: '十字形方块'
+        width: 3,
+        height: 2
+    },
+    
+    // 6. T形方块 (T-Shape) - 向右
+    tshape_right: {
+        name: 'tshape_right',
+        description: 'T形方块(向右)',
+        blocks: [[1, 0], [0, 1], [1, 1], [1, 2]],
+        width: 2,
+        height: 3
+    },
+    
+    // 6. T形方块 (T-Shape) - 向下
+    tshape_down: {
+        name: 'tshape_down',
+        description: 'T形方块(向下)',
+        blocks: [[1, 0], [0, 1], [1, 1], [2, 1]],
+        width: 3,
+        height: 2
+    },
+    
+    // 6. T形方块 (T-Shape) - 向左
+    tshape_left: {
+        name: 'tshape_left',
+        description: 'T形方块(向左)',
+        blocks: [[0, 0], [0, 1], [1, 1], [0, 2]],
+        width: 2,
+        height: 3
+    },
+    
+    // 7. H形方块 (H-Shape) - 向上
+    hshape_up: {
+        name: 'hshape_up',
+        description: 'H形方块(向上)',
+        blocks: [[0, 0], [2, 0], [0, 1], [1, 1], [2, 1], [0, 2], [2, 2]],
+        width: 3,
+        height: 3
+    },
+    
+    // 7. H形方块 (H-Shape) - 向右
+    hshape_right: {
+        name: 'hshape_right',
+        description: 'H形方块(向右)',
+        blocks: [[0, 0], [0, 2], [1, 0], [1, 1], [1, 2], [2, 0], [2, 2]],
+        width: 3,
+        height: 3
+    },
+    
+    // 7. H形方块 (H-Shape) - 向下
+    hshape_down: {
+        name: 'hshape_down',
+        description: 'H形方块(向下)',
+        blocks: [[0, 0], [2, 0], [0, 1], [1, 1], [2, 1], [0, 2], [2, 2]],
+        width: 3,
+        height: 3
+    },
+    
+    // 7. H形方块 (H-Shape) - 向左
+    hshape_left: {
+        name: 'hshape_left',
+        description: 'H形方块(向左)',
+        blocks: [[0, 0], [0, 2], [1, 0], [1, 1], [1, 2], [2, 0], [2, 2]],
+        width: 3,
+        height: 3
+    },
+    
+    // 8. 三角方块 (Triangle-Shape) - 向上
+    triangle_up: {
+        name: 'triangle_up',
+        description: '三角方块(向上)',
+        blocks: [[1, 0], [0, 1], [1, 1], [2, 1]],
+        width: 3,
+        height: 2
+    },
+    
+    // 8. 三角方块 (Triangle-Shape) - 向右
+    triangle_right: {
+        name: 'triangle_right',
+        description: '三角方块(向右)',
+        blocks: [[0, 0], [0, 1], [1, 1], [0, 2]],
+        width: 2,
+        height: 3
+    },
+    
+    // 8. 三角方块 (Triangle-Shape) - 向下
+    triangle_down: {
+        name: 'triangle_down',
+        description: '三角方块(向下)',
+        blocks: [[0, 0], [1, 0], [2, 0], [1, 1]],
+        width: 3,
+        height: 2
+    },
+    
+    // 8. 三角方块 (Triangle-Shape) - 向左
+    triangle_left: {
+        name: 'triangle_left',
+        description: '三角方块(向左)',
+        blocks: [[1, 0], [2, 1], [1, 1], [1, 2]],
+        width: 2,
+        height: 3
     }
 };
 
-// 创建方块 - 适配抖音小游戏Canvas环境
-var createBlock = function (id, color, position, shape, layer) {
-    layer = layer || 0;
+// 随机颜色分配函数
+var getRandomColor = function() {
+    var colorKeys = Object.keys(BLOCK_COLORS);
+    var randomIndex = Math.floor(Math.random() * colorKeys.length);
+    return colorKeys[randomIndex];
+};
 
-    console.log('createBlock 调用参数:', {id: id, color: color, position: position, shape: shape, layer: layer});
-    console.log('BLOCK_COLORS 可用颜色:', Object.keys(BLOCK_COLORS));
-    console.log('BLOCK_SHAPES 可用形状:', Object.keys(BLOCK_SHAPES));
+// 随机方块类型分配函数
+var getRandomBlockType = function() {
+    var typeKeys = Object.keys(BLOCK_TYPES);
+    var randomIndex = Math.floor(Math.random() * typeKeys.length);
+    return typeKeys[randomIndex];
+};
+
+// 创建方块 - 重新设计的方块创建系统
+var createBlock = function (id, blockType, color, position, layer, options) {
+    layer = layer || 0;
+    options = options || {};
+
+    // 如果没有指定颜色，随机分配
+    if (!color) {
+        color = getRandomColor();
+    }
+    
+    // 如果没有指定方块类型，随机分配
+    if (!blockType) {
+        blockType = getRandomBlockType();
+    }
+
+    console.log('createBlock 调用参数:', {
+        id: id, 
+        blockType: blockType, 
+        color: color, 
+        position: position, 
+        layer: layer,
+        options: options
+    });
 
     var colorData = BLOCK_COLORS[color];
-
-    console.log('查找结果:', {colorData: colorData});
+    var typeData = BLOCK_TYPES[blockType];
 
     if (!colorData) {
         console.error('无效的颜色: ' + color);
         return null;
     }
 
-    // 使用 colorData 中的 blocks 数据作为 shapeData
-    // 根据方块形状智能选择眼睛位置
-    var eyePosition = 'center'; // 默认眼睛在中心
-    var eyeType = 'circle'; // 默认圆形眼睛
-
-    // 根据方块形状调整眼睛位置
-    if (colorData.blocks.length === 1) {
-        // 单个方块
-        eyePosition = 'center';
-        eyeType = 'circle';
-    } else if (colorData.blocks.length === 2) {
-        // 两个方块
-        eyePosition = 'top';
-        eyeType = 'square';
-    } else if (colorData.blocks.length === 3) {
-        // 三个方块
-        eyePosition = 'top';
-        eyeType = 'triangle';
-    } else if (colorData.blocks.length >= 4) {
-        // 四个或更多方块
-        eyePosition = 'top';
-        eyeType = 'star';
+    if (!typeData) {
+        console.error('无效的方块类型: ' + blockType);
+        return null;
     }
-
-    var shapeData = {
-        blocks: colorData.blocks, eyePosition: eyePosition, eyeType: eyeType, description: colorData.shape || '方块'
-    };
 
     var block = {
         id: id,
+        type: blockType,
+        typeData: typeData,
         color: color,
         colorData: colorData,
-        shape: shape,
-        shapeData: shapeData,
         position: position,
         layer: layer,
         state: BlockStates.idle,
         element: null,
         animations: {},
         isSelected: false,
-        isMoving: false
+        isMoving: false,
+        // 冰块属性
+        isIce: options.isIce || false,
+        // 其他属性
+        alpha: options.alpha || 1,
+        scale: options.scale || 1
     };
 
     // 创建Canvas元素
     block.element = {
         x: position.x * GAME_CONFIG.CELL_SIZE,
         y: position.y * GAME_CONFIG.CELL_SIZE,
-        width: Math.max.apply(Math, shapeData.blocks.map(function (block) {
-            return block[0];
-        })) + 1,
-        height: Math.max.apply(Math, shapeData.blocks.map(function (block) {
-            return block[1];
-        })) + 1,
-        blocks: shapeData.blocks,
+        width: typeData.width * GAME_CONFIG.CELL_SIZE,
+        height: typeData.height * GAME_CONFIG.CELL_SIZE,
+        blocks: typeData.blocks,
         color: colorData.gradient,
-        scale: 1,
-        rotation: 0,
-        alpha: 1,
+        scale: block.scale,
+        rotation: 0, // Canvas旋转角度
+        alpha: block.alpha,
     };
 
     return block;
 };
 
-// 绘制方块到Canvas
+// 绘制方块到Canvas - 重新设计的绘制系统
 var drawBlock = function (ctx, block, startX, startY) {
     startX = startX || 0;
     startY = startY || 0;
@@ -242,9 +350,12 @@ var drawBlock = function (ctx, block, startX, startY) {
     var y = startY + element.y;
 
     ctx.save();
-    ctx.translate(x + element.width * GAME_CONFIG.CELL_SIZE / 2, y + element.height * GAME_CONFIG.CELL_SIZE / 2);
+    ctx.globalAlpha = element.alpha;
+    
+    // 应用变换
+    ctx.translate(x + element.width / 2, y + element.height / 2);
     ctx.scale(element.scale, element.scale);
-    ctx.translate(-element.width * GAME_CONFIG.CELL_SIZE / 2, -element.height * GAME_CONFIG.CELL_SIZE / 2);
+    ctx.translate(-element.width / 2, -element.height / 2);
 
     // 绘制方块
     element.blocks.forEach(function (blockPart) {
@@ -260,140 +371,142 @@ var drawBlock = function (ctx, block, startX, startY) {
         ctx.lineWidth = 1;
         ctx.strokeRect(blockX, blockY, GAME_CONFIG.CELL_SIZE, GAME_CONFIG.CELL_SIZE);
 
-        // 绘制眼睛（在第一个方块上）- 使用简化版本
-        if (blockPart === element.blocks[0]) {
-            // 简化的眼睛绘制，避免依赖 creature.js
-            var eyeSize = GAME_CONFIG.CREATURE_CONFIG.EYE_SIZE;
-            var eyeOffset = 6; // 眼睛偏移
-            var eyeSpacing = 12; // 眼睛间距
-
-            // 左眼
-            ctx.fillStyle = 'white';
-            ctx.beginPath();
-            ctx.arc(blockX + eyeOffset, blockY + eyeOffset, eyeSize, 0, 2 * Math.PI);
-            ctx.fill();
-
-            // 右眼
-            ctx.beginPath();
-            ctx.arc(blockX + eyeOffset + eyeSpacing, blockY + eyeOffset, eyeSize, 0, 2 * Math.PI);
-            ctx.fill();
-
-            // 眼珠
-            ctx.fillStyle = 'black';
-            ctx.beginPath();
-            ctx.arc(blockX + eyeOffset, blockY + eyeOffset, eyeSize / 2, 0, 2 * Math.PI);
-            ctx.fill();
-
-            ctx.beginPath();
-            ctx.arc(blockX + eyeOffset + eyeSpacing, blockY + eyeOffset, eyeSize / 2, 0, 2 * Math.PI);
-            ctx.fill();
+        // 如果是冰块，绘制冰块效果
+        if (block.isIce) {
+            drawIceEffect(ctx, blockX, blockY);
         }
     });
 
     ctx.restore();
 };
 
-// 注意：drawEyes 函数在 creature.js 中定义，这里不重复定义
-// 如果需要在 block.js 中使用，应该调用 creature.js 中的版本
-
-// 注意：getColorFromGradient 函数在 creature.js 中定义，这里不重复定义
-
-
-// 创建冰块
-var createIce = function (iceConfig) {
-    // 支持两种调用方式：createIce(id, position, layer) 或 createIce({id, position, layer})
-    let id, position, layer;
-    if (typeof iceConfig === 'object' && iceConfig.id) {
-        // 新格式：传入配置对象
-        id = iceConfig.id;
-        position = iceConfig.position;
-        layer = iceConfig.layer || 1;
-    } else {
-        // 旧格式：分别传入参数
-        id = iceConfig;
-        position = arguments[1];
-        layer = arguments[2] || 1;
-    }
-
-    var ice = {
-        id: id, position: position, layer: layer, 
-        meltProgress: 0, // 融化进度 0-100
-        element: {
-        x: position.x * GAME_CONFIG.CELL_SIZE,
-        y: position.y * GAME_CONFIG.CELL_SIZE,
-        width: GAME_CONFIG.CELL_SIZE,
-        height: GAME_CONFIG.CELL_SIZE,
-            alpha: 0.7
-        }, // 添加 shapeData 属性，冰块是单个格子
-        shapeData: {
-            blocks: [[0, 0]], width: 1, height: 1
-        }
-    };
-
-    return ice;
-};
-
-// 绘制冰块
-var drawIce = function (ctx, ice, startX, startY) {
-    startX = startX || 0;
-    startY = startY || 0;
-
-    var element = ice.element;
-    var x = startX + element.x;
-    var y = startY + element.y;
-
+// 绘制冰块效果
+var drawIceEffect = function(ctx, x, y) {
     ctx.save();
-    ctx.globalAlpha = element.alpha;
-
-    // 绘制冰块背景
-    ctx.fillStyle = 'rgba(173, 216, 230, 0.8)';
-    ctx.fillRect(x, y, element.width, element.height);
-
+    
+    // 绘制冰块覆盖层
+    ctx.fillStyle = 'rgba(173, 216, 230, 0.6)';
+    ctx.fillRect(x, y, GAME_CONFIG.CELL_SIZE, GAME_CONFIG.CELL_SIZE);
+    
     // 绘制冰块边框
     ctx.strokeStyle = 'rgba(135, 206, 235, 0.9)';
     ctx.lineWidth = 2;
-    ctx.strokeRect(x, y, element.width, element.height);
-
+    ctx.strokeRect(x, y, GAME_CONFIG.CELL_SIZE, GAME_CONFIG.CELL_SIZE);
+    
     // 绘制冰块纹理
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
     ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.moveTo(x + 5, y + 5);
-    ctx.lineTo(x + element.width - 5, y + element.height - 5);
-    ctx.moveTo(x + element.width - 5, y + 5);
-    ctx.lineTo(x + 5, y + element.height - 5);
+    ctx.lineTo(x + GAME_CONFIG.CELL_SIZE - 5, y + GAME_CONFIG.CELL_SIZE - 5);
+    ctx.moveTo(x + GAME_CONFIG.CELL_SIZE - 5, y + 5);
+    ctx.lineTo(x + 5, y + GAME_CONFIG.CELL_SIZE - 5);
     ctx.stroke();
-
+    
     ctx.restore();
+};
+
+// 获取方块的旋转版本（返回新的方块类型名称）
+var getRotatedBlockType = function(blockType, direction) {
+    direction = direction || 1; // 1为顺时针，-1为逆时针
+    
+    var rotationMap = {
+        // Line2 旋转
+        'line2_h': 'line2_v',
+        'line2_v': 'line2_h',
+        
+        // Line3 旋转
+        'line3_h': 'line3_v',
+        'line3_v': 'line3_h',
+        
+        // L-Shape 旋转
+        'lshape_up': 'lshape_right',
+        'lshape_right': 'lshape_down',
+        'lshape_down': 'lshape_left',
+        'lshape_left': 'lshape_up',
+        
+        // T-Shape 旋转
+        'tshape_up': 'tshape_right',
+        'tshape_right': 'tshape_down',
+        'tshape_down': 'tshape_left',
+        'tshape_left': 'tshape_up',
+        
+        // H-Shape 旋转
+        'hshape_up': 'hshape_right',
+        'hshape_right': 'hshape_down',
+        'hshape_down': 'hshape_left',
+        'hshape_left': 'hshape_up',
+        
+        // Triangle 旋转
+        'triangle_up': 'triangle_right',
+        'triangle_right': 'triangle_down',
+        'triangle_down': 'triangle_left',
+        'triangle_left': 'triangle_up'
+    };
+    
+    if (direction === -1) {
+        // 逆时针旋转，需要反转映射
+        var reverseMap = {};
+        for (var key in rotationMap) {
+            reverseMap[rotationMap[key]] = key;
+        }
+        return reverseMap[blockType] || blockType;
+    }
+    
+    return rotationMap[blockType] || blockType;
+};
+
+// 创建冰块方块（便捷函数）
+var createIceBlock = function(id, blockType, color, position, layer) {
+    return createBlock(id, blockType, color, position, layer, {
+        isIce: true
+    });
+};
+
+// 融化冰块（整个方块一起融化）
+var meltIce = function(block) {
+    if (block.isIce) {
+        block.isIce = false;
+    }
+    return block;
 };
 
 // 确保在抖音小游戏环境中可用
 if (typeof window !== 'undefined') {
     window.BlockStates = BlockStates;
     window.BLOCK_COLORS = BLOCK_COLORS;
-    window.BLOCK_SHAPES = BLOCK_SHAPES;
-    window.EYE_TYPES = EYE_TYPES;
+    window.BLOCK_TYPES = BLOCK_TYPES;
+    window.getRandomColor = getRandomColor;
+    window.getRandomBlockType = getRandomBlockType;
     window.createBlock = createBlock;
     window.drawBlock = drawBlock;
-    window.createIce = createIce;
-    window.drawIce = drawIce;
+    window.drawIceEffect = drawIceEffect;
+    window.getRotatedBlockType = getRotatedBlockType;
+    window.createIceBlock = createIceBlock;
+    window.meltIce = meltIce;
 } else if (typeof global !== 'undefined') {
     global.BlockStates = BlockStates;
     global.BLOCK_COLORS = BLOCK_COLORS;
-    global.BLOCK_SHAPES = BLOCK_SHAPES;
-    global.EYE_TYPES = EYE_TYPES;
+    global.BLOCK_TYPES = BLOCK_TYPES;
+    global.getRandomColor = getRandomColor;
+    global.getRandomBlockType = getRandomBlockType;
     global.createBlock = createBlock;
     global.drawBlock = drawBlock;
-    global.createIce = createIce;
-    global.drawIce = drawIce;
+    global.drawIceEffect = drawIceEffect;
+    global.getRotatedBlockType = getRotatedBlockType;
+    global.createIceBlock = createIceBlock;
+    global.meltIce = meltIce;
 } else {
     // 在抖音小游戏环境中，直接设置为全局变量
     this.BlockStates = BlockStates;
     this.BLOCK_COLORS = BLOCK_COLORS;
-    this.BLOCK_SHAPES = BLOCK_SHAPES;
-    this.EYE_TYPES = EYE_TYPES;
+    this.BLOCK_TYPES = BLOCK_TYPES;
+    this.getRandomColor = getRandomColor;
+    this.getRandomBlockType = getRandomBlockType;
     this.createBlock = createBlock;
     this.drawBlock = drawBlock;
-    this.createIce = createIce;
-    this.drawIce = drawIce;
+    this.drawIceEffect = drawIceEffect;
+    this.getRotatedBlockType = getRotatedBlockType;
+    this.createIceBlock = createIceBlock;
+    this.meltIce = meltIce;
 }
