@@ -44,20 +44,7 @@ class MapEngine {
             this.setRenderContext(ctx, systemInfo);
         }
 
-        // 颜色常量
-        this.COLORS = {
-            WHITE: 'rgba(255, 255, 255, ',
-            BLACK: 'rgba(0, 0, 0, ',
-            ICE_BLUE: 'rgba(173, 216, 230, ',
-            ICE_BORDER: 'rgba(135, 206, 235, ',
-            ROCK_GRAY: 'rgba(64, 64, 64, 0.8)',
-            SHADOW: 'rgba(0, 0, 0, 0.6)'
-        };
-
-        // 样式常量
-        this.STYLES = {
-            LINE_WIDTH_THIN: 1, LINE_WIDTH_THICK: 2, FONT_SMALL: '12px Arial', TEXT_ALIGN_CENTER: 'center'
-        };
+        // 使用全局配置
 
         // 元素类型碰撞规则配置
         this.collisionRules = {
@@ -449,13 +436,7 @@ class MapEngine {
         // 使用固定格子大小
         this.cellSize = GAME_CONFIG.CELL_SIZE;
         
-        // 基于棋盘矩阵计算网格尺寸
-        if (this.boardMatrix) {
-            const matrixWidth = this.boardMatrix[0] ? this.boardMatrix[0].length : this.GRID_SIZE;
-            const matrixHeight = this.boardMatrix.length;
-            this.GRID_SIZE = Math.max(matrixWidth, matrixHeight);
-        }
-        
+        // 网格尺寸由 updateGridFromBoard() 设置，这里只计算渲染尺寸
         // 计算网格总尺寸
         this.gridSize = this.cellSize * this.GRID_SIZE;
         
@@ -617,7 +598,7 @@ class MapEngine {
 
                 // 绘制网格线
                 this.ctx.strokeStyle = 'rgba(128, 128, 128, 0.5)';
-                this.ctx.lineWidth = this.STYLES.LINE_WIDTH_THIN;
+                this.ctx.lineWidth = GAME_CONFIG.STYLES.LINE_WIDTH_THIN;
                 this.ctx.strokeRect(cellX, cellY, this.cellSize, this.cellSize);
             }
         }
@@ -661,9 +642,9 @@ class MapEngine {
             this.drawCellWithStyle(screenX, screenY, {
                 fillColor: '#404040',
                 strokeColor: '#2A2A2A',
-                strokeWidth: this.STYLES.LINE_WIDTH_THICK,
-                textureColor: this.COLORS.BLACK + '0.3)',
-                highlightColor: this.COLORS.WHITE + '0.2)'
+                strokeWidth: GAME_CONFIG.STYLES.LINE_WIDTH_THICK,
+                textureColor: GAME_CONFIG.COLORS.BLACK + '0.3)',
+                highlightColor: GAME_CONFIG.COLORS.WHITE + '0.2)'
             });
         });
     }
@@ -683,11 +664,11 @@ class MapEngine {
                     const pos = this.getCellScreenPosition(cell);
 
                     this.drawCellWithStyle(pos.x, pos.y, {
-                        fillColor: this.COLORS.ICE_BLUE + '0.8)',
-                        strokeColor: this.COLORS.ICE_BORDER + '1.0)',
-                        strokeWidth: this.STYLES.LINE_WIDTH_THIN,
-                        textureColor: this.COLORS.WHITE + '0.3)',
-                        highlightColor: this.COLORS.WHITE + '0.15)'
+                        fillColor: GAME_CONFIG.COLORS.ICE_BLUE + '0.8)',
+                        strokeColor: GAME_CONFIG.COLORS.ICE_BORDER + '1.0)',
+                        strokeWidth: GAME_CONFIG.STYLES.LINE_WIDTH_THIN,
+                        textureColor: GAME_CONFIG.COLORS.WHITE + '0.3)',
+                        highlightColor: GAME_CONFIG.COLORS.WHITE + '0.15)'
                     });
                 });
             }
@@ -706,14 +687,11 @@ class MapEngine {
             cells.forEach(cell => {
                 const pos = this.getCellScreenPosition(cell);
 
-                // 冰层效果 - 使用相同的冰块颜色
-                this.ctx.fillStyle = this.COLORS.ICE_BLUE + '0.8)';
-                this.drawRect(pos.x, pos.y, this.cellSize, this.cellSize);
-
-                // 冰层边框
-                this.ctx.strokeStyle = this.COLORS.ICE_BORDER + '1.0)';
-                this.ctx.lineWidth = this.STYLES.LINE_WIDTH_THIN;
-                this.drawRect(pos.x, pos.y, this.cellSize, this.cellSize, false, true);
+                this.drawCellWithStyle(pos.x, pos.y, {
+                    fillColor: GAME_CONFIG.COLORS.ICE_BLUE + '0.8)',
+                    strokeColor: GAME_CONFIG.COLORS.ICE_BORDER + '1.0)',
+                    strokeWidth: GAME_CONFIG.STYLES.LINE_WIDTH_THIN
+                });
             });
         });
     }
@@ -775,7 +753,7 @@ class MapEngine {
         // 边框
         if (style.strokeColor) {
             this.ctx.strokeStyle = style.strokeColor;
-            this.ctx.lineWidth = style.strokeWidth || this.STYLES.LINE_WIDTH_THIN;
+            this.ctx.lineWidth = style.strokeWidth || GAME_CONFIG.STYLES.LINE_WIDTH_THIN;
             this.drawRect(x, y, this.cellSize, this.cellSize, false, true);
         }
 
@@ -816,7 +794,7 @@ class MapEngine {
         if (!this.ctx) return;
 
         // 绘制游戏状态信息
-        this.ctx.fillStyle = this.COLORS.WHITE + '0.9)';
+        this.ctx.fillStyle = GAME_CONFIG.COLORS.WHITE + '0.9)';
         this.setTextStyle('16px Arial', 'left');
 
         const infoY = 30;

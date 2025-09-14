@@ -64,6 +64,27 @@ const GAME_CONFIG = {
     EYE_OFFSET: 14, // 眼睛偏移（更居中）
     FOOT_SIZE: 6, // 脚的大小
     WING_SIZE: 12 // 翅膀大小
+  },
+  
+  // 颜色配置
+  COLORS: {
+    WHITE: 'rgba(255, 255, 255, ',
+    BLACK: 'rgba(0, 0, 0, ',
+    BOARD: '#F5F5F5',
+    WALL: '#808080',
+    ICE_BLUE: 'rgba(173, 216, 230, ',
+    ICE_BORDER: 'rgba(100, 149, 237, ',
+    ROCK: '#404040',
+    ROCK_BORDER: '#2A2A2A'
+  },
+  
+  // 样式配置
+  STYLES: {
+    LINE_WIDTH_THIN: 1,
+    LINE_WIDTH_THICK: 2,
+    FONT_SIZE_SMALL: 12,
+    FONT_SIZE_MEDIUM: 14,
+    FONT_SIZE_LARGE: 16
   }
 };
 
