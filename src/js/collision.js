@@ -69,17 +69,14 @@ class CollisionDetector {
     canExitThroughGate(block, gate, grid, blocks) {
         // 检查颜色匹配
         if (block.color !== gate.color) {
-            console.log(`[通过门] 颜色不匹配: 方块${block.color} vs 门${gate.color}`);
             return {canExit: false, reason: 'color_mismatch'};
         }
 
         // 检查方块是否可以完全离开网格（统一的门检测逻辑）
         if (!this.canBlockFullyExitGrid(block, gate, grid, blocks)) {
-            console.log(`[通过门] 方块无法通过门: 方块${block.id}不满足出门条件`);
             return {canExit: false, reason: 'cannot_exit'};
         }
 
-        console.log(`[通过门] 检查通过: 方块${block.id}可以通过门${gate.id}`);
         return {canExit: true, reason: 'success'};
     }
     
@@ -125,13 +122,11 @@ class CollisionDetector {
             case 'down':
                 // 上下方向的门，检查宽度是否足够
                 sizeCheckPassed = gate.length >= blockBounds.width;
-                console.log(`[尺寸检查] 上下方向: 门长度${gate.length} vs 方块宽度${blockBounds.width}: ${sizeCheckPassed ? '✅' : '❌'}`);
                 break;
             case 'left':
             case 'right':
                 // 左右方向的门，检查高度是否足够
                 sizeCheckPassed = gate.length >= blockBounds.height;
-                console.log(`[尺寸检查] 左右方向: 门长度${gate.length} vs 方块高度${blockBounds.height}: ${sizeCheckPassed ? '✅' : '❌'}`);
                 break;
         }
 
@@ -156,7 +151,6 @@ class CollisionDetector {
                 const gateMaxX = gate.position.x + gate.length - 1;
                 
                 const xInRange = minX >= gateMinX && maxX <= gateMaxX;
-                console.log(`[门范围检查] 方块x范围 [${minX}, ${maxX}] vs 门x范围 [${gateMinX}, ${gateMaxX}]: ${xInRange ? '✅' : '❌'}`);
                 return xInRange;
                 
             case 'left':
@@ -168,7 +162,6 @@ class CollisionDetector {
                 const gateMaxY = gate.position.y + gate.length - 1;
                 
                 const yInRange = minY >= gateMinY && maxY <= gateMaxY;
-                console.log(`[门范围检查] 方块y范围 [${minY}, ${maxY}] vs 门y范围 [${gateMinY}, ${gateMaxY}]: ${yInRange ? '✅' : '❌'}`);
                 return yInRange;
                 
             default:
@@ -187,27 +180,19 @@ class CollisionDetector {
         switch (gate.direction) {
             case 'up':
                 // 检查是否有格子贴着上边界 (y=0)
-                const touchingUp = blockCells.some(cell => cell.y === 0);
-                console.log(`[贴门检查] 向上: ${touchingUp ? '✅' : '❌'}`);
-                return touchingUp;
+                return blockCells.some(cell => cell.y === 0);
                 
             case 'down':
                 // 检查是否有格子贴着下边界 (y=7)
-                const touchingDown = blockCells.some(cell => cell.y === this.GRID_SIZE - 1);
-                console.log(`[贴门检查] 向下: ${touchingDown ? '✅' : '❌'}`);
-                return touchingDown;
+                return blockCells.some(cell => cell.y === this.GRID_SIZE - 1);
                 
             case 'left':
                 // 检查是否有格子贴着左边界 (x=0)
-                const touchingLeft = blockCells.some(cell => cell.x === 0);
-                console.log(`[贴门检查] 向左: ${touchingLeft ? '✅' : '❌'}`);
-                return touchingLeft;
+                return blockCells.some(cell => cell.x === 0);
                 
             case 'right':
                 // 检查是否有格子贴着右边界 (x=7)
-                const touchingRight = blockCells.some(cell => cell.x === this.GRID_SIZE - 1);
-                console.log(`[贴门检查] 向右: ${touchingRight ? '✅' : '❌'}`);
-                return touchingRight;
+                return blockCells.some(cell => cell.x === this.GRID_SIZE - 1);
                 
             default:
                 return false;
@@ -244,8 +229,6 @@ class CollisionDetector {
                 break;
         }
         
-        console.log(`[路径检查] 方块需要移动 ${stepsToExit} 步才能完全离开网格`);
-        
         // 检查每一步移动路径上是否有障碍物
         for (let step = 1; step <= stepsToExit; step++) {
             let pathCells = [];
@@ -272,7 +255,6 @@ class CollisionDetector {
                     if (grid && grid[pathCell.y] && grid[pathCell.y][pathCell.x]) {
                         const gridValue = grid[pathCell.y][pathCell.x];
                         if (gridValue && gridValue !== block.id) {
-                            console.log(`[路径检查] 步骤 ${step} 位置 (${pathCell.x}, ${pathCell.y}) 被 ${gridValue} 阻挡`);
                             return false;
                         }
                     }
@@ -280,7 +262,6 @@ class CollisionDetector {
             }
         }
         
-        console.log(`[路径检查] 出门路径畅通`);
         return true;
     }
 

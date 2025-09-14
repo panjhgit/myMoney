@@ -138,8 +138,6 @@ class MapEngine {
      * 添加方块
      */
     addBlock(block) {
-        console.log(`[添加方块] ${block.id}: layer=${block.layer}, color=${block.color}`);
-
         if (typeof createCreature === 'undefined') {
             console.error('createCreature 函数未找到');
             return;
@@ -174,8 +172,6 @@ class MapEngine {
             blockElement: blockElement
         };
 
-        console.log(`[添加方块] 创建的元素: id=${element.id}, layer=${element.layer}, movable=${element.movable}`);
-        console.log(`[添加方块] 原始方块ID: ${block.id}, 新生成ID: ${blockElement.id}`);
         this.blocks.set(element.id, element);
         this.updateGrid();
     }
@@ -207,8 +203,6 @@ class MapEngine {
      * 更新网格数据
      */
     updateGrid() {
-        console.log(`[更新网格] 开始更新网格，方块数量: ${this.blocks.size}`);
-
         // 清空网格
         this.grid.forEach(row => row.fill(null));
 
@@ -217,8 +211,6 @@ class MapEngine {
             const layerBlocks = this.getBlocksByLayer(layer);
             
             if (layerBlocks.length > 0) {
-                console.log(`[更新网格] 第${layer}层: ${layerBlocks.length}个方块`);
-                
                 // 添加方块
                 layerBlocks.forEach(block => {
                     const cells = this.collisionDetector.getBlockCells(block);
@@ -243,29 +235,22 @@ class MapEngine {
                 });
             }
         }
-
-        console.log(`[更新网格] 网格更新完成`);
     }
 
     /**
      * 选择方块
      */
     selectBlock(blockId) {
-        console.log(`[选择] 尝试选择方块: ${blockId}`);
         const block = this.blocks.get(blockId);
         if (!block) {
-            console.log(`[选择] 方块不存在: ${blockId}`);
             return false;
         }
 
-        console.log(`[选择] 方块属性: layer=${block.layer}, movable=${block.movable}`);
         if (!block.movable) {
-            console.log(`[选择] 方块不可移动: ${blockId}`);
             return false;
         }
 
         this.selectedBlock = block;
-        console.log(`[选择] 成功选择方块: ${blockId}`);
         
         // 🔧 优化：选择方块后触发重绘
         if (typeof markNeedsRedraw === 'function') {
@@ -281,11 +266,8 @@ class MapEngine {
      * @param {Object} movedBlock - 移动或消除的方块（可选）
      */
     processIceBlocks(movedBlock = null) {
-        console.log(`[冰块处理] 开始处理冰块 - ${movedBlock ? `移动方块: ${movedBlock.id}` : '消除方块'}`);
-        
         // 获取所有下层方块（冰块）
         const lowerBlocks = this.getLowerLayerBlocks();
-        console.log(`[冰块处理] 找到 ${lowerBlocks.length} 个下层方块`);
         
         lowerBlocks.forEach(block => {
             // 排除刚移动的方块（如果提供了movedBlock）
@@ -295,33 +277,14 @@ class MapEngine {
             
             // 检查方块是否完全显露
             const isFullyRevealed = this.collisionDetector.isBlockFullyRevealed(block, this.grid, this.blocks);
-            console.log(`[冰块处理] 方块 ${block.id} 完全显露: ${isFullyRevealed}`);
             
             if (isFullyRevealed) {
                 // 方块完全显露，直接显露（后续用精灵图动画）
-                console.log(`[冰块处理] 方块 ${block.id} 完全显露，直接显露`);
                 this.revealBlock(block);
             }
         });
     }
 
-    /**
-     * 检查层级显露（移动后调用） - 保持向后兼容
-     * @deprecated 使用 processIceBlocks() 替代
-     */
-    checkLayerReveal(movedBlock) {
-        console.log(`[层级显露] 使用旧方法，建议使用 processIceBlocks()`);
-        this.processIceBlocks(movedBlock);
-    }
-    
-    /**
-     * 检查冰块融化 - 保持向后兼容
-     * @deprecated 使用 processIceBlocks() 替代
-     */
-    checkIceMelting() {
-        console.log(`[冰块融化] 使用旧方法，建议使用 processIceBlocks()`);
-        this.processIceBlocks();
-    }
 
     /**
      * 显露方块
@@ -979,8 +942,6 @@ class MapEngine {
      * 处理点击事件
      */
     handleClick(x, y) {
-        console.log(`[点击] 屏幕坐标: (${x}, ${y})`);
-        
         // 🔧 优化：触发重绘
         if (typeof markNeedsRedraw === 'function') {
             markNeedsRedraw();
@@ -988,40 +949,31 @@ class MapEngine {
         
         // 检查是否有方块正在移动
         if (this.isAnyBlockMoving()) {
-            console.log(`[点击] 有方块正在移动中，请等待移动完成`);
             return;
         }
         
         const gridPos = this.screenToGrid(x, y);
-        console.log(`[点击] 网格坐标: (${gridPos.x}, ${gridPos.y})`);
 
         if (!this.collisionDetector.isValidPosition(gridPos.x, gridPos.y)) {
-            console.log(`[点击] 位置无效`);
             return;
         }
 
         const gridValue = this.grid[gridPos.y][gridPos.x];
-        console.log(`[点击] 网格值: ${gridValue}`);
 
         if (gridValue && this.blocks.has(gridValue)) {
             // 点击了方块
             const clickedBlock = this.blocks.get(gridValue);
-            console.log(`[点击] 点击了方块: ${gridValue}, layer=${clickedBlock.layer}, movable=${clickedBlock.movable}`);
             
             if (clickedBlock.movable) {
                 // 如果点击的是可移动方块，选择它
                 this.selectBlock(gridValue);
             } else if (this.selectedBlock) {
                 // 如果点击的是不可移动方块（如冰块），但已有选中方块，尝试移动
-                console.log(`[点击] 点击了不可移动方块，尝试移动已选中的方块: ${this.selectedBlock.id} 到 (${gridPos.x}, ${gridPos.y})`);
                 this.movementManager.smartMoveBlock(this.selectedBlock, gridPos, this.collisionDetector, this.grid, this.blocks, this.rocks, this);
             }
         } else if (this.selectedBlock) {
             // 点击了空白位置，尝试智能移动
-            console.log(`[点击] 尝试智能移动方块: ${this.selectedBlock.id} 到 (${gridPos.x}, ${gridPos.y})`);
             this.movementManager.smartMoveBlock(this.selectedBlock, gridPos, this.collisionDetector, this.grid, this.blocks, this.rocks, this);
-        } else {
-            console.log(`[点击] 没有选中方块`);
         }
     }
 

@@ -17,8 +17,6 @@ class MovementManager {
      * 计算A*路径 - 返回能到达的最远位置
      */
     calculatePath(block, startPos, targetPos, collisionDetector, grid, blocks, rocks) {
-        console.log(`[A*算法] 开始计算路径: (${startPos.x}, ${startPos.y}) → (${targetPos.x}, ${targetPos.y})`);
-        
         const openList = [];
         const closedList = new Set();
         let bestNode = null; // 记录最接近目标的节点
@@ -67,7 +65,6 @@ class MovementManager {
 
                 const collisionResult = collisionDetector.checkCollision(block, newPos, grid, blocks, rocks, block.id);
                 if (collisionResult.collision) {
-                    console.log(`[A*算法] 位置 (${newX}, ${newY}) 有碰撞: ${collisionResult.reason}`);
                     continue;
                 }
 
@@ -104,7 +101,6 @@ class MovementManager {
 
         // 如果无法到达目标，返回能到达的最远位置的路径
         if (bestNode && bestNode !== startNode) {
-            console.log(`[路径规划] 无法到达目标，返回最接近位置的路径`);
             return this.reconstructPath(bestNode);
         }
 
@@ -148,7 +144,6 @@ class MovementManager {
         
         // 如果没有blockElement，直接更新位置
         if (!block.blockElement || !block.blockElement.element) {
-            console.log(`[移动] 没有blockElement，直接更新位置`);
             block.position = {...endPos};
             gameEngine.updateGrid();
             gameEngine.processIceBlocks(block); // 统一处理冰块
@@ -214,8 +209,6 @@ class MovementManager {
      * 智能移动方块到最佳位置
      */
     smartMoveBlock(block, targetPos, collisionDetector, grid, blocks, rocks, gameEngine) {
-        console.log(`[智能移动] 方块 ${block.id} 尝试移动到 (${targetPos.x}, ${targetPos.y})`);
-        
         // 1. 找到最近的方块，让那个方块移动到目标位置
         const blockCells = collisionDetector.getBlockCells(block);
         let nearestCell = null;
@@ -230,8 +223,6 @@ class MovementManager {
             }
         }
         
-        console.log(`[智能移动] 最近方块: 绝对位置(${nearestCell.x}, ${nearestCell.y}), 距离: ${minDistance}`);
-        
         // 计算目标位置：让最近方块移动到目标位置
         // nearestCell是绝对位置，需要转换为相对位置
         const relativeX = nearestCell.x - block.position.x;
@@ -241,27 +232,21 @@ class MovementManager {
             y: targetPos.y - relativeY
         };
         
-        console.log(`[智能移动] 计算目标位置: (${targetPosition.x}, ${targetPosition.y})`);
-        
         // 2. 直接尝试移动到目标位置
         // 边界检查 - 允许移动到边界外（出地图）
         if (!collisionDetector.isValidPosition(targetPosition.x, targetPosition.y)) {
-            console.log(`[智能移动] 目标位置超出边界，尝试移动到边界外`);
             // 如果目标位置超出边界，尝试移动到边界位置
             const boundaryPos = this.getBoundaryPosition(targetPosition, collisionDetector.GRID_SIZE);
             if (boundaryPos) {
                 targetPosition.x = boundaryPos.x;
                 targetPosition.y = boundaryPos.y;
-                console.log(`[智能移动] 调整目标位置到边界: (${targetPosition.x}, ${targetPosition.y})`);
             } else {
-                console.log(`[智能移动] 无法调整到边界位置`);
                 return false;
             }
         }
         
         // 3. 检查目标位置是否是门的位置，如果是则不允许移动
         if (this.isTargetPositionAGate(targetPosition, gameEngine)) {
-            console.log(`[智能移动] 目标位置是门的位置，不允许移动`);
             return false;
         }
         
@@ -270,13 +255,9 @@ class MovementManager {
         const path = this.calculatePath(block, startPos, targetPosition, collisionDetector, grid, blocks, rocks);
         
         if (path && path.length > 0) {
-            console.log(`[智能移动] 找到路径，长度: ${path.length}`);
-            console.log(`[路径规划] 从 (${startPos.x}, ${startPos.y}) 到 (${targetPosition.x}, ${targetPosition.y})`);
-            console.log(`[路径规划] 路径详情: ${path.map(p => `(${p.x},${p.y})`).join(' → ')}`);
             this.executeMove(block, path, gameEngine);
             return true;
         } else {
-            console.log(`[智能移动] 无法到达目标位置: (${targetPosition.x}, ${targetPosition.y})`);
             return false;
         }
     }
@@ -306,7 +287,6 @@ class MovementManager {
             }
             
             if (isInGate) {
-                console.log(`[智能移动] 目标位置 (${targetPos.x}, ${targetPos.y}) 是门 ${gate.id} 的位置`);
                 return true;
             }
         }

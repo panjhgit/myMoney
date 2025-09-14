@@ -365,16 +365,6 @@ function setupGameEvents() {
   // 可以通过触摸手势或其他方式实现返回功能
 }
 
-// 导出到全局作用域
-if (typeof window !== 'undefined') {
-  window.markNeedsRedraw = markNeedsRedraw;
-}
-if (typeof global !== 'undefined') {
-  global.markNeedsRedraw = markNeedsRedraw;
-}
-if (typeof this !== 'undefined') {
-  this.markNeedsRedraw = markNeedsRedraw;
-}
 
 // 启动游戏 - 添加延迟确保模块加载完成
 setTimeout(() => {
