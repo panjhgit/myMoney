@@ -412,14 +412,6 @@ var getColorFromGradient = function (gradientString) {
 };
 
 
-// 销毁生物
-var destroyCreature = function (creature) {
-    // 在Canvas环境中，无需特殊清理
-};
-
-
-// 注意：全局导出统一在文件末尾进行，避免重复导出
-
 
 // 导出到全局作用域
 if (typeof window !== 'undefined') {
