@@ -213,6 +213,11 @@ function drawGame() {
   ctx.fillStyle = '#FFFFFF'; // 改回白色背景
   ctx.fillRect(0, 0, systemInfo.windowWidth, systemInfo.windowHeight);
   
+  // 🔧 修复：在游戏循环中持续处理冰块融化
+  if (mapEngine) {
+    mapEngine.processIceBlocks(null, true); // 持续处理冰块融化（游戏循环模式）
+  }
+  
   // 绘制地图状态信息
   drawGameInfo();
   

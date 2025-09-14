@@ -271,58 +271,50 @@ class MapEngine {
 
 
     /**
-     * 检查冰块融化
+     * 统一的冰块处理逻辑 - 在方块移动或消除后调用
+     * @param {Object} movedBlock - 移动或消除的方块（可选）
      */
-    checkIceMelting() {
-        // 检查所有下层方块（冰块）
+    processIceBlocks(movedBlock = null) {
+        console.log(`[冰块处理] 开始处理冰块 - ${movedBlock ? `移动方块: ${movedBlock.id}` : '消除方块'}`);
+        
+        // 获取所有下层方块（冰块）
         const lowerBlocks = this.getLowerLayerBlocks();
+        console.log(`[冰块处理] 找到 ${lowerBlocks.length} 个下层方块`);
         
         lowerBlocks.forEach(block => {
-            // 检查方块是否被覆盖
-            const isCovered = !this.collisionDetector.isBlockFullyRevealed(block, this.grid, this.blocks);
-
-            if (!isCovered && block.meltProgress < 100) {
-                // 开始融化
-                if (!block.meltProgress) {
-                    block.meltProgress = 0;
-                }
-                block.meltProgress += 2; // 每帧融化2%
-
-                if (block.meltProgress >= 100) {
-                    this.completeIceMelting(block);
-                }
+            // 排除刚移动的方块（如果提供了movedBlock）
+            if (movedBlock && block.id === movedBlock.id) {
+                return;
+            }
+            
+            // 检查方块是否完全显露
+            const isFullyRevealed = this.collisionDetector.isBlockFullyRevealed(block, this.grid, this.blocks);
+            console.log(`[冰块处理] 方块 ${block.id} 完全显露: ${isFullyRevealed}`);
+            
+            if (isFullyRevealed) {
+                // 方块完全显露，直接显露（后续用精灵图动画）
+                console.log(`[冰块处理] 方块 ${block.id} 完全显露，直接显露`);
+                this.revealBlock(block);
             }
         });
     }
 
     /**
-     * 完成冰块融化
-     */
-    completeIceMelting(block) {
-        console.log(`冰块 ${block.id} 融化完成`);
-        this.revealBlock(block);
-    }
-
-    /**
-     * 检查层级显露（移动后调用）
+     * 检查层级显露（移动后调用） - 保持向后兼容
+     * @deprecated 使用 processIceBlocks() 替代
      */
     checkLayerReveal(movedBlock) {
-        console.log(`[层级显露] 检查方块 ${movedBlock.id} 移动后的下层显露`);
-
-        // 检查所有下层方块，看是否有完全显露的
-        const lowerBlocks = this.getLowerLayerBlocks();
-        
-        lowerBlocks.forEach(block => {
-            if (block.id !== movedBlock.id) {
-                // 检查这个下层方块是否完全显露
-                const isFullyRevealed = this.collisionDetector.isBlockFullyRevealed(block, this.grid, this.blocks);
-
-                if (isFullyRevealed) {
-                    console.log(`[层级显露] 方块 ${block.id} 完全显露，开始融化`);
-                    this.revealBlock(block);
-                }
-            }
-        });
+        console.log(`[层级显露] 使用旧方法，建议使用 processIceBlocks()`);
+        this.processIceBlocks(movedBlock);
+    }
+    
+    /**
+     * 检查冰块融化 - 保持向后兼容
+     * @deprecated 使用 processIceBlocks() 替代
+     */
+    checkIceMelting() {
+        console.log(`[冰块融化] 使用旧方法，建议使用 processIceBlocks()`);
+        this.processIceBlocks();
     }
 
     /**
@@ -365,6 +357,10 @@ class MapEngine {
         this.blocks.delete(block.id);
         this.selectedBlock = null;
         this.updateGrid();
+
+        // 🔧 修复：方块出门后统一处理冰块
+        console.log(`[通过门] 处理冰块 - 方块 ${block.id} 出门后`);
+        this.processIceBlocks(block);
 
         // 检查胜利条件
         this.checkWinCondition();

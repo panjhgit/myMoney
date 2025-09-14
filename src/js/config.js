@@ -2,7 +2,7 @@
 const GAME_CONFIG = {
   // 网格配置
   GRID_SIZE: 8, // 8x8网格
-  CELL_SIZE: 45, // 每个格子40px
+  CELL_SIZE: 45, // 每个格子45px
   
   // 地图配置
   MIN_CELL_SIZE: 30, // 最小格子大小

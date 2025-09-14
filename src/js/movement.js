@@ -151,7 +151,7 @@ class MovementManager {
             console.log(`[移动] 没有blockElement，直接更新位置`);
             block.position = {...endPos};
             gameEngine.updateGrid();
-            gameEngine.checkIceMelting();
+            gameEngine.processIceBlocks(block); // 统一处理冰块
             gameEngine.checkGateExit(block);
             return;
         }
@@ -164,8 +164,7 @@ class MovementManager {
             onComplete: () => {
                 block.isMoving = false;
                 gameEngine.updateGrid();
-                gameEngine.checkIceMelting();
-                gameEngine.checkLayerReveal(block); // 检查层级显露
+                gameEngine.processIceBlocks(block); // 统一处理冰块
                 gameEngine.checkGateExit(block);
                 
                 if (gameEngine.animations) {

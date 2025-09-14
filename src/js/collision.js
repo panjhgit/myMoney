@@ -87,33 +87,29 @@ class CollisionDetector {
      * 检查方块是否可以完全离开网格（模拟移动到门外）
      */
     canBlockFullyExitGrid(block, gate, grid, blocks) {
+        // 缓存 blockCells 计算结果，避免重复计算
         const blockCells = this.getBlockCells(block);
         
         // 1. 检查门的尺寸是否足够让方块通过
         if (!this.isGateSizeSufficient(block, gate)) {
-            console.log(`[出门检查] 门的尺寸不够`);
             return false;
         }
         
-        // 2. 检查方块是否在门的覆盖范围内
-        if (!this.isBlockInGateRange(block, gate)) {
-            console.log(`[出门检查] 方块不在门的覆盖范围内`);
+        // 2. 检查方块是否在门的覆盖范围内（传递缓存的 blockCells）
+        if (!this.isBlockInGateRange(block, gate, blockCells)) {
             return false;
         }
         
-        // 3. 检查方块是否贴着门
-        if (!this.isBlockTouchingGate(block, gate)) {
-            console.log(`[出门检查] 方块没有贴着门`);
+        // 3. 检查方块是否贴着门（传递缓存的 blockCells）
+        if (!this.isBlockTouchingGate(block, gate, blockCells)) {
             return false;
         }
         
-        // 4. 检查出门路径是否畅通
-        if (!this.isExitPathClear(block, gate, grid, blocks)) {
-            console.log(`[出门检查] 出门路径被阻挡`);
+        // 4. 检查出门路径是否畅通（传递缓存的 blockCells）
+        if (!this.isExitPathClear(block, gate, grid, blocks, blockCells)) {
             return false;
         }
         
-        console.log(`[出门检查] 方块可以通过门`);
         return true;
     }
     
@@ -145,8 +141,10 @@ class CollisionDetector {
     /**
      * 检查方块是否在门的覆盖范围内
      */
-    isBlockInGateRange(block, gate) {
-        const blockCells = this.getBlockCells(block);
+    isBlockInGateRange(block, gate, blockCells = null) {
+        if (!blockCells) {
+            blockCells = this.getBlockCells(block);
+        }
         
         switch (gate.direction) {
             case 'up':
@@ -181,8 +179,10 @@ class CollisionDetector {
     /**
      * 检查方块是否贴着门
      */
-    isBlockTouchingGate(block, gate) {
-        const blockCells = this.getBlockCells(block);
+    isBlockTouchingGate(block, gate, blockCells = null) {
+        if (!blockCells) {
+            blockCells = this.getBlockCells(block);
+        }
         
         switch (gate.direction) {
             case 'up':
@@ -217,8 +217,10 @@ class CollisionDetector {
     /**
      * 检查出门路径是否畅通
      */
-    isExitPathClear(block, gate, grid, blocks) {
-        const blockCells = this.getBlockCells(block);
+    isExitPathClear(block, gate, grid, blocks, blockCells = null) {
+        if (!blockCells) {
+            blockCells = this.getBlockCells(block);
+        }
         
         // 计算方块需要移动多少步才能完全离开网格
         const minX = Math.min(...blockCells.map(cell => cell.x));
@@ -280,16 +282,6 @@ class CollisionDetector {
         
         console.log(`[路径检查] 出门路径畅通`);
         return true;
-    }
-
-
-    /**
-     * 获取网格值
-     */
-    getGridValue(x, y) {
-        // 这里需要访问游戏引擎的网格数据
-        // 暂时返回null，需要从外部传入
-        return null;
     }
 
     /**
