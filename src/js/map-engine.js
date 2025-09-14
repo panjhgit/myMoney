@@ -708,9 +708,7 @@ class MapEngine {
             green: '#96CEB4',
             yellow: '#FFEAA7',
             purple: '#DDA0DD',
-            orange: '#FFA500',
-            cyan: '#00CED1',
-            magenta: '#FF69B4'
+            orange: '#FFA500'
         };
         return colors[colorName] || '#CCCCCC';
     }
@@ -816,20 +814,7 @@ class MapEngine {
         // 只绘制第0层方块（可移动的方块）
         const topLayerBlocks = this.getBlocksByLayer(0);
         
-        console.log('绘制方块:', {
-            totalBlocks: this.blocks.size,
-            topLayerBlocks: topLayerBlocks.length,
-            blocks: Array.from(this.blocks.values()).map(b => ({
-                id: b.id,
-                layer: b.layer,
-                position: b.position,
-                hasShapeData: !!b.shapeData,
-                hasTypeData: !!b.typeData
-            }))
-        });
-        
         topLayerBlocks.forEach(block => {
-            console.log('绘制方块:', block.id, block.position, block.shapeData);
             this.drawTetrisBlock(block);
         });
     }
@@ -880,13 +865,6 @@ class MapEngine {
     drawTetrisBlock(block) {
         const cells = this.collisionDetector.getBlockCells(block);
         const color = this.getBlockColor(block.color);
-
-        console.log('drawTetrisBlock:', {
-            blockId: block.id,
-            cells: cells,
-            color: color,
-            shapeData: block.shapeData
-        });
 
         // 绘制方块主体和边框
         this.ctx.fillStyle = color;

@@ -18,7 +18,7 @@ var map1 = {
     }, {
         id: "gate_right_orange", color: "orange", position: {x: 7, y: 4}, length: 3, direction: "right"
     }, {
-        id: "gate_down_green", color: "green", position: {x: 1, y: 7}, length: 2, direction: "down"
+        id: "gate_down_green", color: "green", position: {x: 1, y: 7}, length: 3, direction: "down"
     }, {
         id: "gate_left_yellow", color: "yellow", position: {x: 0, y: 3}, length: 2, direction: "left"
     }],

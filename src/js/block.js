@@ -282,14 +282,6 @@ var createBlock = function (id, blockType, color, position, layer, options) {
         blockType = getRandomBlockType();
     }
 
-    console.log('createBlock 调用参数:', {
-        id: id, 
-        blockType: blockType, 
-        color: color, 
-        position: position, 
-        layer: layer,
-        options: options
-    });
 
     var colorData = BLOCK_COLORS[color];
     var typeData = BLOCK_TYPES[blockType];
