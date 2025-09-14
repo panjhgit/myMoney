@@ -7,7 +7,6 @@ console.log(
 require('./src/js/config.js'); // 加载统一配置
 require('./src/js/gsap.min.js');
 require('./src/js/block.js'); // 需要先加载，因为包含EYE_TYPES等常量
-require('./src/js/creature.js');
 require('./src/js/collision.js'); // 碰撞检测模块
 require('./src/js/movement.js'); // 移动逻辑模块
 require('./src/js/menu.js');
@@ -112,11 +111,6 @@ function startGame(levelId) {
     return;
   }
   
-  // 检查 Creature 系统是否已加载
-  if (typeof createCreature === 'undefined') {
-    console.error('Creature 系统未找到，请检查 creature.js 是否正确加载');
-    return;
-  }
   
   // 立即切换到游戏状态
   gameState = 'game';

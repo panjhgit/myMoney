@@ -6,13 +6,25 @@
 class CollisionDetector {
     constructor(gridSize) {
         this.GRID_SIZE = gridSize;
+        this.mapEngine = null; // MapEngine 引用
+    }
+
+    /**
+     * 设置 MapEngine 引用
+     */
+    setMapEngine(mapEngine) {
+        this.mapEngine = mapEngine;
     }
 
     /**
      * 检查位置是否在边界内
      */
     isValidPosition(x, y) {
-        return x >= 0 && x < this.GRID_SIZE && y >= 0 && y < this.GRID_SIZE;
+        if (this.mapEngine && this.mapEngine.boardMatrix) {
+            return this.mapEngine.isValidBoardPosition(x, y);
+        }
+        // 如果没有棋盘系统，则认为位置无效
+        return false;
     }
 
     /**
@@ -20,16 +32,18 @@ class CollisionDetector {
      */
     getBlockCells(block, position = null) {
         const pos = position || block.position;
-        const cells = [];
-
-        if (block.shapeData && block.shapeData.blocks) {
-            block.shapeData.blocks.forEach(blockCell => {
-                cells.push({
-                    x: pos.x + blockCell[0], y: pos.y + blockCell[1]
-                });
-            });
+        
+        // 使用 Block 类的方法获取方块格子
+        if (block.getCells && typeof block.getCells === 'function') {
+            return block.getCells().map(cell => ({
+                x: pos.x + (cell.x - block.position.x),
+                y: pos.y + (cell.y - block.position.y)
+            }));
         }
-        return cells;
+        
+        // 如果不是 Block 类，返回空数组
+        console.warn('getBlockCells: 方块不是 Block 类实例', block);
+        return [];
     }
 
     /**
@@ -269,25 +283,28 @@ class CollisionDetector {
      * 获取方块的边界尺寸
      */
     getBlockBounds(block) {
-        if (!block.shapeData || !block.shapeData.blocks) {
-            return {width: 1, height: 1};
+        // 使用 Block 类的方法获取方块格子
+        if (block.getCells && typeof block.getCells === 'function') {
+            const cells = block.getCells();
+            if (cells.length === 0) {
+                return {width: 1, height: 1};
+            }
+
+            const minX = Math.min(...cells.map(c => c.x));
+            const maxX = Math.max(...cells.map(c => c.x));
+            const minY = Math.min(...cells.map(c => c.y));
+            const maxY = Math.max(...cells.map(c => c.y));
+
+            return {
+                width: maxX - minX + 1, 
+                height: maxY - minY + 1,
+                minX, maxX, minY, maxY
+            };
         }
-
-        const blocks = block.shapeData.blocks;
-        if (blocks.length === 0) {
-            return {width: 1, height: 1};
-        }
-
-        const minX = Math.min(...blocks.map(b => b[0]));
-        const maxX = Math.max(...blocks.map(b => b[0]));
-        const minY = Math.min(...blocks.map(b => b[1]));
-        const maxY = Math.max(...blocks.map(b => b[1]));
-
-        return {
-            width: maxX - minX + 1, 
-            height: maxY - minY + 1,
-            minX, maxX, minY, maxY
-        };
+        
+        // 如果不是 Block 类，返回默认尺寸
+        console.warn('getBlockBounds: 方块不是 Block 类实例', block);
+        return {width: 1, height: 1};
     }
 
     /**

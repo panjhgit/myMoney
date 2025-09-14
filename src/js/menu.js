@@ -10,7 +10,7 @@ class MainMenu {
     this.lives = 5;
     this.maxLives = 5;
     this.currentLevel = 1;
-    this.maxUnlockedLevel = 2; // 解锁前两关用于测试
+    this.maxUnlockedLevel = 5; // 解锁前五关用于测试
     this.totalLevels = 500;
     
     // 滚动相关

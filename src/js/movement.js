@@ -142,16 +142,21 @@ class MovementManager {
             gameEngine.animations.get(animationId).kill();
         }
         
-        // 如果没有blockElement，直接更新位置
-        if (!block.blockElement || !block.blockElement.element) {
+        // 使用 Block 类的移动方法
+        if (block.moveTo && typeof block.moveTo === 'function') {
+            block.moveTo(endPos);
+        } else {
+            // 如果不是 Block 类，直接更新位置
             block.position = {...endPos};
+        }
+        
+        // 检查是否有动画系统
+        if (typeof gsap === 'undefined') {
             gameEngine.updateGrid();
-            gameEngine.processIceBlocks(block); // 统一处理冰块
+            gameEngine.processIceBlocks(block);
             gameEngine.checkGateExit(block);
             return;
         }
-        
-        const blockElement = block.blockElement.element;
         block.isMoving = true;
         
         // 创建动画时间线
@@ -190,17 +195,13 @@ class MovementManager {
             
             // 更新逻辑位置
             walkTimeline.call(() => {
-                block.position = {x: step.x, y: step.y};
+                if (block.moveTo && typeof block.moveTo === 'function') {
+                    block.moveTo({x: step.x, y: step.y});
+                } else {
+                    block.position = {x: step.x, y: step.y};
+                }
                 gameEngine.updateGrid();
             }, [], delay);
-            
-            // 更新渲染位置
-            walkTimeline.to(blockElement, {
-                x: step.x * GAME_CONFIG.CELL_SIZE, 
-                y: step.y * GAME_CONFIG.CELL_SIZE, 
-                duration: stepDuration, 
-                ease: "power2.out"
-            }, delay);
         });
     }
 
@@ -266,11 +267,11 @@ class MovementManager {
      * 检查目标位置是否是门的位置
      */
     isTargetPositionAGate(targetPos, gameEngine) {
-        if (!gameEngine || !gameEngine.mapEngine || !gameEngine.mapEngine.mapData) {
+        if (!gameEngine || !gameEngine.mapEngine) {
             return false;
         }
         
-        const gates = gameEngine.mapEngine.mapData.gates || [];
+        const gates = Array.from(gameEngine.mapEngine.gates.values());
         
         for (const gate of gates) {
             // 检查目标位置是否在门的范围内

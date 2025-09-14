@@ -12,6 +12,49 @@ const GAME_CONFIG = {
   ANIMATION_DURATION: 0.5, // 动画持续时间
   STEP_DURATION: 0.4, // 移动步长持续时间
   
+  // 新棋盘系统配置
+  BOARD_SYSTEM: {
+    // 棋盘元素类型定义
+    ELEMENT_TYPES: {
+      EMPTY: -1,      // 无意义，仅填充
+      WALL: 1,        // 墙边界
+      BOARD: 0,       // 棋盘区域
+      // 门类型 (2-9 对应不同颜色)
+      GATE_RED: 2,    // 红色门
+      GATE_BLUE: 3,   // 蓝色门
+      GATE_GREEN: 4,  // 绿色门
+      GATE_YELLOW: 5, // 黄色门
+      GATE_PURPLE: 6, // 紫色门
+      GATE_ORANGE: 7, // 橙色门
+      GATE_PINK: 8,   // 粉色门
+      GATE_CYAN: 9    // 青色门
+    },
+    
+    // 门颜色映射
+    GATE_COLOR_MAP: {
+      2: 'red',
+      3: 'blue', 
+      4: 'green',
+      5: 'yellow',
+      6: 'purple',
+      7: 'orange',
+      8: 'pink',
+      9: 'cyan'
+    },
+    
+    // 方块颜色到门类型的映射
+    COLOR_TO_GATE_TYPE: {
+      'red': 2,
+      'blue': 3,
+      'green': 4,
+      'yellow': 5,
+      'purple': 6,
+      'orange': 7,
+      'pink': 8,
+      'cyan': 9
+    }
+  },
+  
   // 生物配置
   CREATURE_CONFIG: {
     CELL_SIZE: 45, // 与主配置保持一致

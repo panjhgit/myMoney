@@ -9,6 +9,11 @@ class MapEngine {
         this.GRID_SIZE = GAME_CONFIG.GRID_SIZE;
         this.MAX_LAYERS = 10;
 
+        // 棋盘矩阵系统（整合自BoardSystem）
+        this.boardMatrix = null;
+        this.boardWidth = 0;
+        this.boardHeight = 0;
+
         // 核心数据结构
         this.grid = Array(this.GRID_SIZE).fill().map(() => Array(this.GRID_SIZE).fill(null));
         this.blocks = new Map(); // blockId -> Block
@@ -29,6 +34,7 @@ class MapEngine {
 
         // 模块
         this.collisionDetector = new CollisionDetector(this.GRID_SIZE);
+        this.collisionDetector.setMapEngine(this); // 设置引用
         this.movementManager = new MovementManager(this.GRID_SIZE);
 
         // 动画管理
@@ -40,7 +46,7 @@ class MapEngine {
             BLACK: 'rgba(0, 0, 0, ',
             ICE_BLUE: 'rgba(173, 216, 230, ',
             ICE_BORDER: 'rgba(135, 206, 235, ',
-            ROCK_GRAY: 'rgba(128, 128, 128, 0.3)',
+            ROCK_GRAY: 'rgba(64, 64, 64, 0.8)',
             SHADOW: 'rgba(0, 0, 0, 0.6)'
         };
 
@@ -87,9 +93,12 @@ class MapEngine {
         this.clearMap();
         this.currentLevel = mapData.level || 1;
 
-        // 加载门
-        if (mapData.gates) {
-            mapData.gates.forEach(gate => this.addGate(gate));
+        // 优先加载棋盘矩阵系统
+        if (mapData.boardMatrix) {
+            this.loadBoardFromMatrix(mapData.boardMatrix);
+        } else {
+            console.error('loadMap: 缺少 boardMatrix 数据，无法加载地图。');
+            return;
         }
 
         // 加载方块
@@ -119,34 +128,20 @@ class MapEngine {
         this.animations.clear();
     }
 
-    /**
-     * 添加门
-     */
-    addGate(gate) {
-        const gateElement = {
-            id: gate.id,
-            color: gate.color,
-            position: gate.position,
-            length: gate.length,
-            direction: gate.direction,
-            layer: 0
-        };
-        this.gates.set(gate.id, gateElement);
-    }
 
     /**
      * 添加方块
      */
     addBlock(block) {
-        if (typeof createBlock === 'undefined') {
-            console.error('createBlock 函数未找到');
+        if (typeof Block === 'undefined') {
+            console.error('Block 类未找到');
             return;
         }
 
-        // 使用新的方块创建系统
-        const blockElement = createBlock(
+        // 直接使用 Block 类，移除双重数据结构
+        const blockInstance = new Block(
             block.id,
-            block.blockType || block.shape, // 支持旧的shape参数
+            block.blockType, // 只使用 blockType，不再支持 shape
             block.color,
             block.position,
             block.layer || 0,
@@ -157,30 +152,13 @@ class MapEngine {
             }
         );
 
-        if (!blockElement) {
+        if (!blockInstance) {
             console.error('方块创建失败:', block);
             return;
         }
 
-        // 使用新的方块结构
-        const element = {
-            id: block.id,
-            type: 'tetris',
-            color: blockElement.color,
-            position: block.position,
-            initialPosition: {...block.position},
-            typeData: blockElement.typeData,
-            shapeData: {
-                blocks: blockElement.typeData.blocks,
-                description: blockElement.typeData.description
-            },
-            layer: block.layer || 0,
-            movable: (block.layer || 0) === 0, // 只有第0层才能移动
-            blockElement: blockElement,
-            isIce: blockElement.isIce || false
-        };
-
-        this.blocks.set(element.id, element);
+        // 直接存储 Block 实例，不再包装
+        this.blocks.set(blockInstance.id, blockInstance);
         this.updateGrid();
     }
 
@@ -299,8 +277,16 @@ class MapEngine {
      */
     revealBlock(block) {
         console.log(`显露方块: ${block.id}`);
-        block.layer = 0;
-        block.movable = true;
+        
+        // 使用 Block 类的显露方法
+        if (block.revealIce && typeof block.revealIce === 'function') {
+            block.revealIce();
+        } else {
+            // 如果不是 Block 类，使用旧逻辑
+            block.layer = 0;
+            block.movable = true;
+        }
+        
         this.updateGrid();
     }
 
@@ -659,29 +645,53 @@ class MapEngine {
      */
     drawBoard() {
         if (!this.ctx) return;
+        
+        // 使用新的棋盘矩阵系统绘制
+        if (this.boardMatrix) {
+            this.drawNewBoard();
+        } else {
+            console.warn('drawBoard: 未加载棋盘矩阵，无法绘制。');
+        }
+    }
 
-        // 使用与drawMapGrid相同的坐标系统
-        const boardWidth = this.GRID_SIZE * this.cellSize;
-        const boardHeight = this.GRID_SIZE * this.cellSize;
+    /**
+     * 使用棋盘矩阵绘制新棋盘
+     */
+    drawNewBoard() {
+        const matrix = this.boardMatrix;
         const startX = this.gridOffsetX;
         const startY = this.gridOffsetY;
-
-        // 绘制棋盘背景 - 灰色
-        this.ctx.fillStyle = 'rgba(128, 128, 128, 0.3)';
-        this.ctx.fillRect(startX, startY, boardWidth, boardHeight);
-
-        // 绘制网格线 - 深灰色
-        this.ctx.strokeStyle = 'rgba(64, 64, 64, 0.6)';
-        this.ctx.lineWidth = this.STYLES.LINE_WIDTH_THIN;
-
-        for (let row = 0; row <= this.GRID_SIZE; row++) {
-            const y = startY + row * this.cellSize;
-            this.drawLine(startX, y, startX + boardWidth, y);
-        }
-
-        for (let col = 0; col <= this.GRID_SIZE; col++) {
-            const x = startX + col * this.cellSize;
-            this.drawLine(x, startY, x, startY + boardHeight);
+        
+        for (let y = 0; y < matrix.length; y++) {
+            for (let x = 0; x < matrix[y].length; x++) {
+                const elementType = matrix[y][x];
+                const cellX = startX + x * this.cellSize;
+                const cellY = startY + y * this.cellSize;
+                
+                switch (elementType) {
+                    case GAME_CONFIG.BOARD_SYSTEM.ELEMENT_TYPES.BOARD:
+                        this.ctx.fillStyle = 'rgba(200, 200, 200, 0.3)';
+                        this.ctx.fillRect(cellX, cellY, this.cellSize, this.cellSize);
+                        break;
+                    case GAME_CONFIG.BOARD_SYSTEM.ELEMENT_TYPES.WALL:
+                        this.ctx.fillStyle = 'rgba(64, 64, 64, 0.8)';
+                        this.ctx.fillRect(cellX, cellY, this.cellSize, this.cellSize);
+                        break;
+                    default:
+                        if (elementType >= 2 && elementType <= 9) {
+                            const color = GAME_CONFIG.BOARD_SYSTEM.GATE_COLOR_MAP[elementType];
+                            const gateColor = this.getBlockColor(color);
+                            this.ctx.fillStyle = gateColor + '0.6)';
+                            this.ctx.fillRect(cellX, cellY, this.cellSize, this.cellSize);
+                        }
+                        break;
+                }
+                
+                // 绘制网格线
+                this.ctx.strokeStyle = 'rgba(128, 128, 128, 0.5)';
+                this.ctx.lineWidth = this.STYLES.LINE_WIDTH_THIN;
+                this.ctx.strokeRect(cellX, cellY, this.cellSize, this.cellSize);
+            }
         }
     }
 
@@ -722,12 +732,12 @@ class MapEngine {
             const screenX = this.gridOffsetX + x * this.cellSize;
             const screenY = this.gridOffsetY + y * this.cellSize;
 
-            // 石块主体 - 棕色
-            this.ctx.fillStyle = '#8B4513';
+            // 石块主体 - 灰黑色
+            this.ctx.fillStyle = '#404040';
             this.drawRect(screenX, screenY, this.cellSize, this.cellSize);
 
             // 石块边框
-            this.ctx.strokeStyle = '#654321';
+            this.ctx.strokeStyle = '#2A2A2A';
             this.ctx.lineWidth = this.STYLES.LINE_WIDTH_THICK;
             this.drawRect(screenX, screenY, this.cellSize, this.cellSize, false, true);
 
@@ -863,44 +873,12 @@ class MapEngine {
      * 绘制单个俄罗斯方块
      */
     drawTetrisBlock(block) {
-        const cells = this.collisionDetector.getBlockCells(block);
-        const color = this.getBlockColor(block.color);
-
-        // 绘制方块主体和边框
-        this.ctx.fillStyle = color;
-        this.ctx.strokeStyle = this.COLORS.SHADOW;
-        this.ctx.lineWidth = this.STYLES.LINE_WIDTH_THICK;
-        
-        // 先绘制所有格子的填充（不绘制边框）
-        cells.forEach(cell => {
-            const pos = this.getCellScreenPosition(cell);
-            this.drawRect(pos.x, pos.y, this.cellSize, this.cellSize, true, false);
-        });
-        
-        // 然后绘制外边框（整体边框）
-        cells.forEach(cell => {
-            const pos = this.getCellScreenPosition(cell);
-            
-            // 检查每个格子的四个边，只绘制外边框
-            const hasTop = cells.some(c => c.x === cell.x && c.y === cell.y - 1);
-            const hasBottom = cells.some(c => c.x === cell.x && c.y === cell.y + 1);
-            const hasLeft = cells.some(c => c.x === cell.x - 1 && c.y === cell.y);
-            const hasRight = cells.some(c => c.x === cell.x + 1 && c.y === cell.y);
-            
-            // 绘制外边框
-            if (!hasTop) {
-                this.drawLine(pos.x, pos.y, pos.x + this.cellSize, pos.y);
-            }
-            if (!hasBottom) {
-                this.drawLine(pos.x, pos.y + this.cellSize, pos.x + this.cellSize, pos.y + this.cellSize);
-            }
-            if (!hasLeft) {
-                this.drawLine(pos.x, pos.y, pos.x, pos.y + this.cellSize);
-            }
-            if (!hasRight) {
-                this.drawLine(pos.x + this.cellSize, pos.y, pos.x + this.cellSize, pos.y + this.cellSize);
-            }
-        });
+        // 使用 Block 类的绘制方法
+        if (block.draw && typeof block.draw === 'function') {
+            block.draw(this.ctx, this.cellSize, this.gridOffsetX, this.gridOffsetY);
+        } else {
+            console.warn('drawTetrisBlock: 方块不是 Block 类实例，无法绘制', block);
+        }
     }
 
     /**
@@ -1002,6 +980,260 @@ class MapEngine {
         const gridX = Math.floor((screenX - this.gridOffsetX) / this.cellSize);
         const gridY = Math.floor((screenY - this.gridOffsetY) / this.cellSize);
         return {x: gridX, y: gridY};
+    }
+
+    // ==================== 棋盘矩阵系统方法（整合自BoardSystem） ====================
+
+    /**
+     * 从数字矩阵加载棋盘
+     * @param {Array<Array<number>>} matrix - 数字矩阵
+     */
+    loadBoardFromMatrix(matrix) {
+        if (!Array.isArray(matrix) || matrix.length === 0) {
+            console.error('无效的棋盘矩阵');
+            return false;
+        }
+
+        this.boardMatrix = matrix;
+        this.boardHeight = matrix.length;
+        this.boardWidth = matrix[0] ? matrix[0].length : 0;
+        
+        // 解析棋盘元素
+        this.parseBoardElements();
+        
+        // 更新网格尺寸
+        this.updateGridSizeFromBoard();
+        
+        console.log('棋盘加载完成:', {
+            width: this.boardWidth,
+            height: this.boardHeight,
+            gates: this.gates.size,
+            gridSize: this.GRID_SIZE
+        });
+        
+        return true;
+    }
+
+    /**
+     * 解析棋盘元素
+     */
+    parseBoardElements() {
+        const processedGates = new Set(); // 跟踪已处理的门格子
+
+        for (let y = 0; y < this.boardHeight; y++) {
+            for (let x = 0; x < this.boardWidth; x++) {
+                const elementType = this.boardMatrix[y][x];
+                
+                // 只处理门 (2-9)，墙和棋盘区域不需要特殊处理
+                if (elementType >= 2 && elementType <= 9) {
+                    const gateKey = `${x},${y}`;
+                    if (!processedGates.has(gateKey)) {
+                        const gateInfo = this.parseGateSegment(x, y, elementType, processedGates);
+                        if (gateInfo) {
+                            this.addGateFromMatrix(gateInfo);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * 解析门段（连续的门格子）
+     * @param {number} startX - 起始X坐标
+     * @param {number} startY - 起始Y坐标
+     * @param {number} gateType - 门类型
+     * @param {Set} processedGates - 已处理的门格子集合
+     * @returns {Object|null} 门信息
+     */
+    parseGateSegment(startX, startY, gateType, processedGates) {
+        const color = GAME_CONFIG.BOARD_SYSTEM.GATE_COLOR_MAP[gateType];
+        if (!color) return null;
+
+        // 确定门的方向
+        const direction = this.determineGateDirection(startX, startY);
+        
+        // 计算门的长度
+        let length = 1;
+        let currentX = startX;
+        let currentY = startY;
+        
+        // 根据门的方向扩展长度
+        while (true) {
+            const gateKey = `${currentX},${currentY}`;
+            processedGates.add(gateKey);
+            
+            let nextX = currentX;
+            let nextY = currentY;
+            
+            // 根据方向计算下一个位置
+            switch (direction) {
+                case 'up':
+                case 'down':
+                    nextX = currentX + 1; // 水平扩展
+                    break;
+                case 'left':
+                case 'right':
+                    nextY = currentY + 1; // 垂直扩展
+                    break;
+                default:
+                    break;
+            }
+            
+            // 检查下一个位置是否是相同类型的门
+            const nextValue = this.getCellValue(nextX, nextY);
+            if (nextValue === gateType) {
+                length++;
+                currentX = nextX;
+                currentY = nextY;
+            } else {
+                break;
+            }
+        }
+        
+        return {
+            x: startX, 
+            y: startY, 
+            type: 'gate',
+            gateType: gateType,
+            color: color,
+            direction: direction,
+            length: length
+        };
+    }
+
+    /**
+     * 确定门的方向
+     * @param {number} x - X坐标
+     * @param {number} y - Y坐标
+     * @returns {string} 门的方向
+     */
+    determineGateDirection(x, y) {
+        // 检查是否在边界上
+        if (y === 0) return 'up';
+        if (y === this.boardHeight - 1) return 'down';
+        if (x === 0) return 'left';
+        if (x === this.boardWidth - 1) return 'right';
+        
+        // 如果不在边界上，检查周围是否有墙
+        const neighbors = this.getNeighbors(x, y);
+        if (neighbors.top === GAME_CONFIG.BOARD_SYSTEM.ELEMENT_TYPES.WALL) return 'up';
+        if (neighbors.bottom === GAME_CONFIG.BOARD_SYSTEM.ELEMENT_TYPES.WALL) return 'down';
+        if (neighbors.left === GAME_CONFIG.BOARD_SYSTEM.ELEMENT_TYPES.WALL) return 'left';
+        if (neighbors.right === GAME_CONFIG.BOARD_SYSTEM.ELEMENT_TYPES.WALL) return 'right';
+        
+        return 'unknown';
+    }
+
+    /**
+     * 获取指定位置的邻居元素
+     * @param {number} x - X坐标
+     * @param {number} y - Y坐标
+     * @returns {Object} 邻居元素
+     */
+    getNeighbors(x, y) {
+        return {
+            top: this.getCellValue(x, y - 1),
+            bottom: this.getCellValue(x, y + 1),
+            left: this.getCellValue(x - 1, y),
+            right: this.getCellValue(x + 1, y)
+        };
+    }
+
+    /**
+     * 获取指定位置的值
+     * @param {number} x - X坐标
+     * @param {number} y - Y坐标
+     * @returns {number|null} 单元格值
+     */
+    getCellValue(x, y) {
+        if (x < 0 || x >= this.boardWidth || y < 0 || y >= this.boardHeight) {
+            return null;
+        }
+        return this.boardMatrix[y][x];
+    }
+
+    /**
+     * 从矩阵信息添加门
+     * @param {Object} gateInfo - 门信息
+     */
+    addGateFromMatrix(gateInfo) {
+        const gateElement = {
+            id: `gate_${gateInfo.color}_${gateInfo.x}_${gateInfo.y}`,
+            color: gateInfo.color,
+            position: {x: gateInfo.x, y: gateInfo.y},
+            length: gateInfo.length || 1,
+            direction: gateInfo.direction,
+            layer: 0,
+            gateType: gateInfo.gateType
+        };
+        this.gates.set(gateElement.id, gateElement);
+    }
+
+    /**
+     * 更新网格尺寸基于棋盘矩阵
+     */
+    updateGridSizeFromBoard() {
+        if (this.boardMatrix) {
+            this.GRID_SIZE = Math.max(this.boardMatrix[0].length, this.boardMatrix.length);
+            this.grid = Array(this.boardMatrix.length).fill().map(() => Array(this.boardMatrix[0].length).fill(null));
+            this.collisionDetector = new CollisionDetector(this.GRID_SIZE);
+            this.collisionDetector.setMapEngine(this); // 设置引用
+            this.movementManager = new MovementManager(this.GRID_SIZE);
+            console.log('网格尺寸已更新:', {
+                gridSize: this.GRID_SIZE,
+                matrixWidth: this.boardMatrix[0].length,
+                matrixHeight: this.boardMatrix.length
+            });
+        }
+    }
+
+    /**
+     * 检查位置是否是有效的棋盘区域
+     * @param {number} x - X坐标
+     * @param {number} y - Y坐标
+     * @returns {boolean} 是否有效
+     */
+    isValidBoardPosition(x, y) {
+        if (!this.boardMatrix) return false;
+        
+        const value = this.getCellValue(x, y);
+        return value === GAME_CONFIG.BOARD_SYSTEM.ELEMENT_TYPES.BOARD;
+    }
+
+    /**
+     * 检查位置是否是墙
+     * @param {number} x - X坐标
+     * @param {number} y - Y坐标
+     * @returns {boolean} 是否是墙
+     */
+    isWall(x, y) {
+        if (!this.boardMatrix) return false;
+        
+        const value = this.getCellValue(x, y);
+        return value === GAME_CONFIG.BOARD_SYSTEM.ELEMENT_TYPES.WALL;
+    }
+
+    /**
+     * 检查位置是否是门
+     * @param {number} x - X坐标
+     * @param {number} y - Y坐标
+     * @returns {Object|null} 门信息或null
+     */
+    getGateAt(x, y) {
+        if (!this.boardMatrix) return null;
+        
+        const value = this.getCellValue(x, y);
+        if (value >= 2 && value <= 9) {
+            const color = GAME_CONFIG.BOARD_SYSTEM.GATE_COLOR_MAP[value];
+            return {
+                x, y,
+                gateType: value,
+                color: color,
+                direction: this.determineGateDirection(x, y)
+            };
+        }
+        return null;
     }
 }
 
