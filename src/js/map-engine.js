@@ -433,25 +433,14 @@ class MapEngine {
      * 统一计算网格尺寸
      */
     calculateGridDimensions(windowWidth, windowHeight) {
-        // 使用固定格子大小
-        this.cellSize = GAME_CONFIG.CELL_SIZE;
+        // 使用固定格子大小，不进行缩放
+        this.cellSize = GAME_CONFIG.FIXED_CELL_SIZE;
         
         // 网格尺寸由 updateGridFromBoard() 设置，这里只计算渲染尺寸
         // 计算网格总尺寸
         this.gridSize = this.cellSize * this.GRID_SIZE;
         
-        // 根据屏幕尺寸调整
-        const maxWidth = windowWidth * 0.9;
-        const maxHeight = windowHeight * 0.8;
-        
-        // 如果网格太大，缩放格子大小
-        if (this.gridSize > maxWidth || this.gridSize > maxHeight) {
-            const scale = Math.min(maxWidth / this.gridSize, maxHeight / this.gridSize);
-            this.cellSize = Math.floor(this.cellSize * scale);
-            this.gridSize = this.cellSize * this.GRID_SIZE;
-        }
-        
-        // 居中定位
+        // 居中定位（不进行缩放）
         this.gridOffsetX = (windowWidth - this.gridSize) / 2;
         this.gridOffsetY = (windowHeight - this.gridSize) / 2 + 20;
         

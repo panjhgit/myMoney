@@ -5,8 +5,7 @@ const GAME_CONFIG = {
   CELL_SIZE: 45, // 每个格子45px
   
   // 地图配置
-  MIN_CELL_SIZE: 30, // 最小格子大小
-  MAX_CELL_SIZE: 60, // 最大格子大小
+  FIXED_CELL_SIZE: 45, // 固定格子大小，不缩放
   
   // 动画配置
   ANIMATION_DURATION: 0.5, // 动画持续时间
