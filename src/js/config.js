@@ -7,7 +7,12 @@ const GAME_CONFIG = {
   // 地图配置
   FIXED_CELL_SIZE: 45, // 固定格子大小，不缩放
   
-  // 动画配置
+  // 渲染颜色常量
+  RENDER_COLORS: {
+    PIPE_BACKGROUND: 'rgba(100, 100, 100, 0.8)',  // 管道背景色
+    GAME_AREA_BACKGROUND: 'rgba(200, 200, 200, 0.3)',  // 游戏区域背景色
+    GAME_AREA_BORDER: 'rgba(128, 128, 128, 0.5)',  // 游戏区域边框色
+  },
   ANIMATION_DURATION: 0.5, // 动画持续时间
   STEP_DURATION: 0.4, // 移动步长持续时间
   

@@ -223,11 +223,18 @@ class MapEngine {
         this.selectedBlock = block;
 
         // 🔧 优化：选择方块后触发重绘
+        this.triggerRedraw();
+
+        return true;
+    }
+
+    /**
+     * 触发重绘（统一方法）
+     */
+    triggerRedraw() {
         if (typeof markNeedsRedraw === 'function') {
             markNeedsRedraw();
         }
-
-        return true;
     }
 
 
@@ -495,47 +502,8 @@ class MapEngine {
     }
 
 
-    /**
-     * 绘制坐标标签
-     */
-    drawCoordinateLabels(ctx) {
-        if (!this.boardMatrix) return;
-
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
-        ctx.font = '12px Arial';
-        ctx.textAlign = 'center';
-
-        const matrixHeight = this.boardMatrix.length;
-        const matrixWidth = this.boardMatrix[0] ? this.boardMatrix[0].length : 0;
-
-        // 绘制行标签 (Y坐标)
-        for (let i = 0; i < matrixHeight; i++) {
-            const y = this.gridOffsetY + i * this.cellSize + this.cellSize / 2;
-            ctx.fillText(i.toString(), this.gridOffsetX - 15, y + 4);
-        }
-
-        // 绘制列标签 (X坐标)
-        for (let i = 0; i < matrixWidth; i++) {
-            const x = this.gridOffsetX + i * this.cellSize + this.cellSize / 2;
-            ctx.fillText(i.toString(), x, this.gridOffsetY - 8);
-        }
-    }
 
 
-    /**
-     * 将十六进制颜色转换为RGB
-     */
-    hexToRgb(hex) {
-        // 移除 # 号
-        hex = hex.replace('#', '');
-
-        // 解析RGB值
-        const r = parseInt(hex.substr(0, 2), 16);
-        const g = parseInt(hex.substr(2, 2), 16);
-        const b = parseInt(hex.substr(4, 2), 16);
-
-        return `${r}, ${g}, ${b}`;
-    }
 
     /**
      * 绘制棋盘
@@ -583,11 +551,11 @@ class MapEngine {
         const centerY = (canvasHeight - totalSize) / 2;
         
         // 绘制游戏区域背景
-        this.ctx.fillStyle = 'rgba(200, 200, 200, 0.3)';
+        this.ctx.fillStyle = GAME_CONFIG.RENDER_COLORS.GAME_AREA_BACKGROUND;
         this.ctx.fillRect(centerX, centerY, totalSize, totalSize);
         
         // 绘制外边框
-        this.ctx.strokeStyle = 'rgba(128, 128, 128, 0.5)';
+        this.ctx.strokeStyle = GAME_CONFIG.RENDER_COLORS.GAME_AREA_BORDER;
         this.ctx.lineWidth = GAME_CONFIG.STYLES.LINE_WIDTH_THIN;
         this.ctx.strokeRect(centerX, centerY, totalSize, totalSize);
         
@@ -622,159 +590,96 @@ class MapEngine {
         const gameSize = GAME_CONFIG.GRID_SIZE; // 8×8
         const totalSize = gameSize * this.cellSize; // 360px
         
-        // 绘制顶部管道
-        this.drawTopPipe(matrix, pipeThickness, totalSize);
-        
-        // 绘制底部管道
-        this.drawBottomPipe(matrix, pipeThickness, totalSize);
-        
-        // 绘制左侧管道
-        this.drawLeftPipe(matrix, pipeThickness, totalSize);
-        
-        // 绘制右侧管道
-        this.drawRightPipe(matrix, pipeThickness, totalSize);
+        // 绘制四个方向的管道
+        this.drawPipeSegment(matrix, 'top', pipeThickness, totalSize);
+        this.drawPipeSegment(matrix, 'bottom', pipeThickness, totalSize);
+        this.drawPipeSegment(matrix, 'left', pipeThickness, totalSize);
+        this.drawPipeSegment(matrix, 'right', pipeThickness, totalSize);
     }
     
     /**
-     * 绘制顶部管道
+     * 绘制管道段（统一方法）
      */
-    drawTopPipe(matrix, thickness, gameSize) {
+    drawPipeSegment(matrix, direction, thickness, gameSize) {
         const startX = this.gridOffsetX;
         const startY = this.gridOffsetY;
-        const pipeY = startY - thickness;
         
-        // 绘制顶部管道背景（灰色）
-        this.ctx.fillStyle = 'rgba(100, 100, 100, 0.8)';
-        this.ctx.fillRect(startX - thickness, pipeY, gameSize + 2 * thickness, thickness);
+        let pipeX, pipeY, pipeWidth, pipeHeight;
+        let gateCheckX, gateCheckY, gateLoopStart, gateLoopEnd, gateLoopVar;
+        
+        // 根据方向设置管道参数
+        switch (direction) {
+            case 'top':
+                pipeX = startX - thickness;
+                pipeY = startY - thickness;
+                pipeWidth = gameSize + 2 * thickness;
+                pipeHeight = thickness;
+                gateCheckX = 0; // 检查第0行
+                gateLoopStart = 1; gateLoopEnd = 8; gateLoopVar = 'x';
+                break;
+            case 'bottom':
+                pipeX = startX - thickness;
+                pipeY = startY + gameSize;
+                pipeWidth = gameSize + 2 * thickness;
+                pipeHeight = thickness;
+                gateCheckX = 9; // 检查第9行
+                gateLoopStart = 1; gateLoopEnd = 8; gateLoopVar = 'x';
+                break;
+            case 'left':
+                pipeX = startX - thickness;
+                pipeY = startY - thickness;
+                pipeWidth = thickness;
+                pipeHeight = gameSize + 2 * thickness;
+                gateCheckY = 0; // 检查第0列
+                gateLoopStart = 1; gateLoopEnd = 8; gateLoopVar = 'y';
+                break;
+            case 'right':
+                pipeX = startX + gameSize;
+                pipeY = startY - thickness;
+                pipeWidth = thickness;
+                pipeHeight = gameSize + 2 * thickness;
+                gateCheckY = 9; // 检查第9列
+                gateLoopStart = 1; gateLoopEnd = 8; gateLoopVar = 'y';
+                break;
+        }
+        
+        // 绘制管道背景（灰色）
+        this.ctx.fillStyle = GAME_CONFIG.RENDER_COLORS.PIPE_BACKGROUND;
+        this.ctx.fillRect(pipeX, pipeY, pipeWidth, pipeHeight);
         
         // 绘制门段
-        for (let x = 1; x <= 8; x++) {
-            const elementType = matrix[0][x];
+        for (let i = gateLoopStart; i <= gateLoopEnd; i++) {
+            let elementType;
+            if (direction === 'top' || direction === 'bottom') {
+                elementType = matrix[gateCheckX][i];
+            } else {
+                elementType = matrix[i][gateCheckY];
+            }
+            
             if (elementType >= 2 && elementType <= 9) {
                 const color = GAME_CONFIG.BOARD_SYSTEM.GATE_COLOR_MAP[elementType];
                 const gateColor = this.getBlockColor(color);
                 
                 this.ctx.fillStyle = this.convertToRgba(gateColor, 1.0);
-                const gateX = startX + (x - 1) * this.cellSize;
-                this.ctx.fillRect(gateX, pipeY, this.cellSize, thickness);
                 
-                // 绘制白色箭头
-                this.drawArrow(gateX + this.cellSize/2, pipeY + thickness/2, 'right');
+                let gateX, gateY, gateWidth, gateHeight;
+                if (direction === 'top' || direction === 'bottom') {
+                    gateX = startX + (i - 1) * this.cellSize;
+                    gateY = pipeY;
+                    gateWidth = this.cellSize;
+                    gateHeight = thickness;
+                } else {
+                    gateX = pipeX;
+                    gateY = startY + (i - 1) * this.cellSize;
+                    gateWidth = thickness;
+                    gateHeight = this.cellSize;
+                }
+                
+                this.ctx.fillRect(gateX, gateY, gateWidth, gateHeight);
             }
         }
     }
     
-    /**
-     * 绘制底部管道
-     */
-    drawBottomPipe(matrix, thickness, gameSize) {
-        const startX = this.gridOffsetX;
-        const startY = this.gridOffsetY;
-        const pipeY = startY + gameSize;
-        
-        // 绘制底部管道背景（灰色）
-        this.ctx.fillStyle = 'rgba(100, 100, 100, 0.8)';
-        this.ctx.fillRect(startX - thickness, pipeY, gameSize + 2 * thickness, thickness);
-        
-        // 绘制门段
-        for (let x = 1; x <= 8; x++) {
-            const elementType = matrix[9][x];
-            if (elementType >= 2 && elementType <= 9) {
-                const color = GAME_CONFIG.BOARD_SYSTEM.GATE_COLOR_MAP[elementType];
-                const gateColor = this.getBlockColor(color);
-                
-                this.ctx.fillStyle = this.convertToRgba(gateColor, 1.0);
-                const gateX = startX + (x - 1) * this.cellSize;
-                this.ctx.fillRect(gateX, pipeY, this.cellSize, thickness);
-                
-                // 绘制白色箭头
-                this.drawArrow(gateX + this.cellSize/2, pipeY + thickness/2, 'down');
-            }
-        }
-    }
-    
-    /**
-     * 绘制左侧管道
-     */
-    drawLeftPipe(matrix, thickness, gameSize) {
-        const startX = this.gridOffsetX;
-        const startY = this.gridOffsetY;
-        const pipeX = startX - thickness;
-        
-        // 绘制左侧管道背景（灰色）
-        this.ctx.fillStyle = 'rgba(100, 100, 100, 0.8)';
-        this.ctx.fillRect(pipeX, startY - thickness, thickness, gameSize + 2 * thickness);
-        
-        // 绘制门段
-        for (let y = 1; y <= 8; y++) {
-            const elementType = matrix[y][0];
-            if (elementType >= 2 && elementType <= 9) {
-                const color = GAME_CONFIG.BOARD_SYSTEM.GATE_COLOR_MAP[elementType];
-                const gateColor = this.getBlockColor(color);
-                
-                this.ctx.fillStyle = this.convertToRgba(gateColor, 1.0);
-                const gateY = startY + (y - 1) * this.cellSize;
-                this.ctx.fillRect(pipeX, gateY, thickness, this.cellSize);
-                
-                // 绘制白色箭头
-                this.drawArrow(pipeX + thickness/2, gateY + this.cellSize/2, 'right');
-            }
-        }
-    }
-    
-    /**
-     * 绘制右侧管道
-     */
-    drawRightPipe(matrix, thickness, gameSize) {
-        const startX = this.gridOffsetX;
-        const startY = this.gridOffsetY;
-        const pipeX = startX + gameSize;
-        
-        // 绘制右侧管道背景（灰色）
-        this.ctx.fillStyle = 'rgba(100, 100, 100, 0.8)';
-        this.ctx.fillRect(pipeX, startY - thickness, thickness, gameSize + 2 * thickness);
-        
-        // 绘制门段
-        for (let y = 1; y <= 8; y++) {
-            const elementType = matrix[y][9];
-            if (elementType >= 2 && elementType <= 9) {
-                const color = GAME_CONFIG.BOARD_SYSTEM.GATE_COLOR_MAP[elementType];
-                const gateColor = this.getBlockColor(color);
-                
-                this.ctx.fillStyle = this.convertToRgba(gateColor, 1.0);
-                const gateY = startY + (y - 1) * this.cellSize;
-                this.ctx.fillRect(pipeX, gateY, thickness, this.cellSize);
-                
-                // 绘制白色箭头
-                this.drawArrow(pipeX + thickness/2, gateY + this.cellSize/2, 'down');
-            }
-        }
-    }
-    
-    /**
-     * 绘制箭头
-     */
-    drawArrow(x, y, direction) {
-        this.ctx.fillStyle = 'white';
-        this.ctx.strokeStyle = 'white';
-        this.ctx.lineWidth = 2;
-        
-        const size = 6;
-        this.ctx.beginPath();
-        
-        if (direction === 'right') {
-            this.ctx.moveTo(x - size/2, y - size/2);
-            this.ctx.lineTo(x + size/2, y);
-            this.ctx.lineTo(x - size/2, y + size/2);
-        } else if (direction === 'down') {
-            this.ctx.moveTo(x - size/2, y - size/2);
-            this.ctx.lineTo(x, y + size/2);
-            this.ctx.lineTo(x + size/2, y - size/2);
-        }
-        
-        this.ctx.closePath();
-        this.ctx.fill();
-    }
 
     /**
      * 获取方块颜色
@@ -834,6 +739,24 @@ class MapEngine {
     }
 
     /**
+     * 绘制冰块样式（统一方法）
+     */
+    drawIceStyle(x, y, includeTexture = true) {
+        const style = {
+            fillColor: GAME_CONFIG.COLORS.ICE_BLUE + '0.8)',
+            strokeColor: GAME_CONFIG.COLORS.ICE_BORDER + '1.0)',
+            strokeWidth: GAME_CONFIG.STYLES.LINE_WIDTH_THIN
+        };
+        
+        if (includeTexture) {
+            style.textureColor = GAME_CONFIG.COLORS.WHITE + '0.3)';
+            style.highlightColor = GAME_CONFIG.COLORS.WHITE + '0.15)';
+        }
+        
+        this.drawCellWithStyle(x, y, style);
+    }
+
+    /**
      * 绘制冰块（淡色渲染）
      */
     drawIceBlocks() {
@@ -843,22 +766,15 @@ class MapEngine {
             if (!this.collisionDetector.isBlockFullyRevealed(block, this.grid, this.blocks)) {
                 const cells = this.collisionDetector.getBlockCells(block);
 
-                // 冰块样式
+                // 使用统一的冰块样式绘制
                 cells.forEach(cell => {
                     const pos = this.getCellScreenPosition(cell);
-
-                    this.drawCellWithStyle(pos.x, pos.y, {
-                        fillColor: GAME_CONFIG.COLORS.ICE_BLUE + '0.8)',
-                        strokeColor: GAME_CONFIG.COLORS.ICE_BORDER + '1.0)',
-                        strokeWidth: GAME_CONFIG.STYLES.LINE_WIDTH_THIN,
-                        textureColor: GAME_CONFIG.COLORS.WHITE + '0.3)',
-                        highlightColor: GAME_CONFIG.COLORS.WHITE + '0.15)'
-                    });
+                    this.drawIceStyle(pos.x, pos.y, true);
                 });
             }
         });
     }
-
+    
     /**
      * 绘制冰层
      */
@@ -870,16 +786,12 @@ class MapEngine {
             const cells = this.collisionDetector.getBlockCells(block);
             cells.forEach(cell => {
                 const pos = this.getCellScreenPosition(cell);
-
-                this.drawCellWithStyle(pos.x, pos.y, {
-                    fillColor: GAME_CONFIG.COLORS.ICE_BLUE + '0.8)',
-                    strokeColor: GAME_CONFIG.COLORS.ICE_BORDER + '1.0)',
-                    strokeWidth: GAME_CONFIG.STYLES.LINE_WIDTH_THIN
-                });
+                // 使用统一的冰块样式绘制（不包含纹理）
+                this.drawIceStyle(pos.x, pos.y, false);
             });
         });
     }
-
+    
     /**
      * 绘制俄罗斯方块（包括被冰块包裹的方块）
      */
@@ -1019,9 +931,7 @@ class MapEngine {
      */
     handleClick(x, y) {
         // 🔧 优化：触发重绘
-        if (typeof markNeedsRedraw === 'function') {
-            markNeedsRedraw();
-        }
+        this.triggerRedraw();
 
         // 检查是否有方块正在移动
         if (this.isAnyBlockMoving()) {
