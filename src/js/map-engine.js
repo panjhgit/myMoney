@@ -707,7 +707,7 @@ class MapEngine {
         
         // 绘制门段
         for (let y = 1; y <= 8; y++) {
-            const elementType = matrix[y][1];
+            const elementType = matrix[y][0];
             if (elementType >= 2 && elementType <= 9) {
                 const color = GAME_CONFIG.BOARD_SYSTEM.GATE_COLOR_MAP[elementType];
                 const gateColor = this.getBlockColor(color);
@@ -736,7 +736,7 @@ class MapEngine {
         
         // 绘制门段
         for (let y = 1; y <= 8; y++) {
-            const elementType = matrix[y][8];
+            const elementType = matrix[y][9];
             if (elementType >= 2 && elementType <= 9) {
                 const color = GAME_CONFIG.BOARD_SYSTEM.GATE_COLOR_MAP[elementType];
                 const gateColor = this.getBlockColor(color);
