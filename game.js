@@ -16,6 +16,12 @@ require('./src/js/map-engine.js');
 require('./src/map/map1.js');
 require('./src/map/map2.js');
 
+// 验证配置一致性
+if (window.ConfigUtils) {
+  const validation = ConfigUtils.validateConfig();
+  console.log('配置一致性检查:', validation);
+}
+
 let systemInfo = tt.getSystemInfoSync();
 let canvas = tt.createCanvas(),
   ctx = canvas.getContext('2d');

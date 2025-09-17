@@ -1,10 +1,15 @@
 // 游戏统一配置
 const GAME_CONFIG = {
-  // 网格配置
+  // 核心尺寸配置 - 统一管理所有格子大小
+  CORE_SIZES: {
+    GRID_SIZE: 8,        // 8x8网格
+    CELL_SIZE: 45,        // 标准格子大小
+    FIXED_CELL_SIZE: 45  // 固定格子大小（不缩放）
+  },
+  
+  // 兼容性别名 - 保持向后兼容
   GRID_SIZE: 8, // 8x8网格
   CELL_SIZE: 45, // 每个格子45px
-  
-  // 地图配置
   FIXED_CELL_SIZE: 45, // 固定格子大小，不缩放
   
   // 渲染颜色常量
@@ -67,9 +72,9 @@ const GAME_CONFIG = {
     }
   },
   
-  // 生物配置
+  // 生物配置 - 使用统一的格子大小
   CREATURE_CONFIG: {
-    CELL_SIZE: 45, // 与主配置保持一致
+    CELL_SIZE: 45, // 使用 CORE_SIZES.CELL_SIZE
     BREATHING_SCALE: 1.05, // 呼吸动画缩放
     EYE_SIZE: 6, // 眼睛大小（稍微小一点）
     EYE_SPACING: 16, // 眼睛间距（增加间距）
@@ -100,5 +105,36 @@ const GAME_CONFIG = {
   }
 };
 
+// 配置访问工具函数
+const ConfigUtils = {
+  // 获取格子大小
+  getCellSize: function() {
+    return GAME_CONFIG.CORE_SIZES.CELL_SIZE;
+  },
+  
+  // 获取网格大小
+  getGridSize: function() {
+    return GAME_CONFIG.CORE_SIZES.GRID_SIZE;
+  },
+  
+  // 获取固定格子大小
+  getFixedCellSize: function() {
+    return GAME_CONFIG.CORE_SIZES.FIXED_CELL_SIZE;
+  },
+  
+  // 检查配置一致性
+  validateConfig: function() {
+    const core = GAME_CONFIG.CORE_SIZES;
+    const creature = GAME_CONFIG.CREATURE_CONFIG;
+    
+    return {
+      cellSizeConsistent: core.CELL_SIZE === creature.CELL_SIZE,
+      gridSizeConsistent: core.GRID_SIZE === GAME_CONFIG.GRID_SIZE,
+      fixedSizeConsistent: core.FIXED_CELL_SIZE === GAME_CONFIG.FIXED_CELL_SIZE
+    };
+  }
+};
+
 // 导出到全局作用域
 window.GAME_CONFIG = GAME_CONFIG;
+window.ConfigUtils = ConfigUtils;

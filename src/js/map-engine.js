@@ -6,7 +6,7 @@
 class MapEngine {
     constructor(canvas, ctx, systemInfo) {
         // 基础配置
-        this.GRID_SIZE = GAME_CONFIG.GRID_SIZE;
+        this.GRID_SIZE = ConfigUtils.getGridSize();
         this.MAX_LAYERS = 10;
 
         // 棋盘矩阵系统（整合自BoardSystem）
@@ -28,7 +28,7 @@ class MapEngine {
         // 渲染相关
         this.ctx = null;
         this.systemInfo = null;
-        this.cellSize = GAME_CONFIG.FIXED_CELL_SIZE; // 使用固定格子大小
+        this.cellSize = ConfigUtils.getFixedCellSize(); // 使用统一配置
         this.gridOffsetX = 0;
         this.gridOffsetY = 0;
 
@@ -550,7 +550,7 @@ class MapEngine {
      */
     drawGameArea(matrix) {
         // 直接绘制8×8游戏区域，不扫描矩阵
-        const gameSize = GAME_CONFIG.GRID_SIZE; // 8×8
+        const gameSize = ConfigUtils.getGridSize(); // 8×8
         const totalSize = gameSize * this.cellSize; // 8 × 45 = 360px
         
         // 使用系统信息获取画布尺寸，确保是有效数字
@@ -600,7 +600,7 @@ class MapEngine {
      */
     drawPipeBorder(matrix) {
         const pipeThickness = 12; // 管道厚度
-        const gameSize = GAME_CONFIG.GRID_SIZE; // 8×8
+        const gameSize = ConfigUtils.getGridSize(); // 8×8
         const totalSize = gameSize * this.cellSize; // 360px
         
         // 绘制四个方向的管道
@@ -1294,7 +1294,7 @@ class MapEngine {
      */
     updateGridFromBoard() {
         if (this.boardMatrix) {
-            const matrixWidth = this.boardMatrix[0] ? this.boardMatrix[0].length : GAME_CONFIG.GRID_SIZE;
+            const matrixWidth = this.boardMatrix[0] ? this.boardMatrix[0].length : ConfigUtils.getGridSize();
             const matrixHeight = this.boardMatrix.length;
             
             // 不修改 GRID_SIZE，使用配置中的值
