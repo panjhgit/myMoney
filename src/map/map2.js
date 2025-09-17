@@ -3,7 +3,7 @@
  * 包含一个L形木块用于测试翅膀飞行动画
  */
 
-const map2 = {
+var map2 = {
     level: 2,
     name: "翅膀测试地图",
     description: "包含一个L形木块，可以测试翅膀的扇动效果",
@@ -44,16 +44,4 @@ const map2 = {
 };
 
 // 导出地图数据
-console.log('Map2 正在加载，方块数量:', map2.tetrisBlocks.length);
-if (typeof window !== 'undefined') {
-    window.map2 = map2;
-    console.log('Map2 已导出到 window.map2');
-} else if (typeof global !== 'undefined') {
-    global.map2 = map2;
-    console.log('Map2 已导出到 global.map2');
-} else {
-    this.map2 = map2;
-    console.log('Map2 已导出到 this.map2');
-}
-
-console.log('地图2已更新为新棋盘系统:', map2.name);
+window.map2 = map2;

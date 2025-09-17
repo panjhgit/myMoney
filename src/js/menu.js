@@ -244,8 +244,7 @@ class MainMenu {
   
   handleClick(event) {
     // 检查游戏状态，如果不在菜单状态，则不处理点击事件
-    if (typeof window !== 'undefined' && window.gameState && window.gameState !== 'menu') {
-      console.log(`[菜单点击] 游戏状态为 ${window.gameState}，忽略菜单点击事件`);
+    if (window.gameState && window.gameState !== 'menu') {
       return;
     }
     
@@ -265,17 +264,15 @@ class MainMenu {
     // 调整坐标以考虑滚动
     const adjustedY = clickY + this.scrollY;
     
-    console.log(`[菜单点击] 点击坐标: (${clickX}, ${clickY}), 调整后Y: ${adjustedY}`);
+    console.log(GameUtils.formatLog('菜单', '点击坐标: (' + clickX + ', ' + clickY + ')'));
     
     // 检查关卡点击
     for (let level of this.levels) {
       if (this.isPointInLevel(clickX, adjustedY, level)) {
         if (level.unlocked) {
-          console.log(`[菜单点击] 关卡 ${level.id} 被点击，开始关卡`);
           this.animateLevelClick(level);
-          setTimeout(() => this.startLevel(level.id), 300);
+          setTimeout(function() { this.startLevel(level.id); }.bind(this), 300);
         } else {
-          console.log(`[菜单点击] 关卡 ${level.id} 被点击，但未解锁`);
           this.animateLockedLevel(level);
         }
         return;
@@ -870,18 +867,11 @@ class MainMenu {
 
   triggerRedraw() {
     this.hasDrawn = false;
-    if (typeof window !== 'undefined' && window.markNeedsRedraw) {
+    if (window.markNeedsRedraw) {
       window.markNeedsRedraw();
     }
   }
 }
 
 // 确保 MainMenu 类在全局作用域中可用
-if (typeof window !== 'undefined') {
-  window.MainMenu = MainMenu;
-} else if (typeof global !== 'undefined') {
-  global.MainMenu = MainMenu;
-} else {
-  // 在抖音小游戏环境中，直接设置为全局变量
-  this.MainMenu = MainMenu;
-}
+window.MainMenu = MainMenu;

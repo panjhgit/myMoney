@@ -352,12 +352,44 @@ class Block {
     }
     
     /**
-     * 移动方块到新位置
+     * 移动方块到新位置 - 格子化移动
      * @param {Object} newPosition - 新位置 {x, y}
+     * @param {boolean} snapToGrid - 是否对齐到格子中心
      */
-    moveTo(newPosition) {
-        this.position.x = newPosition.x;
-        this.position.y = newPosition.y;
+    moveTo(newPosition, snapToGrid = true) {
+        if (snapToGrid) {
+            // 格子化移动：确保位置是整数
+            this.position.x = Math.round(newPosition.x);
+            this.position.y = Math.round(newPosition.y);
+        } else {
+            // 连续移动：允许小数位置
+            this.position.x = newPosition.x;
+            this.position.y = newPosition.y;
+        }
+        
+        // 更新状态
+        this.state = BlockStates.moving;
+    }
+    
+    /**
+     * 移动到下一个格子（用于格子化移动）
+     * @param {Object} nextPosition - 下一个格子位置 {x, y}
+     */
+    moveToNextGrid(nextPosition) {
+        // 确保位置是整数（格子化）
+        this.position.x = Math.round(nextPosition.x);
+        this.position.y = Math.round(nextPosition.y);
+        
+        // 更新状态
+        this.state = BlockStates.moving;
+    }
+    
+    /**
+     * 完成移动
+     */
+    finishMove() {
+        this.state = BlockStates.idle;
+        this.isMoving = false;
     }
     
     /**
@@ -669,14 +701,7 @@ class Block {
 // 便捷函数已移除，直接使用 Block 类
 
 // 确保在抖音小游戏环境中可用
-if (typeof window !== 'undefined') {
-    window.BlockStates = BlockStates;
-    window.BLOCK_COLORS = BLOCK_COLORS;
-    window.BLOCK_TYPES = BLOCK_TYPES;
-    window.Block = Block;
-} else if (typeof global !== 'undefined') {
-    global.BlockStates = BlockStates;
-    global.BLOCK_COLORS = BLOCK_COLORS;
-    global.BLOCK_TYPES = BLOCK_TYPES;
-    global.Block = Block;
-}
+window.BlockStates = BlockStates;
+window.BLOCK_COLORS = BLOCK_COLORS;
+window.BLOCK_TYPES = BLOCK_TYPES;
+window.Block = Block;

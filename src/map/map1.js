@@ -63,14 +63,4 @@ var map1 = {
 };
 
 // 导出地图数据
-if (typeof window !== 'undefined') {
-    window.map1 = map1;
-} else if (typeof global !== 'undefined') {
-    global.map1 = map1;
-} else {
-    this.map1 = map1;
-}
-
-console.log('地图1已更新为10x10棋盘系统:', map1.name);
-console.log('棋盘尺寸:', map1.boardMatrix[0].length + 'x' + map1.boardMatrix.length);
-console.log('核心游戏区域: 8x8 (内部区域)');
+window.map1 = map1;

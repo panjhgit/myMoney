@@ -128,7 +128,7 @@ class MovementManager {
     }
 
     /**
-     * 执行移动 - 一格一格地移动
+     * 执行移动 - 真正的格子化移动
      */
     executeMove(block, path, gameEngine) {
         if (path.length < 2) return;
@@ -142,38 +142,40 @@ class MovementManager {
             gameEngine.animations.get(animationId).kill();
         }
         
-        // 使用 Block 类的移动方法
-        if (block.moveTo && typeof block.moveTo === 'function') {
-            block.moveTo(endPos);
-        } else {
-            // 如果不是 Block 类，直接更新位置
-            block.position = {...endPos};
-        }
+        // 设置移动状态
+        block.isMoving = true;
+        block.state = 'moving';
         
         // 检查是否有动画系统
         if (typeof gsap === 'undefined') {
-            gameEngine.updateGrid();
-            gameEngine.processIceBlocks(block);
-            gameEngine.checkGateExit(block);
+            // 没有动画系统，直接移动到最终位置
+            this.moveToFinalPosition(block, endPos, gameEngine);
             return;
         }
-        block.isMoving = true;
         
-        // 创建动画时间线
-        const walkTimeline = gsap.timeline({
+        // 创建格子化移动动画
+        this.createGridBasedAnimation(block, path, gameEngine, animationId);
+    }
+    
+    /**
+     * 创建基于格子的移动动画
+     */
+    createGridBasedAnimation(block, path, gameEngine, animationId) {
+        const timeline = gsap.timeline({
             onUpdate: () => {
-                // 🔧 优化：动画进行时持续重绘
+                // 动画进行时持续重绘
                 if (typeof markNeedsRedraw === 'function') {
                     markNeedsRedraw();
                 }
             },
             onComplete: () => {
                 block.isMoving = false;
+                block.state = 'idle';
                 gameEngine.updateGrid();
-                gameEngine.processIceBlocks(block); // 统一处理冰块
+                gameEngine.processIceBlocks(block);
                 gameEngine.checkGateExit(block);
                 
-                // 🔧 优化：动画完成后触发重绘
+                // 动画完成后触发重绘
                 if (typeof markNeedsRedraw === 'function') {
                     markNeedsRedraw();
                 }
@@ -185,82 +187,248 @@ class MovementManager {
         });
         
         if (gameEngine.animations) {
-            gameEngine.animations.set(animationId, walkTimeline);
+            gameEngine.animations.set(animationId, timeline);
         }
         
-        // 按路径逐步移动
+        // 格子化移动：每个格子都有明确的移动步骤
         path.forEach((step, index) => {
-            const stepDuration = 0.4; // 每步持续时间
+            if (index === 0) return; // 跳过起始位置
+            
+            const stepDuration = GAME_CONFIG.MOVEMENT.STEP_DURATION || 0.3; // 每格移动时间
             const delay = index * stepDuration;
             
-            // 更新逻辑位置
-            walkTimeline.call(() => {
-                if (block.moveTo && typeof block.moveTo === 'function') {
-                    block.moveTo({x: step.x, y: step.y});
-                } else {
-                    block.position = {x: step.x, y: step.y};
-                }
-                gameEngine.updateGrid();
+            // 移动到下一个格子
+            timeline.call(() => {
+                this.moveToGridPosition(block, step, gameEngine);
             }, [], delay);
         });
+    }
+    
+    /**
+     * 移动到指定格子位置
+     */
+    moveToGridPosition(block, gridPos, gameEngine) {
+        // 使用格子化移动方法
+        if (block.moveToNextGrid && typeof block.moveToNextGrid === 'function') {
+            block.moveToNextGrid({x: gridPos.x, y: gridPos.y});
+        } else if (block.moveTo && typeof block.moveTo === 'function') {
+            block.moveTo({x: gridPos.x, y: gridPos.y}, true); // 强制格子化
+        } else {
+            block.position = {x: Math.round(gridPos.x), y: Math.round(gridPos.y)};
+        }
+        
+        // 更新游戏网格
+        gameEngine.updateGrid();
+        
+        // 检查碰撞和特殊效果
+        this.checkGridEffects(block, gridPos, gameEngine);
+    }
+    
+    /**
+     * 检查格子效果（冰块融化、门检测等）
+     */
+    checkGridEffects(block, gridPos, gameEngine) {
+        // 检查冰块融化
+        gameEngine.processIceBlocks(block);
+        
+        // 检查是否到达门
+        gameEngine.checkGateExit(block);
+        
+        // 可以在这里添加其他格子效果
+        // 比如：特殊格子、陷阱、奖励等
+    }
+    
+    /**
+     * 直接移动到最终位置（无动画）
+     */
+    moveToFinalPosition(block, endPos, gameEngine) {
+        // 使用格子化移动方法
+        if (block.moveTo && typeof block.moveTo === 'function') {
+            block.moveTo({x: endPos.x, y: endPos.y}, true); // 强制格子化
+        } else {
+            block.position = {x: Math.round(endPos.x), y: Math.round(endPos.y)};
+        }
+        
+        // 更新状态
+        block.isMoving = false;
+        block.state = 'idle';
+        
+        // 更新游戏状态
+        gameEngine.updateGrid();
+        gameEngine.processIceBlocks(block);
+        gameEngine.checkGateExit(block);
     }
 
 
     /**
-     * 智能移动方块到最佳位置
+     * 点击移动 - 点击目标位置移动方块
+     * @param {Block} block - 要移动的方块
+     * @param {Object} targetPos - 目标位置 {x, y}
+     * @param {Object} gameEngine - 游戏引擎
+     * @returns {boolean} 是否成功开始移动
      */
-    smartMoveBlock(block, targetPos, collisionDetector, grid, blocks, rocks, gameEngine) {
-        // 1. 找到最近的方块，让那个方块移动到目标位置
-        const blockCells = collisionDetector.getBlockCells(block);
-        let nearestCell = null;
-        let minDistance = Infinity;
-        
-        // 计算每个方块到目标位置的距离
-        for (const cell of blockCells) {
-            const distance = Math.abs(cell.x - targetPos.x) + Math.abs(cell.y - targetPos.y);
-            if (distance < minDistance) {
-                minDistance = distance;
-                nearestCell = cell; // 保存绝对位置
-            }
-        }
-        
-        // 计算目标位置：让最近方块移动到目标位置
-        // nearestCell是绝对位置，需要转换为相对位置
-        const relativeX = nearestCell.x - block.position.x;
-        const relativeY = nearestCell.y - block.position.y;
-        const targetPosition = {
-            x: targetPos.x - relativeX,
-            y: targetPos.y - relativeY
-        };
-        
-        // 2. 直接尝试移动到目标位置
-        // 边界检查 - 允许移动到边界外（出地图）
-        if (!collisionDetector.isValidPosition(targetPosition.x, targetPosition.y)) {
-            // 如果目标位置超出边界，尝试移动到边界位置
-            const boundaryPos = this.getBoundaryPosition(targetPosition, collisionDetector.GRID_SIZE);
-            if (boundaryPos) {
-                targetPosition.x = boundaryPos.x;
-                targetPosition.y = boundaryPos.y;
-            } else {
-                return false;
-            }
-        }
-        
-        // 3. 检查目标位置是否是门的位置，如果是则不允许移动
-        if (this.isTargetPositionAGate(targetPosition, gameEngine)) {
+    clickMove(block, targetPos, gameEngine) {
+        if (!block || !block.canMove()) {
+            console.warn('方块无法移动');
             return false;
         }
         
-        // 使用路径规划系统
-        const startPos = block.position;
-        const path = this.calculatePath(block, startPos, targetPosition, collisionDetector, grid, blocks, rocks);
+        // 检查目标位置是否有效
+        if (!this.isValidTargetPosition(targetPos, gameEngine)) {
+            console.warn('目标位置无效');
+            return false;
+        }
         
-        if (path && path.length > 0) {
+        // 计算移动路径
+        const startPos = block.position;
+        const path = this.calculatePath(block, startPos, targetPos, 
+            gameEngine.collisionDetector, gameEngine.grid, 
+            gameEngine.blocks, 
+            gameEngine.rocks);
+        
+        if (path && path.length > 1) {
             this.executeMove(block, path, gameEngine);
             return true;
         } else {
+            console.warn('无法找到有效路径');
             return false;
         }
+    }
+    
+    /**
+     * 拖动移动 - 拖动方块到目标位置
+     * @param {Block} block - 要移动的方块
+     * @param {Object} startPos - 起始位置 {x, y}
+     * @param {Object} endPos - 结束位置 {x, y}
+     * @param {Object} gameEngine - 游戏引擎
+     * @returns {boolean} 是否成功开始移动
+     */
+    dragMove(block, startPos, endPos, gameEngine) {
+        if (!block || !block.canMove()) {
+            console.warn('方块无法移动');
+            return false;
+        }
+        
+        // 检查结束位置是否有效
+        if (!this.isValidTargetPosition(endPos, gameEngine)) {
+            console.warn('拖动目标位置无效');
+            return false;
+        }
+        
+        // 计算移动路径
+        const path = this.calculatePath(block, startPos, endPos, 
+            gameEngine.collisionDetector, gameEngine.grid, 
+            gameEngine.blocks, 
+            gameEngine.rocks);
+        
+        if (path && path.length > 1) {
+            this.executeMove(block, path, gameEngine);
+            return true;
+        } else {
+            console.warn('拖动路径无效');
+            return false;
+        }
+    }
+    
+    /**
+     * 检查目标位置是否有效
+     * @param {Object} targetPos - 目标位置 {x, y}
+     * @param {Object} gameEngine - 游戏引擎
+     * @returns {boolean} 是否有效
+     */
+    isValidTargetPosition(targetPos, gameEngine) {
+        // 检查是否在边界内
+        if (targetPos.x < 0 || targetPos.x >= this.GRID_SIZE || 
+            targetPos.y < 0 || targetPos.y >= this.GRID_SIZE) {
+            return false;
+        }
+        
+        // 检查是否是门的位置（门是特殊区域，需要特殊处理）
+        if (this.isTargetPositionAGate(targetPos, gameEngine)) {
+            return false;
+        }
+        
+        return true;
+    }
+    
+    /**
+     * 获取屏幕坐标对应的格子位置
+     * @param {number} screenX - 屏幕X坐标
+     * @param {number} screenY - 屏幕Y坐标
+     * @param {Object} gameEngine - 游戏引擎
+     * @returns {Object} 格子位置 {x, y}
+     */
+    screenToGrid(screenX, screenY, gameEngine) {
+        if (!gameEngine || !gameEngine.mapEngine) {
+            return null;
+        }
+        
+        const mapEngine = gameEngine.mapEngine;
+        const cellSize = mapEngine.cellSize;
+        const offsetX = mapEngine.gridOffsetX;
+        const offsetY = mapEngine.gridOffsetY;
+        
+        // 计算相对于游戏区域的坐标
+        const relativeX = screenX - offsetX;
+        const relativeY = screenY - offsetY;
+        
+        // 转换为格子坐标
+        const gridX = Math.floor(relativeX / cellSize);
+        const gridY = Math.floor(relativeY / cellSize);
+        
+        return {x: gridX, y: gridY};
+    }
+    
+    /**
+     * 获取格子位置对应的屏幕坐标
+     * @param {Object} gridPos - 格子位置 {x, y}
+     * @param {Object} gameEngine - 游戏引擎
+     * @returns {Object} 屏幕坐标 {x, y}
+     */
+    gridToScreen(gridPos, gameEngine) {
+        if (!gameEngine || !gameEngine.mapEngine) {
+            return null;
+        }
+        
+        const mapEngine = gameEngine.mapEngine;
+        const cellSize = mapEngine.cellSize;
+        const offsetX = mapEngine.gridOffsetX;
+        const offsetY = mapEngine.gridOffsetY;
+        
+        // 计算屏幕坐标
+        const screenX = offsetX + gridPos.x * cellSize;
+        const screenY = offsetY + gridPos.y * cellSize;
+        
+        return {x: screenX, y: screenY};
+    }
+    
+    /**
+     * 检查拖动是否有效（不能跨过障碍）
+     * @param {Block} block - 要移动的方块
+     * @param {Object} startPos - 起始位置
+     * @param {Object} endPos - 结束位置
+     * @param {Object} gameEngine - 游戏引擎
+     * @returns {boolean} 是否有效
+     */
+    isValidDrag(block, startPos, endPos, gameEngine) {
+        // 检查起始和结束位置是否相邻（拖动应该是相邻移动）
+        const dx = Math.abs(endPos.x - startPos.x);
+        const dy = Math.abs(endPos.y - startPos.y);
+        
+        // 只允许相邻移动（上下左右）
+        if (dx + dy !== 1) {
+            return false;
+        }
+        
+        // 检查目标位置是否有障碍
+        const collisionResult = gameEngine.collisionDetector.checkCollision(
+            block, endPos, gameEngine.grid, 
+            gameEngine.blocks, 
+            gameEngine.rocks, 
+            block.id
+        );
+        
+        return !collisionResult.collision;
     }
 
     /**
@@ -310,16 +478,29 @@ class MovementManager {
         
         return {x, y};
     }
+    
+    /**
+     * 切换移动模式
+     * @param {boolean} gridBased - 是否使用格子化移动
+     */
+    setMovementMode(gridBased) {
+        if (typeof GAME_CONFIG !== 'undefined' && GAME_CONFIG.MOVEMENT) {
+            GAME_CONFIG.MOVEMENT.GRID_BASED = gridBased;
+            console.log(`移动模式已切换为: ${gridBased ? '格子化移动' : '连续移动'}`);
+        }
+    }
+    
+    /**
+     * 获取当前移动模式
+     * @returns {boolean} 是否使用格子化移动
+     */
+    isGridBasedMovement() {
+        return typeof GAME_CONFIG !== 'undefined' && 
+               GAME_CONFIG.MOVEMENT && 
+               GAME_CONFIG.MOVEMENT.GRID_BASED;
+    }
 
 }
 
 // 导出到全局作用域
-if (typeof window !== 'undefined') {
-    window.MovementManager = MovementManager;
-} else if (typeof global !== 'undefined') {
-    global.MovementManager = MovementManager;
-} else if (typeof module !== 'undefined' && module.exports) {
-    module.exports = MovementManager;
-} else {
-    this.MovementManager = MovementManager;
-}
+window.MovementManager = MovementManager;

@@ -321,12 +321,4 @@ class CollisionDetector {
 }
 
 // 导出到全局作用域
-if (typeof window !== 'undefined') {
-    window.CollisionDetector = CollisionDetector;
-} else if (typeof global !== 'undefined') {
-    global.CollisionDetector = CollisionDetector;
-} else if (typeof module !== 'undefined' && module.exports) {
-    module.exports = CollisionDetector;
-} else {
-    this.CollisionDetector = CollisionDetector;
-}
+window.CollisionDetector = CollisionDetector;

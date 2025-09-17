@@ -39,6 +39,11 @@ class MapEngine {
         // 动画管理
         this.animations = new Map();
 
+        // 拖动状态
+        this.isDragging = false;
+        this.dragStartPos = null;
+        this.dragStartScreenPos = null;
+
         // 如果提供了参数，立即设置渲染上下文
         if (ctx && systemInfo) {
             this.setRenderContext(ctx, systemInfo);
@@ -109,7 +114,7 @@ class MapEngine {
      */
     clearMap() {
         if (this.grid) {
-            this.grid.forEach(row => row.fill(null));
+        this.grid.forEach(row => row.fill(null));
         }
         this.blocks.clear();
         this.gates.clear();
@@ -173,13 +178,13 @@ class MapEngine {
     updateGrid() {
         // 清空网格
         if (this.grid) {
-            this.grid.forEach(row => row.fill(null));
+        this.grid.forEach(row => row.fill(null));
         }
 
         // 按层级顺序填充网格（第0层优先显示）
         for (let layer = 0; layer < this.MAX_LAYERS; layer++) {
             const layerBlocks = this.getBlocksByLayer(layer);
-
+            
             if (layerBlocks.length > 0) {
                 // 添加方块
                 layerBlocks.forEach(block => {
@@ -221,7 +226,7 @@ class MapEngine {
         }
 
         this.selectedBlock = block;
-
+        
         // 🔧 优化：选择方块后触发重绘
         this.triggerRedraw();
 
@@ -245,16 +250,16 @@ class MapEngine {
     processIceBlocks(movedBlock = null) {
         // 获取所有下层方块（冰块）
         const lowerBlocks = this.getLowerLayerBlocks();
-
+        
         lowerBlocks.forEach(block => {
             // 排除刚移动的方块（如果提供了movedBlock）
             if (movedBlock && block.id === movedBlock.id) {
                 return;
             }
-
+            
             // 检查方块是否完全显露
             const isFullyRevealed = this.collisionDetector.isBlockFullyRevealed(block, this.grid, this.blocks);
-
+            
             if (isFullyRevealed) {
                 // 方块完全显露，直接显露（后续用精灵图动画）
                 this.revealBlock(block);
@@ -274,8 +279,8 @@ class MapEngine {
             block.revealIce();
         } else {
             // 如果不是 Block 类，使用旧逻辑
-            block.layer = 0;
-            block.movable = true;
+        block.layer = 0;
+        block.movable = true;
         }
 
         this.updateGrid();
@@ -335,17 +340,17 @@ class MapEngine {
             return;
         }
 
-        // 检查是否所有方块都已经在正确的位置（通过门）
-        const allBlocksAtTarget = movableBlocks.every(block => {
-            return this.isBlockAtCorrectGate(block);
-        });
+            // 检查是否所有方块都已经在正确的位置（通过门）
+            const allBlocksAtTarget = movableBlocks.every(block => {
+                return this.isBlockAtCorrectGate(block);
+            });
 
-        if (allBlocksAtTarget) {
-            console.log('所有可移动方块都已到达目标位置，关卡完成！');
-            this.gameState = 'completed';
-            this.onGameComplete();
-        } else {
-            console.log('还有可移动方块未到达目标位置，继续游戏');
+            if (allBlocksAtTarget) {
+                console.log('所有可移动方块都已到达目标位置，关卡完成！');
+                this.gameState = 'completed';
+                this.onGameComplete();
+            } else {
+                console.log('还有可移动方块未到达目标位置，继续游戏');
         }
     }
 
@@ -492,13 +497,19 @@ class MapEngine {
     drawBackground() {
         if (!this.ctx) return;
 
+        // 确保系统信息有效
+        const windowWidth = this.systemInfo && this.systemInfo.windowWidth ? 
+            Number(this.systemInfo.windowWidth) || 375 : 375;
+        const windowHeight = this.systemInfo && this.systemInfo.windowHeight ? 
+            Number(this.systemInfo.windowHeight) || 667 : 667;
+
         // 渐变背景
-        const gradient = this.ctx.createLinearGradient(0, 0, 0, this.systemInfo.windowHeight);
+        const gradient = this.ctx.createLinearGradient(0, 0, 0, windowHeight);
         gradient.addColorStop(0, '#87CEEB');
         gradient.addColorStop(1, '#4682B4');
 
         this.ctx.fillStyle = gradient;
-        this.ctx.fillRect(0, 0, this.systemInfo.windowWidth, this.systemInfo.windowHeight);
+        this.ctx.fillRect(0, 0, windowWidth, windowHeight);
     }
 
 
@@ -542,9 +553,11 @@ class MapEngine {
         const gameSize = GAME_CONFIG.GRID_SIZE; // 8×8
         const totalSize = gameSize * this.cellSize; // 8 × 45 = 360px
         
-        // 使用系统信息获取画布尺寸
-        const canvasWidth = this.systemInfo ? this.systemInfo.windowWidth : 375;
-        const canvasHeight = this.systemInfo ? this.systemInfo.windowHeight : 667;
+        // 使用系统信息获取画布尺寸，确保是有效数字
+        const canvasWidth = this.systemInfo && this.systemInfo.windowWidth ? 
+            Number(this.systemInfo.windowWidth) || 375 : 375;
+        const canvasHeight = this.systemInfo && this.systemInfo.windowHeight ? 
+            Number(this.systemInfo.windowHeight) || 667 : 667;
         
         // 计算居中位置
         const centerX = (canvasWidth - totalSize) / 2;
@@ -603,7 +616,7 @@ class MapEngine {
     drawPipeSegment(matrix, direction, thickness, gameSize) {
         const startX = this.gridOffsetX;
         const startY = this.gridOffsetY;
-        
+
         let pipeX, pipeY, pipeWidth, pipeHeight;
         let gateCheckX, gateCheckY, gateLoopStart, gateLoopEnd, gateLoopVar;
         
@@ -774,14 +787,14 @@ class MapEngine {
             }
         });
     }
-    
+
     /**
      * 绘制冰层
      */
     drawIceLayers() {
         // 绘制冰层效果，显示被遮挡的方块
         const lowerBlocks = this.getLowerLayerBlocks();
-
+        
         lowerBlocks.forEach(block => {
             const cells = this.collisionDetector.getBlockCells(block);
             cells.forEach(cell => {
@@ -791,14 +804,14 @@ class MapEngine {
             });
         });
     }
-    
+
     /**
      * 绘制俄罗斯方块（包括被冰块包裹的方块）
      */
     drawTetrisBlocks() {
         // 只绘制第0层方块（可移动的方块）
         const topLayerBlocks = this.getBlocksByLayer(0);
-
+        
         topLayerBlocks.forEach(block => {
             this.drawTetrisBlock(block);
         });
@@ -810,7 +823,7 @@ class MapEngine {
     getCellScreenPosition(cell) {
         // 方块坐标直接对应8×8游戏区域，不需要偏移调整
         return {
-            x: this.gridOffsetX + cell.x * this.cellSize, 
+            x: this.gridOffsetX + cell.x * this.cellSize,
             y: this.gridOffsetY + cell.y * this.cellSize
         };
     }
@@ -819,11 +832,11 @@ class MapEngine {
      * Canvas绘制工具函数
      */
     drawLine(x1, y1, x2, y2) {
-        this.ctx.beginPath();
+            this.ctx.beginPath();
         this.ctx.moveTo(x1, y1);
         this.ctx.lineTo(x2, y2);
-        this.ctx.stroke();
-    }
+                this.ctx.stroke();
+            }
 
     drawRect(x, y, width, height, fill = true, stroke = true) {
         if (fill) {
@@ -907,7 +920,9 @@ class MapEngine {
         if (this.selectedBlock) {
             this.ctx.fillStyle = 'rgba(255, 255, 0, 0.8)';
             this.setTextStyle('14px Arial', 'left');
-            this.ctx.fillText('点击目标位置移动方块', 20, this.systemInfo.windowHeight - 20);
+            const windowHeight = this.systemInfo && this.systemInfo.windowHeight ? 
+                Number(this.systemInfo.windowHeight) || 667 : 667;
+            this.ctx.fillText('点击目标位置移动方块', 20, windowHeight - 20);
         }
     }
 
@@ -927,17 +942,17 @@ class MapEngine {
 
 
     /**
-     * 处理点击事件
+     * 处理点击事件 - 支持点击移动
      */
     handleClick(x, y) {
         // 🔧 优化：触发重绘
         this.triggerRedraw();
-
+        
         // 检查是否有方块正在移动
         if (this.isAnyBlockMoving()) {
             return;
         }
-
+        
         const gridPos = this.screenToGrid(x, y);
 
         if (!this.collisionDetector.isValidPosition(gridPos.x, gridPos.y)) {
@@ -949,17 +964,118 @@ class MapEngine {
         if (gridValue && this.blocks.has(gridValue)) {
             // 点击了方块
             const clickedBlock = this.blocks.get(gridValue);
-
+            
             if (clickedBlock.movable) {
                 // 如果点击的是可移动方块，选择它
                 this.selectBlock(gridValue);
             } else if (this.selectedBlock) {
                 // 如果点击的是不可移动方块（如冰块），但已有选中方块，尝试移动
-                this.movementManager.smartMoveBlock(this.selectedBlock, gridPos, this.collisionDetector, this.grid, this.blocks, this.rocks, this);
+                this.movementManager.clickMove(this.selectedBlock, gridPos, this);
             }
         } else if (this.selectedBlock) {
-            // 点击了空白位置，尝试智能移动
-            this.movementManager.smartMoveBlock(this.selectedBlock, gridPos, this.collisionDetector, this.grid, this.blocks, this.rocks, this);
+            // 点击了空白位置，尝试点击移动
+            this.movementManager.clickMove(this.selectedBlock, gridPos, this);
+        }
+    }
+    
+    /**
+     * 处理拖动事件 - 支持拖动移动
+     * @param {number} startX - 起始X坐标
+     * @param {number} startY - 起始Y坐标
+     * @param {number} endX - 结束X坐标
+     * @param {number} endY - 结束Y坐标
+     */
+    handleDrag(startX, startY, endX, endY) {
+        // 检查是否有方块正在移动
+        if (this.isAnyBlockMoving()) {
+            return;
+        }
+
+        const startGridPos = this.screenToGrid(startX, startY);
+        const endGridPos = this.screenToGrid(endX, endY);
+
+        // 检查起始位置是否有方块
+        if (!this.collisionDetector.isValidPosition(startGridPos.x, startGridPos.y)) {
+            return;
+        }
+
+        const gridValue = this.grid[startGridPos.y][startGridPos.x];
+        if (!gridValue || !this.blocks.has(gridValue)) {
+            return;
+        }
+
+        const draggedBlock = this.blocks.get(gridValue);
+        if (!draggedBlock.movable) {
+            return;
+        }
+
+        // 检查拖动是否有效（相邻移动且无障碍）
+        if (this.movementManager.isValidDrag(draggedBlock, startGridPos, endGridPos, this)) {
+            // 执行拖动移动
+            this.movementManager.dragMove(draggedBlock, startGridPos, endGridPos, this);
+        } else {
+            console.warn('拖动无效：不能跨过障碍或移动距离过远');
+        }
+    }
+    
+    /**
+     * 处理鼠标按下事件
+     * @param {number} x - X坐标
+     * @param {number} y - Y坐标
+     */
+    handleMouseDown(x, y) {
+        const gridPos = this.screenToGrid(x, y);
+        
+        if (this.collisionDetector.isValidPosition(gridPos.x, gridPos.y)) {
+            const gridValue = this.grid[gridPos.y][gridPos.x];
+            if (gridValue && this.blocks.has(gridValue)) {
+                const block = this.blocks.get(gridValue);
+                if (block.movable) {
+                    // 记录拖动的起始位置
+                    this.dragStartPos = {x: gridPos.x, y: gridPos.y};
+                    this.dragStartScreenPos = {x, y};
+                    this.isDragging = true;
+                }
+            }
+        }
+    }
+    
+    /**
+     * 处理鼠标移动事件
+     * @param {number} x - X坐标
+     * @param {number} y - Y坐标
+     */
+    handleMouseMove(x, y) {
+        if (this.isDragging && this.dragStartPos) {
+            // 可以在这里添加拖动预览效果
+            // 比如高亮目标位置或显示移动路径
+        }
+    }
+    
+    /**
+     * 处理鼠标释放事件
+     * @param {number} x - X坐标
+     * @param {number} y - Y坐标
+     */
+    handleMouseUp(x, y) {
+        if (this.isDragging && this.dragStartPos) {
+            const endGridPos = this.screenToGrid(x, y);
+            
+            // 检查是否移动到了不同的格子
+            if (endGridPos.x !== this.dragStartPos.x || endGridPos.y !== this.dragStartPos.y) {
+                // 执行拖动移动
+                this.handleDrag(
+                    this.dragStartScreenPos.x, 
+                    this.dragStartScreenPos.y, 
+                    x, 
+                    y
+                );
+            }
+            
+            // 重置拖动状态
+            this.isDragging = false;
+            this.dragStartPos = null;
+            this.dragStartScreenPos = null;
         }
     }
 
@@ -970,7 +1086,7 @@ class MapEngine {
         // 计算移动路径（直接路径）
         const startPos = block.position;
         const path = [{x: startPos.x, y: startPos.y}, {x: targetPos.x, y: targetPos.y}];
-
+        
         // 执行移动
         this.movementManager.executeMove(block, path, this);
     }
@@ -979,8 +1095,18 @@ class MapEngine {
      * 屏幕坐标转网格坐标
      */
     screenToGrid(screenX, screenY) {
-        const gridX = Math.floor((screenX - this.gridOffsetX) / this.cellSize);
-        const gridY = Math.floor((screenY - this.gridOffsetY) / this.cellSize);
+        // 确保坐标是有效数字
+        const x = Number(screenX) || 0;
+        const y = Number(screenY) || 0;
+        
+        // 确保偏移量和格子大小是有效数字
+        const offsetX = Number(this.gridOffsetX) || 0;
+        const offsetY = Number(this.gridOffsetY) || 0;
+        const cellSize = Number(this.cellSize) || 45;
+        
+        const gridX = Math.floor((x - offsetX) / cellSize);
+        const gridY = Math.floor((y - offsetY) / cellSize);
+        
         return {x: gridX, y: gridY};
     }
 
@@ -1253,12 +1379,4 @@ class MapEngine {
 }
 
 // 导出到全局作用域
-if (typeof window !== 'undefined') {
-    window.MapEngine = MapEngine;
-} else if (typeof global !== 'undefined') {
-    global.MapEngine = MapEngine;
-} else if (typeof module !== 'undefined' && module.exports) {
-    module.exports = MapEngine;
-} else {
-    this.MapEngine = MapEngine;
-}
+window.MapEngine = MapEngine;

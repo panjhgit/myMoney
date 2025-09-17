@@ -4,7 +4,9 @@ console.log(
 );
 
 // 加载必要的库和模块
+require('./src/js/utils.js'); // 加载工具函数
 require('./src/js/config.js'); // 加载统一配置
+require('./src/js/creature.js'); // 加载生物系统
 require('./src/js/gsap.min.js');
 require('./src/js/block.js'); // 需要先加载，因为包含EYE_TYPES等常量
 require('./src/js/collision.js'); // 碰撞检测模块
@@ -45,11 +47,11 @@ function initMainMenu() {
   
   mainMenu = new MainMenu(canvas, ctx, systemInfo);
   
-  // 设置关卡开始回调
-  window.onLevelStart = (levelId) => {
-    console.log(`开始关卡 ${levelId}`);
-    startGame(levelId);
-  };
+// 设置关卡开始回调
+window.onLevelStart = function(levelId) {
+  console.log('开始关卡 ' + levelId);
+  startGame(levelId);
+};
   
   // 确保菜单能显示，强制重绘
   needsRedraw = true;
@@ -120,8 +122,8 @@ function startGame(levelId) {
   mapEngine = new MapEngine(canvas, ctx, systemInfo);
   
   // 设置关卡完成回调
-  window.onLevelComplete = (completedLevelId) => {
-    console.log(`关卡 ${completedLevelId} 完成！`);
+  window.onLevelComplete = function(completedLevelId) {
+    console.log('关卡 ' + completedLevelId + ' 完成！');
     
     // 更新主菜单的进度
     if (mainMenu && typeof mainMenu.completeLevel === 'function') {
@@ -129,7 +131,7 @@ function startGame(levelId) {
     }
     
     // 延迟返回主菜单
-    setTimeout(() => {
+    setTimeout(function() {
       initMainMenu();
     }, 2000);
   };
@@ -137,7 +139,6 @@ function startGame(levelId) {
   // 加载地图数据
   mapEngine.loadMap(mapData);
   
-  console.log('Creature 系统已加载，支持方块动画和行为');
   console.log('游戏状态已切换到:', gameState);
 }
 
@@ -152,13 +153,7 @@ function markNeedsRedraw() {
 }
 
 // 将markNeedsRedraw设置为全局函数
-if (typeof window !== 'undefined') {
-  window.markNeedsRedraw = markNeedsRedraw;
-} else if (typeof global !== 'undefined') {
-  global.markNeedsRedraw = markNeedsRedraw;
-} else {
-  this.markNeedsRedraw = markNeedsRedraw;
-}
+window.markNeedsRedraw = markNeedsRedraw;
 
 // 主绘制函数 - 适配抖音小游戏环境
 function draw() {
@@ -327,30 +322,73 @@ function drawDefault() {
 // 设置游戏交互事件
 function setupGameEvents() {
   // 鼠标点击事件
-  canvas.addEventListener('click', (e) => {
-    let x, y;
-    
-    // 抖音小游戏环境兼容处理
-    if (typeof canvas.getBoundingClientRect === 'function') {
-      // 浏览器环境
-      const rect = canvas.getBoundingClientRect();
-      x = e.clientX - rect.left;
-      y = e.clientY - rect.top;
-    } else {
-      // 抖音小游戏环境 - 直接使用触摸坐标
-      x = e.clientX || e.x || 0;
-      y = e.clientY || e.y || 0;
-    }
+  canvas.addEventListener('click', function(e) {
+    var coords = GameUtils.getEventCoordinates(e);
     
     if (gameState === 'game' && mapEngine) {
-      mapEngine.handleClick(x, y);
-      markNeedsRedraw(); // 游戏交互后需要重绘
+      mapEngine.handleClick(coords.x, coords.y);
+      markNeedsRedraw();
     } else if (gameState === 'menu' && mainMenu) {
-      // 菜单交互处理
-      markNeedsRedraw(); // 菜单交互后需要重绘
+      markNeedsRedraw();
     }
   });
   
+  // 鼠标按下事件（拖动开始）
+  canvas.addEventListener('mousedown', function(e) {
+    var coords = GameUtils.getEventCoordinates(e);
+    
+    if (gameState === 'game' && mapEngine) {
+      mapEngine.handleMouseDown(coords.x, coords.y);
+    }
+  });
+  
+  // 鼠标移动事件（拖动中）
+  canvas.addEventListener('mousemove', function(e) {
+    var coords = GameUtils.getEventCoordinates(e);
+    
+    if (gameState === 'game' && mapEngine) {
+      mapEngine.handleMouseMove(coords.x, coords.y);
+    }
+  });
+  
+  // 鼠标释放事件（拖动结束）
+  canvas.addEventListener('mouseup', function(e) {
+    var coords = GameUtils.getEventCoordinates(e);
+    
+    if (gameState === 'game' && mapEngine) {
+      mapEngine.handleMouseUp(coords.x, coords.y);
+      markNeedsRedraw();
+    }
+  });
+  
+  // 触摸事件（移动端支持）
+  canvas.addEventListener('touchstart', function(e) {
+    e.preventDefault();
+    var coords = GameUtils.getTouchCoordinates(e);
+    
+    if (gameState === 'game' && mapEngine) {
+      mapEngine.handleMouseDown(coords.x, coords.y);
+    }
+  });
+  
+  canvas.addEventListener('touchmove', function(e) {
+    e.preventDefault();
+    var coords = GameUtils.getTouchCoordinates(e);
+    
+    if (gameState === 'game' && mapEngine) {
+      mapEngine.handleMouseMove(coords.x, coords.y);
+    }
+  });
+  
+  canvas.addEventListener('touchend', function(e) {
+    e.preventDefault();
+    var coords = GameUtils.getTouchCoordinates(e);
+    
+    if (gameState === 'game' && mapEngine) {
+      mapEngine.handleMouseUp(coords.x, coords.y);
+      markNeedsRedraw();
+    }
+  });
   
   // 抖音小游戏不支持键盘事件，移除键盘监听
   // 可以通过触摸手势或其他方式实现返回功能

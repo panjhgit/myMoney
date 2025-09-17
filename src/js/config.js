@@ -14,7 +14,15 @@ const GAME_CONFIG = {
     GAME_AREA_BORDER: 'rgba(128, 128, 128, 0.5)',  // 游戏区域边框色
   },
   ANIMATION_DURATION: 0.5, // 动画持续时间
-  STEP_DURATION: 0.4, // 移动步长持续时间
+  STEP_DURATION: 0.3, // 移动步长持续时间（格子化移动）
+  
+  // 移动系统配置
+  MOVEMENT: {
+    GRID_BASED: true,        // 是否使用格子化移动
+    STEP_DURATION: 0.3,      // 每格移动时间
+    SNAP_TO_GRID: true,      // 是否对齐到格子中心
+    CONTINUOUS_MOVEMENT: false // 是否允许连续移动
+  },
   
   // 新棋盘系统配置
   BOARD_SYSTEM: {
@@ -93,23 +101,4 @@ const GAME_CONFIG = {
 };
 
 // 导出到全局作用域
-if (typeof window !== 'undefined') {
-  window.GAME_CONFIG = GAME_CONFIG;
-}
-if (typeof global !== 'undefined') {
-  global.GAME_CONFIG = GAME_CONFIG;
-}
-if (typeof this !== 'undefined') {
-  this.GAME_CONFIG = GAME_CONFIG;
-}
-
-console.log('游戏配置已加载:', GAME_CONFIG);
-console.log('格子大小:', GAME_CONFIG.CELL_SIZE);
-console.log('网格大小:', GAME_CONFIG.GRID_SIZE);
-console.log('生物配置格子大小:', GAME_CONFIG.CREATURE_CONFIG.CELL_SIZE);
-console.log('配置一致性检查:', {
-  main: GAME_CONFIG.CELL_SIZE,
-  creature: GAME_CONFIG.CREATURE_CONFIG.CELL_SIZE,
-  consistent: GAME_CONFIG.CELL_SIZE === GAME_CONFIG.CREATURE_CONFIG.CELL_SIZE
-});
-console.log('✅ 所有单元格大小计算都统一使用 config.js 中的配置');
+window.GAME_CONFIG = GAME_CONFIG;
