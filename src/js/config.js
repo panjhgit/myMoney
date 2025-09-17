@@ -1,10 +1,11 @@
 // 游戏统一配置
 const GAME_CONFIG = {
-  // 核心尺寸配置 - 统一管理所有格子大小
+  // 核心尺寸配置 - 10x10矩阵包含墙和门，实际游戏区域最大8x8
   CORE_SIZES: {
-    GRID_SIZE: 8,        // 8x8网格
-    CELL_SIZE: 45,        // 标准格子大小
-    FIXED_CELL_SIZE: 45  // 固定格子大小（不缩放）
+    BOARD_MATRIX_SIZE: 10,  // 棋盘矩阵尺寸（10x10，最外层给墙和门预留）
+    MAX_GAME_AREA: 8,       // 最大游戏区域尺寸（8x8）
+    CELL_SIZE: 45,          // 标准格子大小
+    FIXED_CELL_SIZE: 45     // 固定格子大小（不缩放）
   },
   
   // 兼容性别名 - 保持向后兼容
@@ -112,9 +113,14 @@ const ConfigUtils = {
     return GAME_CONFIG.CORE_SIZES.CELL_SIZE;
   },
   
-  // 获取网格大小
+  // 获取最大游戏区域尺寸（8x8）
   getGridSize: function() {
-    return GAME_CONFIG.CORE_SIZES.GRID_SIZE;
+    return GAME_CONFIG.CORE_SIZES.MAX_GAME_AREA;
+  },
+  
+  // 获取棋盘矩阵尺寸（10x10，包含墙和门）
+  getBoardMatrixSize: function() {
+    return GAME_CONFIG.CORE_SIZES.BOARD_MATRIX_SIZE;
   },
   
   // 获取固定格子大小
@@ -129,8 +135,11 @@ const ConfigUtils = {
     
     return {
       cellSizeConsistent: core.CELL_SIZE === creature.CELL_SIZE,
-      gridSizeConsistent: core.GRID_SIZE === GAME_CONFIG.GRID_SIZE,
-      fixedSizeConsistent: core.FIXED_CELL_SIZE === GAME_CONFIG.FIXED_CELL_SIZE
+      maxGameAreaConsistent: core.MAX_GAME_AREA === this.getGridSize(),
+      boardMatrixSizeConsistent: core.BOARD_MATRIX_SIZE === this.getBoardMatrixSize(),
+      fixedSizeConsistent: core.FIXED_CELL_SIZE === GAME_CONFIG.FIXED_CELL_SIZE,
+      // 设计说明：10x10矩阵最外层给墙和门预留，实际游戏区域最大8x8
+      designNote: "10x10矩阵最外层给墙和门预留，实际游戏区域由墙(1)和门(2-9)围成，最大8x8"
     };
   }
 };

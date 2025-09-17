@@ -1322,27 +1322,26 @@ class MapEngine {
     }
 
     /**
-     * 检查位置是否是有效的棋盘区域（包括可游戏区域和门区域）
-     * @param {number} x - X坐标
-     * @param {number} y - Y坐标
+     * 检查位置是否是有效的棋盘区域
+     * 注意：screenToGrid返回的坐标需要转换为boardMatrix坐标
+     * @param {number} x - X坐标 (来自screenToGrid，范围-1到8)
+     * @param {number} y - Y坐标 (来自screenToGrid，范围-1到8)
      * @returns {boolean} 是否有效
      */
     isValidBoardPosition(x, y) {
         if (!this.boardMatrix) return false;
         
+        // screenToGrid返回的坐标范围是-1到8，需要转换为boardMatrix坐标(0到7)
+        // 如果坐标超出8x8游戏区域，则不可移动
+        if (x < 0 || x >= 8 || y < 0 || y >= 8) {
+            return false;
+        }
+        
         const value = this.getCellValue(x, y);
         
-        // 可游戏区域
-        if (value === GAME_CONFIG.BOARD_SYSTEM.ELEMENT_TYPES.BOARD) {
-            return true;
-        }
-        
-        // 门区域 (2-9) 也是可移动的
-        if (value >= 2 && value <= 9) {
-            return true;
-        }
-        
-        return false;
+        // 只有值为0的位置才是可移动的游戏区域
+        // 门(2-9)和墙(1)的渲染只是为了美观，不是真实的碰撞边界
+        return value === GAME_CONFIG.BOARD_SYSTEM.ELEMENT_TYPES.BOARD;
     }
 
     /**
@@ -1376,7 +1375,123 @@ class MapEngine {
         }
         return null;
     }
+
+    /**
+     * 调试方法：打印所有棋盘元素的位置和层级信息
+     */
+    debugPrintBoardElements() {
+        console.log('=== 棋盘元素调试信息 ===');
+        
+        // 打印第0层方块
+        console.log('\n--- 第0层方块 (可移动) ---');
+        const layer0Blocks = this.getBlocksByLayer(0);
+        layer0Blocks.forEach(block => {
+            const cells = this.collisionDetector.getBlockCells(block);
+            console.log(`${block.id} (${block.color}, ${block.type}):`, {
+                position: block.position,
+                cells: cells,
+                movable: block.movable
+            });
+        });
+        
+        // 打印第1层及以下方块（冰块）
+        console.log('\n--- 第1层及以下方块 (冰块) ---');
+        const lowerBlocks = this.getLowerLayerBlocks();
+        lowerBlocks.forEach(block => {
+            const cells = this.collisionDetector.getBlockCells(block);
+            console.log(`${block.id} (${block.color}, ${block.type}):`, {
+                position: block.position,
+                cells: cells,
+                layer: block.layer,
+                isIce: block.ice.isIce,
+                isRevealed: block.ice.isRevealed
+            });
+        });
+        
+        // 打印石块
+        console.log('\n--- 石块 ---');
+        this.rocks.forEach(rockKey => {
+            const [x, y] = rockKey.split(',').map(Number);
+            console.log(`rock_${x}_${y}:`, { position: {x, y} });
+        });
+        
+        // 打印门
+        console.log('\n--- 门 ---');
+        this.gates.forEach((gate, gateId) => {
+            console.log(`${gateId}:`, {
+                color: gate.color,
+                position: gate.position,
+                direction: gate.direction,
+                length: gate.length
+            });
+        });
+        
+        // 打印网格状态
+        console.log('\n--- 网格状态 (8x8游戏区域) ---');
+        for (let y = 1; y <= 8; y++) {
+            let row = '';
+            for (let x = 1; x <= 8; x++) {
+                const gridValue = this.grid[y] && this.grid[y][x];
+                if (gridValue) {
+                    row += gridValue.toString().padStart(3);
+                } else {
+                    row += '  .';
+                }
+            }
+            console.log(`第${y}行: ${row}`);
+        }
+        
+        // 检查重叠
+        console.log('\n--- 重叠检查 ---');
+        this.checkOverlaps();
+        
+        console.log('=== 调试信息结束 ===\n');
+    }
+    
+    /**
+     * 检查方块重叠
+     */
+    checkOverlaps() {
+        const allBlocks = Array.from(this.blocks.values());
+        const occupiedPositions = new Map();
+        
+        // 检查第0层方块重叠
+        const layer0Blocks = allBlocks.filter(block => block.layer === 0);
+        layer0Blocks.forEach(block => {
+            const cells = this.collisionDetector.getBlockCells(block);
+            cells.forEach(cell => {
+                const key = `${cell.x},${cell.y}`;
+                if (occupiedPositions.has(key)) {
+                    console.warn(`⚠️  重叠警告: ${block.id} 与 ${occupiedPositions.get(key)} 在位置 (${cell.x}, ${cell.y}) 重叠`);
+                } else {
+                    occupiedPositions.set(key, block.id);
+                }
+            });
+        });
+        
+        // 检查石块与方块重叠
+        this.rocks.forEach(rockKey => {
+            const [x, y] = rockKey.split(',').map(Number);
+            const key = `${x},${y}`;
+            if (occupiedPositions.has(key)) {
+                console.warn(`⚠️  石块重叠警告: 石块在位置 (${x}, ${y}) 与方块 ${occupiedPositions.get(key)} 重叠`);
+            }
+        });
+        
+        if (occupiedPositions.size === 0) {
+            console.log('✅ 没有发现重叠问题');
+        }
+    }
 }
 
 // 导出到全局作用域
 window.MapEngine = MapEngine;
+
+// 全局调试函数
+window.debugMap = function() {
+    if (window.mapEngine) {
+        window.mapEngine.debugPrintBoardElements();
+    } else {
+        console.log('MapEngine 未初始化，请先加载地图');
+    }
+};

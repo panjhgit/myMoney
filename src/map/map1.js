@@ -35,32 +35,43 @@ var map1 = {
             id: "green_line3", color: "green", position: {x: 5, y: 1}, blockType: "line3_h", layer: 0
         }, {
             id: "yellow_square", color: "yellow", position: {x: 1, y: 3}, blockType: "square", layer: 0
+        },         {
+            id: "purple_lshape", color: "purple", position: {x: 3, y: 3}, blockType: "lshape_up", layer: 0
         }, {
-            id: "purple_lshape", color: "purple", position: {x: 4, y: 3}, blockType: "lshape_up", layer: 0
-        }, {
-            id: "orange_hshape", color: "orange", position: {x: 2, y: 5}, blockType: "hshape_up", layer: 0
+            id: "orange_hshape", color: "orange", position: {x: 5, y: 5}, blockType: "hshape_up", layer: 0
         },
 
         // 第1层 - 隐藏的方块（被上层完全遮挡，显示为冰块）
         {
-            id: "hidden_red", color: "red", position: {x: 1, y: 2}, blockType: "single", layer: 1, isIce: true
+            id: "hidden_red", color: "red", position: {x: 1, y: 1}, blockType: "single", layer: 1, isIce: true
         }, {
-            id: "hidden_blue", color: "blue", position: {x: 3, y: 2}, blockType: "line2_h", layer: 1, isIce: true
+            id: "hidden_blue", color: "blue", position: {x: 3, y: 1}, blockType: "line2_h", layer: 1, isIce: true
         }, {
-            id: "hidden_yellow", color: "yellow", position: {x: 1, y: 4}, blockType: "square", layer: 1, isIce: true
+            id: "hidden_green", color: "green", position: {x: 5, y: 1}, blockType: "line3_h", layer: 1, isIce: true
         }, {
-            id: "hidden_purple", color: "purple", position: {x: 4, y: 4}, blockType: "lshape_up", layer: 1, isIce: true
+            id: "hidden_yellow", color: "yellow", position: {x: 1, y: 3}, blockType: "square", layer: 1, isIce: true
         }],
 
     // 石块配置 - 核心区域内的岩石作为障碍物
     rocks: [
         {
-            id: "rock_center1", position: {x: 3, y: 3}, layer: 0
+            id: "rock_center1", position: {x: 6, y: 2}, layer: 0
         }, {
-            id: "rock_center2", position: {x: 4, y: 4}, layer: 0
+            id: "rock_center2", position: {x: 7, y: 4}, layer: 0
         }
     ]
 };
 
 // 导出地图数据
 window.map1 = map1;
+
+// 自动验证地图布局
+if (typeof window.MapLayoutValidator !== 'undefined') {
+    console.log('正在验证 map1 布局...');
+    const validationResult = window.validateMapLayout(map1);
+    if (!validationResult.isValid) {
+        console.error('Map1 布局验证失败！');
+    } else {
+        console.log('Map1 布局验证通过 ✅');
+    }
+}
