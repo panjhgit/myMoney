@@ -231,7 +231,7 @@ class MapEngine {
 
         console.log(`[选择调试] 成功选择方块: ${block.id} (${block.color})`);
         console.log(`[选择调试] 方块位置: (${block.position.x}, ${block.position.y})`);
-        console.log(`[选择调试] 方块类型: ${block.blockType}`);
+        console.log(`[选择调试] 方块类型: ${block.type}`);
         
         this.selectedBlock = block;
         
@@ -1015,10 +1015,10 @@ class MapEngine {
         console.log(`[点击调试] 屏幕坐标: (${x}, ${y}) -> 网格坐标: (${gridPos.x}, ${gridPos.y})`);
         
         // 显示坐标类型
-        const matrixWidth = this.boardMatrix ? this.boardMatrix[0].length : 8;
-        const matrixHeight = this.boardMatrix ? this.boardMatrix.length : 8;
+        const boardWidth = this.boardWidth || 8;
+        const boardHeight = this.boardHeight || 8;
         
-        if (gridPos.x < 0 || gridPos.x >= matrixWidth || gridPos.y < 0 || gridPos.y >= matrixHeight) {
+        if (gridPos.x < 0 || gridPos.x >= boardWidth || gridPos.y < 0 || gridPos.y >= boardHeight) {
             console.log(`[点击调试] 坐标类型: 墙区域 (${gridPos.x}, ${gridPos.y})`);
         } else {
             console.log(`[点击调试] 坐标类型: 游戏区域 (${gridPos.x}, ${gridPos.y})`);
@@ -1028,8 +1028,8 @@ class MapEngine {
             console.log(`[点击调试] 点击位置无效，忽略点击`);
             const value = this.getCellValue(gridPos.x, gridPos.y);
             console.log(`[点击调试] 位置矩阵值: ${value}`);
-            if (gridPos.x < 0 || gridPos.x >= matrixWidth || gridPos.y < 0 || gridPos.y >= matrixHeight) {
-                console.log(`[点击调试] 原因: 坐标超出${matrixWidth}x${matrixHeight}游戏区域边界`);
+            if (gridPos.x < 0 || gridPos.x >= boardWidth || gridPos.y < 0 || gridPos.y >= boardHeight) {
+                console.log(`[点击调试] 原因: 坐标超出${boardWidth}x${boardHeight}游戏区域边界`);
             } else if (value === 1) {
                 console.log(`[点击调试] 原因: 位置是墙`);
             }
@@ -1043,7 +1043,7 @@ class MapEngine {
             const clickedBlock = this.blocks.get(gridValue);
             console.log(`[点击调试] 点击了方块: ${clickedBlock.id} (${clickedBlock.color})`);
             console.log(`[点击调试] 方块当前位置: (${clickedBlock.position.x}, ${clickedBlock.position.y})`);
-            console.log(`[点击调试] 方块类型: ${clickedBlock.blockType}`);
+            console.log(`[点击调试] 方块类型: ${clickedBlock.type}`);
             console.log(`[点击调试] 方块是否可移动: ${clickedBlock.movable ? '✅是' : '❌否'}`);
             
             if (clickedBlock.movable) {
@@ -1062,10 +1062,10 @@ class MapEngine {
             console.log(`[移动调试] 到位置: (${gridPos.x}, ${gridPos.y})`);
             
             // 显示移动坐标类型
-            const matrixWidth = this.boardMatrix ? this.boardMatrix[0].length : 8;
-            const matrixHeight = this.boardMatrix ? this.boardMatrix.length : 8;
+            const boardWidth = this.boardWidth || 8;
+            const boardHeight = this.boardHeight || 8;
             
-            if (gridPos.x < 0 || gridPos.x >= matrixWidth || gridPos.y < 0 || gridPos.y >= matrixHeight) {
+            if (gridPos.x < 0 || gridPos.x >= boardWidth || gridPos.y < 0 || gridPos.y >= boardHeight) {
                 console.log(`[移动调试] 目标坐标类型: 墙区域 (${gridPos.x}, ${gridPos.y})`);
             } else {
                 console.log(`[移动调试] 目标坐标类型: 游戏区域 (${gridPos.x}, ${gridPos.y})`);
@@ -1430,11 +1430,8 @@ class MapEngine {
     isValidBoardPosition(x, y) {
         if (!this.boardMatrix) return false;
         
-        const matrixWidth = this.boardMatrix[0].length;
-        const matrixHeight = this.boardMatrix.length;
-        
         // 如果坐标超出boardMatrix范围，则不可移动
-        if (x < 0 || x >= matrixWidth || y < 0 || y >= matrixHeight) {
+        if (x < 0 || x >= this.boardWidth || y < 0 || y >= this.boardHeight) {
             return false;
         }
         

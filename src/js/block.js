@@ -421,8 +421,9 @@ class Block {
     revealIce() {
         if (this.ice.isIce && !this.ice.isRevealed) {
             this.ice.isRevealed = true;
+            this.ice.isIce = false; // 显露后不再是冰块
             this.layer = 0;
-            this.movable = false; // 冰块显露后仍然不能移动
+            this.movable = true; // 冰块显露后变成可移动
             this.state = BlockStates.idle;
             console.log(`冰块方块 ${this.id} 已显露`);
         }

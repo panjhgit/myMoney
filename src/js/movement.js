@@ -274,10 +274,10 @@ class MovementManager {
         console.log(`[移动调试] 目标位置: (${targetPos.x}, ${targetPos.y})`);
         
         // 显示坐标类型
-        const matrixWidth = gameEngine.boardMatrix ? gameEngine.boardMatrix[0].length : 8;
-        const matrixHeight = gameEngine.boardMatrix ? gameEngine.boardMatrix.length : 8;
+        const boardWidth = gameEngine.boardWidth || 8;
+        const boardHeight = gameEngine.boardHeight || 8;
         
-        if (targetPos.x < 0 || targetPos.x >= matrixWidth || targetPos.y < 0 || targetPos.y >= matrixHeight) {
+        if (targetPos.x < 0 || targetPos.x >= boardWidth || targetPos.y < 0 || targetPos.y >= boardHeight) {
             console.log(`[移动调试] 目标坐标类型: 墙区域 (${targetPos.x}, ${targetPos.y})`);
         } else {
             console.log(`[移动调试] 目标坐标类型: 游戏区域 (${targetPos.x}, ${targetPos.y})`);
@@ -292,17 +292,14 @@ class MovementManager {
         if (!this.isValidTargetPosition(targetPos, gameEngine)) {
             console.warn(`[移动调试] 目标位置无效: (${targetPos.x}, ${targetPos.y})`);
             // 详细检查为什么无效
-            const isValidPos = gameEngine.collisionDetector.isValidPosition(targetPos.x, targetPos.y);
-            console.log(`[移动调试] isValidPosition 结果: ${isValidPos}`);
-            
-            if (!isValidPos) {
-                const value = gameEngine.getCellValue(targetPos.x, targetPos.y);
-                console.log(`[移动调试] 目标位置矩阵值: ${value}`);
-                if (targetPos.x < 0 || targetPos.x >= matrixWidth || targetPos.y < 0 || targetPos.y >= matrixHeight) {
-                    console.log(`[移动调试] 原因: 坐标超出${matrixWidth}x${matrixHeight}游戏区域边界`);
-                } else if (value === 1) {
-                    console.log(`[移动调试] 原因: 位置是墙`);
-                }
+            const value = gameEngine.getCellValue(targetPos.x, targetPos.y);
+            console.log(`[移动调试] 目标位置矩阵值: ${value}`);
+            if (targetPos.x < 0 || targetPos.x >= boardWidth || targetPos.y < 0 || targetPos.y >= boardHeight) {
+                console.log(`[移动调试] 原因: 坐标超出${boardWidth}x${boardHeight}游戏区域边界`);
+            } else if (value === 1) {
+                console.log(`[移动调试] 原因: 位置是墙`);
+            } else if (value >= 2 && value <= 9) {
+                console.log(`[移动调试] 原因: 位置是门`);
             }
             return false;
         }
@@ -454,37 +451,6 @@ class MovementManager {
         return !collisionResult.collision;
     }
 
-    /**
-     * 检查目标位置是否是门的位置
-     */
-    isTargetPositionAGate(targetPos, gameEngine) {
-        if (!gameEngine || !gameEngine.mapEngine) {
-            return false;
-        }
-        
-        const gates = Array.from(gameEngine.mapEngine.gates.values());
-        
-        for (const gate of gates) {
-            // 检查目标位置是否在门的范围内
-            let isInGate = false;
-            switch (gate.direction) {
-                case 'up':
-                case 'down':
-                    isInGate = targetPos.x >= gate.position.x && targetPos.x < gate.position.x + gate.length;
-                    break;
-                case 'left':
-                case 'right':
-                    isInGate = targetPos.y >= gate.position.y && targetPos.y < gate.position.y + gate.length;
-                    break;
-            }
-            
-            if (isInGate) {
-                return true;
-            }
-        }
-        
-        return false;
-    }
 
     /**
      * 获取边界位置（当目标位置超出边界时）
