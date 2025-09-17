@@ -15,7 +15,7 @@ const GAME_CONFIG = {
   
   // 渲染颜色常量
   RENDER_COLORS: {
-    PIPE_BACKGROUND: 'rgba(100, 100, 100, 0.8)',  // 管道背景色
+    PIPE_BACKGROUND: 'rgba(80, 80, 80, 1.0)',  // 管道背景色（纯色深灰色）
     GAME_AREA_BACKGROUND: 'rgba(200, 200, 200, 0.3)',  // 游戏区域背景色
     GAME_AREA_BORDER: 'rgba(128, 128, 128, 0.5)',  // 游戏区域边框色
   },

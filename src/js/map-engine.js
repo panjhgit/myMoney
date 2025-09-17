@@ -216,15 +216,23 @@ class MapEngine {
      * 选择方块
      */
     selectBlock(blockId) {
+        console.log(`[选择调试] 尝试选择方块: ${blockId}`);
+        
         const block = this.blocks.get(blockId);
         if (!block) {
+            console.log(`[选择调试] 方块不存在: ${blockId}`);
             return false;
         }
 
         if (!block.movable) {
+            console.log(`[选择调试] 方块不可移动: ${blockId} (${block.color})`);
             return false;
         }
 
+        console.log(`[选择调试] 成功选择方块: ${block.id} (${block.color})`);
+        console.log(`[选择调试] 方块位置: (${block.position.x}, ${block.position.y})`);
+        console.log(`[选择调试] 方块类型: ${block.blockType}`);
+        
         this.selectedBlock = block;
         
         // 🔧 优化：选择方块后触发重绘
@@ -542,16 +550,20 @@ class MapEngine {
         // 2. 绘制管道边框（门和墙，贴着棋盘边缘）
         this.drawPipeBorder(matrix);
         
-        // 不绘制坐标标签，让棋盘居中显示
+        // 3. 绘制坐标标签
+        this.drawCoordinateLabels();
     }
     
     /**
-     * 绘制游戏区域（直接绘制8×8游戏区域，居中显示）
+     * 绘制游戏区域（根据boardMatrix绘制不规则游戏区域）
      */
     drawGameArea(matrix) {
-        // 直接绘制8×8游戏区域，不扫描矩阵
-        const gameSize = ConfigUtils.getGridSize(); // 8×8
-        const totalSize = gameSize * this.cellSize; // 8 × 45 = 360px
+        if (!matrix || matrix.length === 0) return;
+        
+        const matrixWidth = matrix[0].length;
+        const matrixHeight = matrix.length;
+        const maxSize = Math.max(matrixWidth, matrixHeight);
+        const totalSize = maxSize * this.cellSize;
         
         // 使用系统信息获取画布尺寸，确保是有效数字
         const canvasWidth = this.systemInfo && this.systemInfo.windowWidth ? 
@@ -563,17 +575,17 @@ class MapEngine {
         const centerX = (canvasWidth - totalSize) / 2;
         const centerY = (canvasHeight - totalSize) / 2;
         
-        // 绘制游戏区域背景
+        // 绘制游戏区域背景（浅蓝色）
         this.ctx.fillStyle = GAME_CONFIG.RENDER_COLORS.GAME_AREA_BACKGROUND;
         this.ctx.fillRect(centerX, centerY, totalSize, totalSize);
         
-        // 绘制外边框
+        // 绘制外边框（细线）
         this.ctx.strokeStyle = GAME_CONFIG.RENDER_COLORS.GAME_AREA_BORDER;
         this.ctx.lineWidth = GAME_CONFIG.STYLES.LINE_WIDTH_THIN;
         this.ctx.strokeRect(centerX, centerY, totalSize, totalSize);
         
-        // 绘制内部网格线
-        for (let i = 1; i < gameSize; i++) {
+        // 绘制内部网格线（分隔所有格子）
+        for (let i = 1; i < maxSize; i++) {
             const lineX = centerX + i * this.cellSize;
             const lineY = centerY + i * this.cellSize;
             
@@ -596,103 +608,146 @@ class MapEngine {
     }
     
     /**
-     * 绘制管道边框（门和墙，贴着8×8棋盘边缘）
+     * 绘制管道边框（门和墙，根据boardMatrix绘制不规则边界）
      */
     drawPipeBorder(matrix) {
-        const pipeThickness = 12; // 管道厚度
-        const gameSize = ConfigUtils.getGridSize(); // 8×8
-        const totalSize = gameSize * this.cellSize; // 360px
+        if (!matrix || matrix.length === 0) return;
         
-        // 绘制四个方向的管道
-        this.drawPipeSegment(matrix, 'top', pipeThickness, totalSize);
-        this.drawPipeSegment(matrix, 'bottom', pipeThickness, totalSize);
-        this.drawPipeSegment(matrix, 'left', pipeThickness, totalSize);
-        this.drawPipeSegment(matrix, 'right', pipeThickness, totalSize);
+        const pipeThickness = 8; // 管道厚度
+        const matrixWidth = matrix[0].length;
+        const matrixHeight = matrix.length;
+        
+        // 根据boardMatrix绘制墙和门
+        for (let y = 0; y < matrixHeight; y++) {
+            for (let x = 0; x < matrixWidth; x++) {
+                const elementType = matrix[y][x];
+                
+                if (elementType === 1) {
+                    // 绘制墙
+                    this.drawWall(x, y, pipeThickness);
+                } else if (elementType >= 2 && elementType <= 9) {
+                    // 绘制门
+                    this.drawGate(x, y, elementType, pipeThickness);
+                }
+            }
+        }
     }
     
     /**
-     * 绘制管道段（统一方法）
+     * 绘制墙（完整45px格子）
      */
-    drawPipeSegment(matrix, direction, thickness, gameSize) {
-        const startX = this.gridOffsetX;
-        const startY = this.gridOffsetY;
-
-        let pipeX, pipeY, pipeWidth, pipeHeight;
-        let gateCheckX, gateCheckY, gateLoopStart, gateLoopEnd, gateLoopVar;
+    drawWall(x, y, thickness) {
+        const wallX = this.gridOffsetX + x * this.cellSize;
+        const wallY = this.gridOffsetY + y * this.cellSize;
         
-        // 根据方向设置管道参数
-        switch (direction) {
-            case 'top':
-                pipeX = startX - thickness;
-                pipeY = startY - thickness;
-                pipeWidth = gameSize + 2 * thickness;
-                pipeHeight = thickness;
-                gateCheckX = 0; // 检查第0行
-                gateLoopStart = 1; gateLoopEnd = 8; gateLoopVar = 'x';
-                break;
-            case 'bottom':
-                pipeX = startX - thickness;
-                pipeY = startY + gameSize;
-                pipeWidth = gameSize + 2 * thickness;
-                pipeHeight = thickness;
-                gateCheckX = 9; // 检查第9行
-                gateLoopStart = 1; gateLoopEnd = 8; gateLoopVar = 'x';
-                break;
-            case 'left':
-                pipeX = startX - thickness;
-                pipeY = startY - thickness;
-                pipeWidth = thickness;
-                pipeHeight = gameSize + 2 * thickness;
-                gateCheckY = 0; // 检查第0列
-                gateLoopStart = 1; gateLoopEnd = 8; gateLoopVar = 'y';
-                break;
-            case 'right':
-                pipeX = startX + gameSize;
-                pipeY = startY - thickness;
-                pipeWidth = thickness;
-                pipeHeight = gameSize + 2 * thickness;
-                gateCheckY = 9; // 检查第9列
-                gateLoopStart = 1; gateLoopEnd = 8; gateLoopVar = 'y';
-                break;
+        // 绘制墙背景（实心灰色）
+        this.ctx.fillStyle = GAME_CONFIG.RENDER_COLORS.PIPE_BACKGROUND;
+        this.ctx.fillRect(wallX, wallY, this.cellSize, this.cellSize);
+        
+        // 绘制墙边框
+        this.ctx.strokeStyle = GAME_CONFIG.RENDER_COLORS.PIPE_BACKGROUND;
+        this.ctx.lineWidth = 2;
+        this.ctx.strokeRect(wallX, wallY, this.cellSize, this.cellSize);
+    }
+    
+    /**
+     * 绘制门（完整45px格子）
+     */
+    drawGate(x, y, gateType, thickness) {
+        const gateX = this.gridOffsetX + x * this.cellSize;
+        const gateY = this.gridOffsetY + y * this.cellSize;
+        
+        // 获取门颜色
+        const color = GAME_CONFIG.BOARD_SYSTEM.GATE_COLOR_MAP[gateType];
+        const gateColor = this.getBlockColor(color);
+        
+        // 绘制门背景（实心彩色）
+        this.ctx.fillStyle = this.convertToRgba(gateColor, 1.0);
+        this.ctx.fillRect(gateX, gateY, this.cellSize, this.cellSize);
+        
+        // 绘制门边框
+        this.ctx.strokeStyle = gateColor;
+        this.ctx.lineWidth = 2;
+        this.ctx.strokeRect(gateX, gateY, this.cellSize, this.cellSize);
+    }
+    
+    
+    /**
+     * 绘制坐标标签（适应不规则地图）
+     */
+    drawCoordinateLabels() {
+        if (!this.ctx || !this.boardMatrix) return;
+        
+        const matrixWidth = this.boardMatrix[0].length;
+        const matrixHeight = this.boardMatrix.length;
+        const pipeThickness = 12; // 管道厚度
+        
+        // 设置文字样式
+        this.ctx.font = '12px Arial';
+        this.ctx.fillStyle = '#333333';
+        this.ctx.textAlign = 'center';
+        this.ctx.textBaseline = 'middle';
+        
+        // 绘制X轴坐标标签（列号）
+        for (let x = 0; x < matrixWidth; x++) {
+            const labelX = this.gridOffsetX + x * this.cellSize + this.cellSize / 2;
+            const labelY = this.gridOffsetY - pipeThickness / 2;
+            
+            // 顶部标签
+            this.ctx.fillText(x.toString(), labelX, labelY);
+            
+            // 底部标签
+            const bottomLabelY = this.gridOffsetY + matrixHeight * this.cellSize + pipeThickness / 2;
+            this.ctx.fillText(x.toString(), labelX, bottomLabelY);
         }
         
-        // 绘制管道背景（灰色）
-        this.ctx.fillStyle = GAME_CONFIG.RENDER_COLORS.PIPE_BACKGROUND;
-        this.ctx.fillRect(pipeX, pipeY, pipeWidth, pipeHeight);
-        
-        // 绘制门段
-        for (let i = gateLoopStart; i <= gateLoopEnd; i++) {
-            let elementType;
-            if (direction === 'top' || direction === 'bottom') {
-                elementType = matrix[gateCheckX][i];
-            } else {
-                elementType = matrix[i][gateCheckY];
-            }
+        // 绘制Y轴坐标标签（行号）
+        for (let y = 0; y < matrixHeight; y++) {
+            const labelX = this.gridOffsetX - pipeThickness / 2;
+            const labelY = this.gridOffsetY + y * this.cellSize + this.cellSize / 2;
             
-            if (elementType >= 2 && elementType <= 9) {
-                const color = GAME_CONFIG.BOARD_SYSTEM.GATE_COLOR_MAP[elementType];
-                const gateColor = this.getBlockColor(color);
+            // 左侧标签
+            this.ctx.fillText(y.toString(), labelX, labelY);
+            
+            // 右侧标签
+            const rightLabelX = this.gridOffsetX + matrixWidth * this.cellSize + pipeThickness / 2;
+            this.ctx.fillText(y.toString(), rightLabelX, labelY);
+        }
+        
+        // 绘制墙和门的坐标标签
+        this.drawWallAndGateLabels(matrixWidth, matrixHeight, pipeThickness);
+    }
+    
+    /**
+     * 绘制墙和门的坐标标签（适合45px格子）
+     */
+    drawWallAndGateLabels(matrixWidth, matrixHeight, pipeThickness) {
+        // 设置标签样式
+        this.ctx.font = '12px Arial';
+        this.ctx.textAlign = 'center';
+        this.ctx.textBaseline = 'middle';
+        
+        // 遍历boardMatrix，为墙和门添加标签
+        for (let y = 0; y < matrixHeight; y++) {
+            for (let x = 0; x < matrixWidth; x++) {
+                const elementType = this.boardMatrix[y][x];
                 
-                this.ctx.fillStyle = this.convertToRgba(gateColor, 1.0);
-                
-                let gateX, gateY, gateWidth, gateHeight;
-                if (direction === 'top' || direction === 'bottom') {
-                    gateX = startX + (i - 1) * this.cellSize;
-                    gateY = pipeY;
-                    gateWidth = this.cellSize;
-                    gateHeight = thickness;
-                } else {
-                    gateX = pipeX;
-                    gateY = startY + (i - 1) * this.cellSize;
-                    gateWidth = thickness;
-                    gateHeight = this.cellSize;
+                if (elementType === 1) {
+                    // 墙标签
+                    this.ctx.fillStyle = '#FFFFFF'; // 白色，在灰色墙上更清楚
+                    const labelX = this.gridOffsetX + x * this.cellSize + this.cellSize / 2;
+                    const labelY = this.gridOffsetY + y * this.cellSize + this.cellSize / 2;
+                    this.ctx.fillText('墙', labelX, labelY);
+                } else if (elementType >= 2 && elementType <= 9) {
+                    // 门标签
+                    this.ctx.fillStyle = '#FFFFFF'; // 白色，在各种颜色门上更清楚
+                    const labelX = this.gridOffsetX + x * this.cellSize + this.cellSize / 2;
+                    const labelY = this.gridOffsetY + y * this.cellSize + this.cellSize / 2;
+                    this.ctx.fillText(`${elementType}`, labelX, labelY); // 只显示门编号，更简洁
                 }
-                
-                this.ctx.fillRect(gateX, gateY, gateWidth, gateHeight);
             }
         }
     }
-    
 
     /**
      * 获取方块颜色
@@ -950,12 +1005,34 @@ class MapEngine {
         
         // 检查是否有方块正在移动
         if (this.isAnyBlockMoving()) {
+            console.log('[点击调试] 有方块正在移动，忽略点击');
             return;
         }
         
         const gridPos = this.screenToGrid(x, y);
+        
+        // 🔧 调试信息：打印点击位置
+        console.log(`[点击调试] 屏幕坐标: (${x}, ${y}) -> 网格坐标: (${gridPos.x}, ${gridPos.y})`);
+        
+        // 显示坐标类型
+        const matrixWidth = this.boardMatrix ? this.boardMatrix[0].length : 8;
+        const matrixHeight = this.boardMatrix ? this.boardMatrix.length : 8;
+        
+        if (gridPos.x < 0 || gridPos.x >= matrixWidth || gridPos.y < 0 || gridPos.y >= matrixHeight) {
+            console.log(`[点击调试] 坐标类型: 墙区域 (${gridPos.x}, ${gridPos.y})`);
+        } else {
+            console.log(`[点击调试] 坐标类型: 游戏区域 (${gridPos.x}, ${gridPos.y})`);
+        }
 
         if (!this.collisionDetector.isValidPosition(gridPos.x, gridPos.y)) {
+            console.log(`[点击调试] 点击位置无效，忽略点击`);
+            const value = this.getCellValue(gridPos.x, gridPos.y);
+            console.log(`[点击调试] 位置矩阵值: ${value}`);
+            if (gridPos.x < 0 || gridPos.x >= matrixWidth || gridPos.y < 0 || gridPos.y >= matrixHeight) {
+                console.log(`[点击调试] 原因: 坐标超出${matrixWidth}x${matrixHeight}游戏区域边界`);
+            } else if (value === 1) {
+                console.log(`[点击调试] 原因: 位置是墙`);
+            }
             return;
         }
 
@@ -964,17 +1041,39 @@ class MapEngine {
         if (gridValue && this.blocks.has(gridValue)) {
             // 点击了方块
             const clickedBlock = this.blocks.get(gridValue);
+            console.log(`[点击调试] 点击了方块: ${clickedBlock.id} (${clickedBlock.color})`);
+            console.log(`[点击调试] 方块当前位置: (${clickedBlock.position.x}, ${clickedBlock.position.y})`);
+            console.log(`[点击调试] 方块类型: ${clickedBlock.blockType}`);
+            console.log(`[点击调试] 方块是否可移动: ${clickedBlock.movable ? '✅是' : '❌否'}`);
             
             if (clickedBlock.movable) {
                 // 如果点击的是可移动方块，选择它
+                console.log(`[点击调试] 选中方块: ${clickedBlock.id}`);
                 this.selectBlock(gridValue);
             } else if (this.selectedBlock) {
                 // 如果点击的是不可移动方块（如冰块），但已有选中方块，尝试移动
+                console.log(`[移动调试] 尝试移动选中方块 ${this.selectedBlock.id} 到不可移动方块位置`);
                 this.movementManager.clickMove(this.selectedBlock, gridPos, this);
             }
         } else if (this.selectedBlock) {
             // 点击了空白位置，尝试点击移动
+            console.log(`[移动调试] 尝试移动选中方块: ${this.selectedBlock.id} (${this.selectedBlock.color})`);
+            console.log(`[移动调试] 从位置: (${this.selectedBlock.position.x}, ${this.selectedBlock.position.y})`);
+            console.log(`[移动调试] 到位置: (${gridPos.x}, ${gridPos.y})`);
+            
+            // 显示移动坐标类型
+            const matrixWidth = this.boardMatrix ? this.boardMatrix[0].length : 8;
+            const matrixHeight = this.boardMatrix ? this.boardMatrix.length : 8;
+            
+            if (gridPos.x < 0 || gridPos.x >= matrixWidth || gridPos.y < 0 || gridPos.y >= matrixHeight) {
+                console.log(`[移动调试] 目标坐标类型: 墙区域 (${gridPos.x}, ${gridPos.y})`);
+            } else {
+                console.log(`[移动调试] 目标坐标类型: 游戏区域 (${gridPos.x}, ${gridPos.y})`);
+            }
+            
             this.movementManager.clickMove(this.selectedBlock, gridPos, this);
+        } else {
+            console.log(`[点击调试] 点击空白区域，但没有选中的方块`);
         }
     }
     
@@ -1324,16 +1423,18 @@ class MapEngine {
     /**
      * 检查位置是否是有效的棋盘区域
      * 注意：screenToGrid返回的坐标需要转换为boardMatrix坐标
-     * @param {number} x - X坐标 (来自screenToGrid，范围-1到8)
-     * @param {number} y - Y坐标 (来自screenToGrid，范围-1到8)
+     * @param {number} x - X坐标 (来自screenToGrid)
+     * @param {number} y - Y坐标 (来自screenToGrid)
      * @returns {boolean} 是否有效
      */
     isValidBoardPosition(x, y) {
         if (!this.boardMatrix) return false;
         
-        // screenToGrid返回的坐标范围是-1到8，需要转换为boardMatrix坐标(0到7)
-        // 如果坐标超出8x8游戏区域，则不可移动
-        if (x < 0 || x >= 8 || y < 0 || y >= 8) {
+        const matrixWidth = this.boardMatrix[0].length;
+        const matrixHeight = this.boardMatrix.length;
+        
+        // 如果坐标超出boardMatrix范围，则不可移动
+        if (x < 0 || x >= matrixWidth || y < 0 || y >= matrixHeight) {
             return false;
         }
         

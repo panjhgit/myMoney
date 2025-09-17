@@ -268,29 +268,62 @@ class MovementManager {
      * @returns {boolean} 是否成功开始移动
      */
     clickMove(block, targetPos, gameEngine) {
+        console.log(`[移动调试] clickMove 开始`);
+        console.log(`[移动调试] 方块: ${block.id} (${block.color})`);
+        console.log(`[移动调试] 方块当前位置: (${block.position.x}, ${block.position.y})`);
+        console.log(`[移动调试] 目标位置: (${targetPos.x}, ${targetPos.y})`);
+        
+        // 显示坐标类型
+        const matrixWidth = gameEngine.boardMatrix ? gameEngine.boardMatrix[0].length : 8;
+        const matrixHeight = gameEngine.boardMatrix ? gameEngine.boardMatrix.length : 8;
+        
+        if (targetPos.x < 0 || targetPos.x >= matrixWidth || targetPos.y < 0 || targetPos.y >= matrixHeight) {
+            console.log(`[移动调试] 目标坐标类型: 墙区域 (${targetPos.x}, ${targetPos.y})`);
+        } else {
+            console.log(`[移动调试] 目标坐标类型: 游戏区域 (${targetPos.x}, ${targetPos.y})`);
+        }
+        
         if (!block || !block.canMove()) {
-            console.warn('方块无法移动');
+            console.warn(`[移动调试] 方块无法移动 - block: ${!!block}, canMove: ${block ? block.canMove() : 'N/A'}`);
             return false;
         }
         
         // 检查目标位置是否有效
         if (!this.isValidTargetPosition(targetPos, gameEngine)) {
-            console.warn('目标位置无效');
+            console.warn(`[移动调试] 目标位置无效: (${targetPos.x}, ${targetPos.y})`);
+            // 详细检查为什么无效
+            const isValidPos = gameEngine.collisionDetector.isValidPosition(targetPos.x, targetPos.y);
+            console.log(`[移动调试] isValidPosition 结果: ${isValidPos}`);
+            
+            if (!isValidPos) {
+                const value = gameEngine.getCellValue(targetPos.x, targetPos.y);
+                console.log(`[移动调试] 目标位置矩阵值: ${value}`);
+                if (targetPos.x < 0 || targetPos.x >= matrixWidth || targetPos.y < 0 || targetPos.y >= matrixHeight) {
+                    console.log(`[移动调试] 原因: 坐标超出${matrixWidth}x${matrixHeight}游戏区域边界`);
+                } else if (value === 1) {
+                    console.log(`[移动调试] 原因: 位置是墙`);
+                }
+            }
             return false;
         }
         
         // 计算移动路径
         const startPos = block.position;
+        console.log(`[移动调试] 开始计算路径: 从 (${startPos.x}, ${startPos.y}) 到 (${targetPos.x}, ${targetPos.y})`);
+        
         const path = this.calculatePath(block, startPos, targetPos, 
             gameEngine.collisionDetector, gameEngine.grid, 
             gameEngine.blocks, 
             gameEngine.rocks);
         
+        console.log(`[移动调试] 路径计算结果: ${path ? `路径长度 ${path.length}` : '无路径'}`);
+        
         if (path && path.length > 1) {
+            console.log(`[移动调试] 开始执行移动`);
             this.executeMove(block, path, gameEngine);
             return true;
         } else {
-            console.warn('无法找到有效路径');
+            console.warn(`[移动调试] 无法找到有效路径`);
             return false;
         }
     }
@@ -337,18 +370,8 @@ class MovementManager {
      * @returns {boolean} 是否有效
      */
     isValidTargetPosition(targetPos, gameEngine) {
-        // 检查是否在边界内
-        if (targetPos.x < 0 || targetPos.x >= this.GRID_SIZE || 
-            targetPos.y < 0 || targetPos.y >= this.GRID_SIZE) {
-            return false;
-        }
-        
-        // 检查是否是门的位置（门是特殊区域，需要特殊处理）
-        if (this.isTargetPositionAGate(targetPos, gameEngine)) {
-            return false;
-        }
-        
-        return true;
+        // 直接使用碰撞检测器的逻辑，它已经包含了边界检查和墙/门检查
+        return gameEngine.collisionDetector.isValidPosition(targetPos.x, targetPos.y);
     }
     
     /**
