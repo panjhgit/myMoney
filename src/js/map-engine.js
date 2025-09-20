@@ -320,6 +320,99 @@ class MapEngine {
             this.animations.delete(animationId);
         }
 
+        // 播放消除闪烁动画
+        this.playEliminationAnimation(block, gate);
+    }
+
+    /**
+     * 播放消除闪烁动画
+     */
+    playEliminationAnimation(block, gate) {
+        // 检查GSAP是否可用
+        if (typeof gsap === 'undefined') {
+            console.log('GSAP 不可用，直接移除方块');
+            this.removeBlockAfterAnimation(block, gate);
+            return;
+        }
+
+        const animationId = `block_eliminate_${block.id}`;
+        
+        // 设置方块状态为消除中
+        block.state = 'eliminating';
+        block.isEliminating = true;
+
+        // 创建闪烁动画时间线
+        const timeline = gsap.timeline({
+            onUpdate: () => {
+                // 动画进行时持续重绘
+                if (typeof markNeedsRedraw === 'function') {
+                    markNeedsRedraw();
+                }
+            },
+            onComplete: () => {
+                // 动画完成后移除方块
+                this.removeBlockAfterAnimation(block, gate);
+                
+                // 清理动画
+                if (this.animations) {
+                    this.animations.delete(animationId);
+                }
+            }
+        });
+
+        // 保存动画引用
+        if (this.animations) {
+            this.animations.set(animationId, timeline);
+        }
+
+        // 闪烁动画：透明度在0.2和1之间快速变化
+        timeline.to(block, {
+            alpha: 0.2,
+            duration: 0.1,
+            ease: "power2.out"
+        })
+        .to(block, {
+            alpha: 1,
+            duration: 0.1,
+            ease: "power2.out"
+        })
+        .to(block, {
+            alpha: 0.2,
+            duration: 0.1,
+            ease: "power2.out"
+        })
+        .to(block, {
+            alpha: 1,
+            duration: 0.1,
+            ease: "power2.out"
+        })
+        .to(block, {
+            alpha: 0.2,
+            duration: 0.1,
+            ease: "power2.out"
+        })
+        .to(block, {
+            alpha: 1,
+            duration: 0.1,
+            ease: "power2.out"
+        })
+        // 最后淡出
+        .to(block, {
+            alpha: 0,
+            scale: 0.8,
+            duration: 0.3,
+            ease: "power2.out"
+        });
+
+        console.log(`[消除动画] 开始播放方块 ${block.id} 的闪烁动画`);
+    }
+
+    /**
+     * 动画完成后移除方块
+     */
+    removeBlockAfterAnimation(block, gate) {
+        console.log(`[消除动画] 动画完成，移除方块 ${block.id}`);
+
         // 移除方块
         this.blocks.delete(block.id);
         this.selectedBlock = null;
@@ -382,29 +475,12 @@ class MapEngine {
 
     /**
      * 检查方块是否在门的位置
+     * 使用正确的门检测逻辑，确保方块完全贴着边界且完全在门覆盖范围内
      */
     isBlockAtGate(block, gate) {
-        const blockCells = this.collisionDetector.getBlockCells(block);
-
-        // 检查方块的任何一格是否在门的位置
-        return blockCells.some(cell => {
-            switch (gate.direction) {
-                case 'up':
-                    // 门在上方，检查方块是否在门下方
-                    return cell.x >= gate.position.x && cell.x < gate.position.x + gate.length && cell.y === gate.position.y + 1;
-                case 'down':
-                    // 门在下方，检查方块是否在门上方
-                    return cell.x >= gate.position.x && cell.x < gate.position.x + gate.length && cell.y === gate.position.y - 1;
-                case 'left':
-                    // 门在左侧，检查方块是否在门右侧
-                    return cell.y >= gate.position.y && cell.y < gate.position.y + gate.length && cell.x === gate.position.x + 1;
-                case 'right':
-                    // 门在右侧，检查方块是否在门左侧
-                    return cell.y >= gate.position.y && cell.y < gate.position.y + gate.length && cell.x === gate.position.x - 1;
-                default:
-                    return false;
-            }
-        });
+        // 直接使用已经正确的碰撞检测逻辑
+        const exitResult = this.collisionDetector.canExitThroughGate(block, gate, this.grid, this.blocks);
+        return exitResult.canExit;
     }
 
     /**

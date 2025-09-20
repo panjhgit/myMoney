@@ -10,6 +10,7 @@ const BlockStates = {
     moving: 'moving', 
     selected: 'selected', 
     exiting: 'exiting', 
+    eliminating: 'eliminating',  // 消除中状态
     eliminated: 'eliminated'
 };
 
@@ -412,7 +413,10 @@ class Block {
      * @returns {boolean} 是否可以移动
      */
     canMove() {
-        return this.movable && this.state !== BlockStates.exiting && this.state !== BlockStates.eliminated;
+        return this.movable && 
+               this.state !== BlockStates.exiting && 
+               this.state !== BlockStates.eliminating && 
+               this.state !== BlockStates.eliminated;
     }
     
     /**
@@ -481,6 +485,16 @@ class Block {
         // 设置透明度
         ctx.globalAlpha = this.alpha * (this.ice.isIce ? 0.7 : 1);
         
+        // 如果正在消除，应用缩放效果
+        if (this.state === BlockStates.eliminating) {
+            ctx.save();
+            const centerX = startX + (this.typeData.width * cellSize) / 2;
+            const centerY = startY + (this.typeData.height * cellSize) / 2;
+            ctx.translate(centerX, centerY);
+            ctx.scale(this.scale || 1, this.scale || 1);
+            ctx.translate(-centerX, -centerY);
+        }
+        
         // 绘制每个方块格子
         this.typeData.blocks.forEach(block => {
             const cellX = startX + block[0] * cellSize;
@@ -498,6 +512,11 @@ class Block {
         // 绘制选择效果
         if (this.isSelected) {
             this._drawSelectionEffect(ctx, startX, startY, cellSize);
+        }
+        
+        // 恢复变换（如果应用了缩放）
+        if (this.state === BlockStates.eliminating) {
+            ctx.restore();
         }
         
         ctx.globalAlpha = 1; // 重置透明度
