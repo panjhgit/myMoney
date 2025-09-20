@@ -17,6 +17,17 @@ class MovementManager {
      * 计算A*路径 - 返回能到达的最远位置
      */
     calculatePath(block, startPos, targetPos, collisionDetector, grid, blocks, rocks) {
+        // 边界检查：验证起始和目标位置
+        if (!collisionDetector.isValidPosition(startPos.x, startPos.y)) {
+            console.warn(`[A*路径] 起始位置无效: (${startPos.x}, ${startPos.y})`);
+            return [];
+        }
+        
+        if (!collisionDetector.isValidPosition(targetPos.x, targetPos.y)) {
+            console.warn(`[A*路径] 目标位置无效: (${targetPos.x}, ${targetPos.y})`);
+            return [];
+        }
+
         const openList = [];
         const closedList = new Set();
         let bestNode = null; // 记录最接近目标的节点
@@ -29,10 +40,12 @@ class MovementManager {
         bestNode = startNode; // 初始最佳节点
 
         while (openList.length > 0) {
-            // 找到f值最小的节点
+            // 优化性能：更高效地找到f值最小的节点
             let currentIndex = 0;
+            let minF = openList[0].f;
             for (let i = 1; i < openList.length; i++) {
-                if (openList[i].f < openList[currentIndex].f) {
+                if (openList[i].f < minF) {
+                    minF = openList[i].f;
                     currentIndex = i;
                 }
             }
@@ -45,11 +58,12 @@ class MovementManager {
 
             // 如果到达目标
             if (currentPos.x === targetPos.x && currentPos.y === targetPos.y) {
+                console.log(`[A*路径] 成功找到路径: 从 (${startPos.x},${startPos.y}) 到 (${targetPos.x},${targetPos.y}), 路径长度: ${currentNode.g + 1}`);
                 return this.reconstructPath(currentNode);
             }
 
-            // 更新最佳节点（距离目标最近的节点）
-            if (currentNode.h < bestNode.h) {
+            // 修复最佳节点选择逻辑：同时考虑h值和g值
+            if (this.isBetterNode(currentNode, bestNode)) {
                 bestNode = currentNode;
             }
 
@@ -101,9 +115,11 @@ class MovementManager {
 
         // 如果无法到达目标，返回能到达的最远位置的路径
         if (bestNode && bestNode !== startNode) {
+            console.log(`[A*路径] 无法到达目标，返回最佳路径: 从 (${startPos.x},${startPos.y}) 到 (${bestNode.position.x},${bestNode.position.y}), h值: ${bestNode.h}, g值: ${bestNode.g}`);
             return this.reconstructPath(bestNode);
         }
 
+        console.log(`[A*路径] 无法找到任何有效路径: 从 (${startPos.x},${startPos.y}) 到 (${targetPos.x},${targetPos.y})`);
         return [];
     }
 
@@ -112,6 +128,26 @@ class MovementManager {
      */
     calculateHeuristic(pos1, pos2) {
         return Math.abs(pos1.x - pos2.x) + Math.abs(pos1.y - pos2.y);
+    }
+
+    /**
+     * 判断节点是否更好（用于最佳节点选择）
+     * 优先选择h值更小的节点，如果h值相同则选择g值更小的节点
+     */
+    isBetterNode(node, bestNode) {
+        if (!bestNode) return true;
+        
+        // 优先考虑启发式值(h值) - 距离目标更近
+        if (node.h < bestNode.h) {
+            return true;
+        }
+        
+        // 如果启发式值相同，选择实际成本更低的节点(g值更小)
+        if (node.h === bestNode.h && node.g < bestNode.g) {
+            return true;
+        }
+        
+        return false;
     }
 
     /**
