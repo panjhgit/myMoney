@@ -101,6 +101,11 @@ class CollisionDetector {
         // 缓存 blockCells 计算结果，避免重复计算
         const blockCells = this.getBlockCells(block);
         
+        // 0. 检查方块的所有格子是否都在有效范围内
+        if (!this.areAllBlockCellsValid(blockCells)) {
+            return false;
+        }
+        
         // 1. 检查门的尺寸是否足够让方块通过
         if (!this.isGateSizeSufficient(block, gate)) {
             return false;
@@ -122,6 +127,13 @@ class CollisionDetector {
         }
         
         return true;
+    }
+    
+    /**
+     * 检查方块的所有格子是否都在有效范围内
+     */
+    areAllBlockCellsValid(blockCells) {
+        return blockCells.every(cell => this.isValidPosition(cell.x, cell.y));
     }
     
     /**
@@ -191,26 +203,56 @@ class CollisionDetector {
             blockCells = this.getBlockCells(block);
         }
         
+        // 获取游戏区域的边界
+        const gameAreaBounds = this.getGameAreaBounds();
+        
         switch (gate.direction) {
             case 'up':
-                // 检查是否有格子贴着上边界 (y=0)
-                return blockCells.some(cell => cell.y === 0);
+                // 检查是否有格子贴着上边界
+                return blockCells.some(cell => cell.y === gameAreaBounds.minY);
                 
             case 'down':
-                // 检查是否有格子贴着下边界 (y=7)
-                return blockCells.some(cell => cell.y === this.GRID_SIZE - 1);
+                // 检查是否有格子贴着下边界
+                return blockCells.some(cell => cell.y === gameAreaBounds.maxY);
                 
             case 'left':
-                // 检查是否有格子贴着左边界 (x=0)
-                return blockCells.some(cell => cell.x === 0);
+                // 检查是否有格子贴着左边界
+                return blockCells.some(cell => cell.x === gameAreaBounds.minX);
                 
             case 'right':
-                // 检查是否有格子贴着右边界 (x=7)
-                return blockCells.some(cell => cell.x === this.GRID_SIZE - 1);
+                // 检查是否有格子贴着右边界
+                return blockCells.some(cell => cell.x === gameAreaBounds.maxX);
                 
             default:
                 return false;
         }
+    }
+    
+    /**
+     * 获取游戏区域的边界
+     */
+    getGameAreaBounds() {
+        if (this.mapEngine && this.mapEngine.boardMatrix) {
+            // 从boardMatrix中找到值为0的区域边界
+            const matrix = this.mapEngine.boardMatrix;
+            let minX = Infinity, maxX = -1, minY = Infinity, maxY = -1;
+            
+            for (let y = 0; y < matrix.length; y++) {
+                for (let x = 0; x < matrix[y].length; x++) {
+                    if (matrix[y][x] === 0) { // 0表示游戏区域
+                        minX = Math.min(minX, x);
+                        maxX = Math.max(maxX, x);
+                        minY = Math.min(minY, y);
+                        maxY = Math.max(maxY, y);
+                    }
+                }
+            }
+            
+            return { minX, maxX, minY, maxY };
+        }
+        
+        // 如果没有boardMatrix，使用默认的8x8区域 (0,0)到(7,7)
+        return { minX: 0, maxX: this.GRID_SIZE - 1, minY: 0, maxY: this.GRID_SIZE - 1 };
     }
     
     /**
@@ -221,6 +263,9 @@ class CollisionDetector {
             blockCells = this.getBlockCells(block);
         }
         
+        // 获取游戏区域的边界
+        const gameAreaBounds = this.getGameAreaBounds();
+        
         // 计算方块需要移动多少步才能完全离开网格
         const minX = Math.min(...blockCells.map(cell => cell.x));
         const maxX = Math.max(...blockCells.map(cell => cell.x));
@@ -230,16 +275,16 @@ class CollisionDetector {
         let stepsToExit = 0;
         switch (gate.direction) {
             case 'up':
-                stepsToExit = minY + 1 + (maxY - minY);
+                stepsToExit = minY - gameAreaBounds.minY + 1 + (maxY - minY);
                 break;
             case 'down':
-                stepsToExit = (this.GRID_SIZE - maxY) + (maxY - minY);
+                stepsToExit = gameAreaBounds.maxY - maxY + 1 + (maxY - minY);
                 break;
             case 'left':
-                stepsToExit = minX + 1 + (maxX - minX);
+                stepsToExit = minX - gameAreaBounds.minX + 1 + (maxX - minX);
                 break;
             case 'right':
-                stepsToExit = (this.GRID_SIZE - maxX) + (maxX - minX);
+                stepsToExit = gameAreaBounds.maxX - maxX + 1 + (maxX - minX);
                 break;
         }
         
