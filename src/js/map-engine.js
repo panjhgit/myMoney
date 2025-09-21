@@ -706,6 +706,8 @@ class MapEngine {
         const matrixWidth = matrix[0].length;
         const matrixHeight = matrix.length;
         
+        
+        
         // 根据boardMatrix绘制墙和门
         for (let y = 0; y < matrixHeight; y++) {
             for (let x = 0; x < matrixWidth; x++) {
@@ -1213,6 +1215,10 @@ class MapEngine {
         // 🔧 优化：触发重绘
         this.triggerRedraw();
         
+        // 输出点击坐标
+        const gridPos = this.screenToGrid(x, y);
+        console.log(`[点击坐标] 屏幕坐标: (${x}, ${y}) -> 网格坐标: (${gridPos.x}, ${gridPos.y})`);
+        
         // 检查是否有方块正在移动
         if (this.isAnyBlockMoving()) {
             return;
@@ -1223,8 +1229,6 @@ class MapEngine {
             return;
         }
         
-        const gridPos = this.screenToGrid(x, y);
-
         const gridValue = this.grid[gridPos.y][gridPos.x];
 
         if (gridValue && this.blocks.has(gridValue)) {
@@ -1815,6 +1819,8 @@ class MapEngine {
         }
 
         this.boardMatrix = matrix;
+        
+        
         this.boardHeight = matrix.length;
         this.boardWidth = matrix[0] ? matrix[0].length : 0;
 

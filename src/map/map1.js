@@ -10,13 +10,12 @@ var map1 = {
     level: 1, name: "完整俄罗斯方块", description: "10x10棋盘，外围墙门设计，内部8x8核心区域", difficulty: "中等",
 
     // 新棋盘系统 - 数字矩阵 (10x10棋盘)
-    boardMatrix: [
-        [1, 2, 2, 2, 1, 1, 3, 3, 3, 1], // 第0行：墙+红色门(1,2,3)+墙+蓝色门(6,7,8)+墙
+    boardMatrix: [[1, 2, 2, 2, 1, 1, 3, 3, 3, 1], // 第0行：墙+红色门(1,2,3)+墙+蓝色门(6,7,8)+墙
         [5, 0, 0, 0, 0, 0, 0, 0, 0, 4], // 第1行：黄色门+8x8核心游戏区域+绿色门
-        [5, 0, 0, 0, 0, 0, 0, 0, 0, 4], // 第2行：黄色门+8x8核心游戏区域+绿色门
+        [5, 0, 0, 0, 0, 10, 0, 0, 0, 4], // 第2行：黄色门+8x8核心游戏区域+砖块(6,2)+绿色门
         [5, 0, 0, 0, 0, 0, 0, 0, 0, 4], // 第3行：黄色门+8x8核心游戏区域+绿色门
         [1, 0, 0, 0, 0, 0, 0, 0, 0, 1], // 第4行：墙+8x8核心游戏区域+墙
-        [1, 0, 0, 0, 0, 0, 0, 0, 0, 1], // 第5行：墙+8x8核心游戏区域+墙
+        [1, 0, 0, 0, 0, 0, 10, 0, 0, 1], // 第5行：墙+8x8核心游戏区域+砖块(7,4)+墙
         [6, 0, 0, 0, 0, 0, 0, 0, 0, 7], // 第6行：紫色门+8x8核心游戏区域+橙色门
         [6, 0, 0, 0, 0, 0, 0, 0, 0, 7], // 第7行：紫色门+8x8核心游戏区域+橙色门
         [6, 0, 0, 0, 0, 0, 0, 0, 0, 7], // 第8行：紫色门+8x8核心游戏区域+橙色门
@@ -24,8 +23,7 @@ var map1 = {
     ],
 
     // 俄罗斯方块配置 - 使用新的方块类型定义
-    tetrisBlocks: [
-        // 第0层 - 顶层方块（可见，可移动，完全遮挡下层）
+    tetrisBlocks: [// 第0层 - 顶层方块（可见，可移动，完全遮挡下层）
         // 位置调整为8×8游戏区域 (0,0) 到 (7,7)
         {
             id: "red_single", color: "red", position: {x: 1, y: 1}, blockType: "single", layer: 0
@@ -35,7 +33,7 @@ var map1 = {
             id: "green_line3", color: "green", position: {x: 5, y: 1}, blockType: "line3_h", layer: 0
         }, {
             id: "yellow_square", color: "yellow", position: {x: 1, y: 3}, blockType: "square", layer: 0
-        },         {
+        }, {
             id: "purple_lshape", color: "purple", position: {x: 3, y: 3}, blockType: "lshape_up", layer: 0
         }, {
             id: "orange_hshape", color: "orange", position: {x: 5, y: 5}, blockType: "hshape_up", layer: 0
@@ -50,16 +48,7 @@ var map1 = {
             id: "hidden_green", color: "green", position: {x: 5, y: 1}, blockType: "line3_h", layer: 1, isIce: true
         }, {
             id: "hidden_yellow", color: "yellow", position: {x: 1, y: 3}, blockType: "square", layer: 1, isIce: true
-        }],
-
-    // 石块配置 - 核心区域内的岩石作为障碍物
-    rocks: [
-        {
-            id: "rock_center1", position: {x: 6, y: 2}, layer: 0
-        }, {
-            id: "rock_center2", position: {x: 7, y: 4}, layer: 0
-        }
-    ]
+        }]
 };
 
 // 导出地图数据
