@@ -29,6 +29,7 @@ const GAME_CONFIG = {
       EMPTY: -1,      // 无意义，仅填充
       WALL: 1,        // 墙边界
       BOARD: 0,       // 棋盘区域
+      BRICK: 10,      // 砖块（火箭创建的）
       // 门类型 (2-9 对应不同颜色)
       GATE_RED: 2,    // 红色门
       GATE_BLUE: 3,   // 蓝色门

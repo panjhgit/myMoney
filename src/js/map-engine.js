@@ -198,7 +198,8 @@ class MapEngine {
                 layerBlocks.forEach(block => {
                     const cells = this.collisionDetector.getBlockCells(block);
                     cells.forEach(cell => {
-                        if (this.collisionDetector.isValidPosition(cell.x, cell.y)) {
+                        // 检查位置是否在有效范围内（不检查boardMatrix值，因为方块可以移动到门的位置）
+                        if (cell.x >= 0 && cell.x < this.boardWidth && cell.y >= 0 && cell.y < this.boardHeight) {
                             // 第0层方块优先显示，第1层及以下只在空白位置填充
                             if (layer === 0 || this.grid[cell.y][cell.x] === null) {
                                 this.grid[cell.y][cell.x] = block.id;
@@ -212,7 +213,8 @@ class MapEngine {
             if (layer === 0) {
                 this.rocks.forEach(rockKey => {
                     const [x, y] = rockKey.split(',').map(Number);
-                    if (this.collisionDetector.isValidPosition(x, y)) {
+                    // 检查位置是否在有效范围内（不检查boardMatrix值，因为石块可以放在门的位置）
+                    if (x >= 0 && x < this.boardWidth && y >= 0 && y < this.boardHeight) {
                         this.grid[y][x] = 'rock';
                     }
                 });
@@ -712,6 +714,9 @@ class MapEngine {
                 if (elementType === 1) {
                     // 绘制墙
                     this.drawWall(x, y, pipeThickness);
+                } else if (elementType === GAME_CONFIG.BOARD_SYSTEM.ELEMENT_TYPES.BRICK) {
+                    // 绘制砖块
+                    this.drawBrick(x, y);
                 } else if (elementType >= 2 && elementType <= 9) {
                     // 绘制门
                     this.drawGate(x, y, elementType, pipeThickness);
@@ -1071,11 +1076,11 @@ class MapEngine {
             for (let x = 0; x < gridWidth; x++) {
                 const gridValue = this.grid[y] && this.grid[y][x];
                 
-                // 只绘制火箭创建的砖块（grid值为1但不是boardMatrix原有的砖块）
-                if (gridValue === 1) {
-                    // 检查是否是火箭创建的砖块（boardMatrix中原本不是1）
+                // 只绘制火箭创建的砖块（grid值为10但不是boardMatrix原有的砖块）
+                if (gridValue === GAME_CONFIG.BOARD_SYSTEM.ELEMENT_TYPES.BRICK) {
+                    // 检查是否是火箭创建的砖块（boardMatrix中原本不是10）
                     const originalElementType = this.boardMatrix && this.boardMatrix[y] && this.boardMatrix[y][x];
-                    if (originalElementType !== 1) {
+                    if (originalElementType !== GAME_CONFIG.BOARD_SYSTEM.ELEMENT_TYPES.BRICK) {
                         this.drawBrick(x, y); // 绘制砖块
                     }
                 }
@@ -1595,11 +1600,11 @@ class MapEngine {
         // 检查坐标是否在有效范围内
         if (x >= 0 && x < this.boardWidth && y >= 0 && y < this.boardHeight) {
             // 在网格中设置砖块标记
-            this.grid[y][x] = 1; // 1表示砖块
+            this.grid[y][x] = GAME_CONFIG.BOARD_SYSTEM.ELEMENT_TYPES.BRICK; // 10表示砖块
             
             // 在boardMatrix中也设置砖块标记（用于渲染）
             if (this.boardMatrix && this.boardMatrix[y] && this.boardMatrix[y][x] !== undefined) {
-                this.boardMatrix[y][x] = 1; // 1表示砖块
+                this.boardMatrix[y][x] = GAME_CONFIG.BOARD_SYSTEM.ELEMENT_TYPES.BRICK; // 10表示砖块
                 console.log(`[火箭] 在boardMatrix位置 (${x}, ${y}) 创建砖块成功`);
             } else {
                 console.log(`[火箭] boardMatrix位置 (${x}, ${y}) 无效或超出范围`);
