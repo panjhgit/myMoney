@@ -58,12 +58,7 @@ class MovementManager {
 
             // 如果到达目标
             if (currentPos.x === targetPos.x && currentPos.y === targetPos.y) {
-                const path = this.reconstructPath(currentNode);
-                const actualSteps = path.length - 1;
-                console.log(`[A*路径] 成功找到路径: 从 (${startPos.x},${startPos.y}) 到 (${targetPos.x},${targetPos.y}), 实际步数: ${actualSteps}`);
-                console.log(`[A*路径] 详细路径:`, path.map(p => `(${p.x},${p.y})`).join(' → '));
-                console.log(`[A*路径] 路径节点数: ${path.length}, g值: ${currentNode.g}`);
-                return path;
+                return this.reconstructPath(currentNode);
             }
 
             // 修复最佳节点选择逻辑：根据移动方向选择最佳对齐的节点
@@ -83,10 +78,6 @@ class MovementManager {
 
                 const collisionResult = collisionDetector.checkCollision(block, newPos, grid, blocks, rocks, block.id);
                 if (collisionResult.collision) {
-                    // 添加碰撞调试信息
-                    if (Math.abs(newX - targetPos.x) <= 1 && Math.abs(newY - targetPos.y) <= 1) {
-                        console.log(`[A*碰撞] 位置 (${newX},${newY}) 有碰撞: ${collisionResult.reason}`, collisionResult);
-                    }
                     continue;
                 }
 
@@ -123,14 +114,9 @@ class MovementManager {
 
         // 如果无法到达目标，返回能到达的最远位置的路径
         if (bestNode && bestNode !== startNode) {
-            const direction = this.getMainDirection(startPos, targetPos);
-            const score = this.calculateDirectionalScore(bestNode, direction, targetPos);
-            console.log(`[A*路径] 无法到达目标，返回最佳路径: 从 (${startPos.x},${startPos.y}) 到 (${bestNode.position.x},${bestNode.position.y})`);
-            console.log(`[A*路径] 移动方向: ${direction}, 方向得分: ${score}, h值: ${bestNode.h}, g值: ${bestNode.g}`);
             return this.reconstructPath(bestNode);
         }
 
-        console.log(`[A*路径] 无法找到任何有效路径: 从 (${startPos.x},${startPos.y}) 到 (${targetPos.x},${targetPos.y})`);
         return [];
     }
 
@@ -402,80 +388,39 @@ class MovementManager {
      * @returns {boolean} 是否成功开始移动
      */
     clickMove(block, targetPos, gameEngine) {
-        console.log(`[移动调试] clickMove 开始`);
-        console.log(`[移动调试] 方块: ${block.id} (${block.color})`);
-        console.log(`[移动调试] 方块当前位置: (${block.position.x}, ${block.position.y})`);
-        console.log(`[移动调试] 目标位置: (${targetPos.x}, ${targetPos.y})`);
-        
         const currentCells = block.getCells();
-        console.log(`[移动调试] 方块类型: ${block.type}, 占用格子:`, currentCells.map(c => `(${c.x},${c.y})`));
         
         // 检查点击的目标位置是否在方块当前占用的格子中
         const isClickingOwnCell = currentCells.some(cell => cell.x === targetPos.x && cell.y === targetPos.y);
         if (isClickingOwnCell) {
-            console.log(`[移动调试] 点击了方块自身的格子，不移动`);
             return false;
         }
         
         // 计算最优的方块目标位置（不是点击位置，而是方块锚点应该移动到的位置）
         const optimalTargetPos = this.calculateOptimalBlockPosition(block, targetPos);
-        console.log(`[移动调试] 计算最优方块位置: 从 (${block.position.x}, ${block.position.y}) 到 (${optimalTargetPos.x}, ${optimalTargetPos.y})`);
         
-        // 计算理论最短距离（基于方块整体移动）
-        const dx = Math.abs(optimalTargetPos.x - block.position.x);
-        const dy = Math.abs(optimalTargetPos.y - block.position.y);
-        const theoreticalMinSteps = dx + dy;
-        console.log(`[移动调试] 理论最短距离: ${theoreticalMinSteps} 步 (dx=${dx}, dy=${dy})`);
-        
-        // 显示坐标类型
-        const boardWidth = gameEngine.boardWidth || 8;
-        const boardHeight = gameEngine.boardHeight || 8;
-        
-        if (targetPos.x < 0 || targetPos.x >= boardWidth || targetPos.y < 0 || targetPos.y >= boardHeight) {
-            console.log(`[移动调试] 目标坐标类型: 墙区域 (${targetPos.x}, ${targetPos.y})`);
-        } else {
-            console.log(`[移动调试] 目标坐标类型: 游戏区域 (${targetPos.x}, ${targetPos.y})`);
-        }
         
         if (!block || !block.canMove()) {
-            console.warn(`[移动调试] 方块无法移动 - block: ${!!block}, canMove: ${block ? block.canMove() : 'N/A'}`);
             return false;
         }
         
         // 检查目标位置是否有效
         if (!this.isValidTargetPosition(targetPos, gameEngine)) {
             console.warn(`[移动调试] 目标位置无效: (${targetPos.x}, ${targetPos.y})`);
-            // 详细检查为什么无效
-            const value = gameEngine.getCellValue(targetPos.x, targetPos.y);
-            console.log(`[移动调试] 目标位置矩阵值: ${value}`);
-            if (targetPos.x < 0 || targetPos.x >= boardWidth || targetPos.y < 0 || targetPos.y >= boardHeight) {
-                console.log(`[移动调试] 原因: 坐标超出${boardWidth}x${boardHeight}游戏区域边界`);
-            } else if (value === 1) {
-                console.log(`[移动调试] 原因: 位置是墙`);
-            } else if (value >= 2 && value <= 9) {
-                console.log(`[移动调试] 原因: 位置是门`);
-            }
             return false;
         }
         
         // 计算移动路径（使用最优目标位置）
         const startPos = block.position;
-        console.log(`[移动调试] 开始计算路径: 从 (${startPos.x}, ${startPos.y}) 到 (${optimalTargetPos.x}, ${optimalTargetPos.y})`);
-        
         const path = this.calculatePath(block, startPos, optimalTargetPos, 
             gameEngine.collisionDetector, gameEngine.grid, 
             gameEngine.blocks, 
             gameEngine.rocks);
         
-        const actualSteps = path ? path.length - 1 : 0;
-        console.log(`[移动调试] 路径计算结果: ${path ? `${actualSteps} 步移动` : '无路径'}`);
-        
         if (path && path.length > 1) {
-            console.log(`[移动调试] 开始执行移动`);
             this.executeMove(block, path, gameEngine);
             return true;
         } else {
-            console.warn(`[移动调试] 无法找到有效路径`);
             return false;
         }
     }
@@ -503,29 +448,15 @@ class MovementManager {
             }
         });
         
-        console.log(`[位置计算] 最近的方块格子: (${nearestCell.x}, ${nearestCell.y}), 距离: ${minDistance}`);
-        
         // 计算从最近格子到点击位置的偏移
         const offsetX = clickedPos.x - nearestCell.x;
         const offsetY = clickedPos.y - nearestCell.y;
-        
-        console.log(`[位置计算] 偏移量: (${offsetX}, ${offsetY})`);
         
         // 应用偏移到方块锚点位置
         const newBlockPos = {
             x: blockPos.x + offsetX,
             y: blockPos.y + offsetY
         };
-        
-        console.log(`[位置计算] 新方块位置: (${newBlockPos.x}, ${newBlockPos.y})`);
-        
-        // 验证新位置后方块的所有格子
-        const newCells = block.typeData.blocks.map(relativePos => ({
-            x: newBlockPos.x + relativePos[0],
-            y: newBlockPos.y + relativePos[1]
-        }));
-        
-        console.log(`[位置计算] 新位置后方块占用格子:`, newCells.map(c => `(${c.x},${c.y})`));
         
         return newBlockPos;
     }
@@ -539,30 +470,19 @@ class MovementManager {
      * @returns {boolean} 是否成功开始移动
      */
     dragMove(block, startPos, endPos, gameEngine) {
-        if (!block || !block.canMove()) {
-            console.warn('方块无法移动');
+        if (!block || !block.canMove() || !this.isValidTargetPosition(endPos, gameEngine)) {
             return false;
         }
         
-        // 检查结束位置是否有效
-        if (!this.isValidTargetPosition(endPos, gameEngine)) {
-            console.warn('拖动目标位置无效');
-            return false;
-        }
-        
-        // 计算移动路径
         const path = this.calculatePath(block, startPos, endPos, 
             gameEngine.collisionDetector, gameEngine.grid, 
-            gameEngine.blocks, 
-            gameEngine.rocks);
+            gameEngine.blocks, gameEngine.rocks);
         
         if (path && path.length > 1) {
             this.executeMove(block, path, gameEngine);
             return true;
-        } else {
-            console.warn('拖动路径无效');
-            return false;
         }
+        return false;
     }
     
     /**
@@ -657,42 +577,6 @@ class MovementManager {
     }
 
 
-    /**
-     * 获取边界位置（当目标位置超出边界时）
-     */
-    getBoundaryPosition(targetPos, gridSize) {
-        let x = targetPos.x;
-        let y = targetPos.y;
-        
-        // 调整到边界内
-        if (x < 0) x = 0;
-        if (x >= gridSize) x = gridSize - 1;
-        if (y < 0) y = 0;
-        if (y >= gridSize) y = gridSize - 1;
-        
-        return {x, y};
-    }
-    
-    /**
-     * 切换移动模式
-     * @param {boolean} gridBased - 是否使用格子化移动
-     */
-    setMovementMode(gridBased) {
-        if (typeof GAME_CONFIG !== 'undefined' && GAME_CONFIG.MOVEMENT) {
-            GAME_CONFIG.MOVEMENT.GRID_BASED = gridBased;
-            console.log(`移动模式已切换为: ${gridBased ? '格子化移动' : '连续移动'}`);
-        }
-    }
-    
-    /**
-     * 获取当前移动模式
-     * @returns {boolean} 是否使用格子化移动
-     */
-    isGridBasedMovement() {
-        return typeof GAME_CONFIG !== 'undefined' && 
-               GAME_CONFIG.MOVEMENT && 
-               GAME_CONFIG.MOVEMENT.GRID_BASED;
-    }
 
 }
 
