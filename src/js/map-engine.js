@@ -728,19 +728,22 @@ class MapEngine {
     }
     
     /**
-     * 绘制墙（完整45px格子）
+     * 绘制实心格子（墙或砖块）
+     * @param {number} x - X坐标
+     * @param {number} y - Y坐标
+     * @param {string} fillColor - 填充颜色
      */
-    drawWall(x, y, thickness) {
-        const wallX = this.gridOffsetX + x * this.cellSize;
-        const wallY = this.gridOffsetY + y * this.cellSize;
+    drawSolidCell(x, y, fillColor) {
+        const cellX = this.gridOffsetX + x * this.cellSize;
+        const cellY = this.gridOffsetY + y * this.cellSize;
         
         // 清除任何可能的边框设置
         this.ctx.strokeStyle = 'transparent';
         this.ctx.lineWidth = 0;
         
-        // 绘制墙背景（实心灰色，完全无边框）
-        this.ctx.fillStyle = GAME_CONFIG.RENDER_COLORS.PIPE_BACKGROUND;
-        this.ctx.fillRect(wallX, wallY, this.cellSize, this.cellSize);
+        // 绘制实心背景
+        this.ctx.fillStyle = fillColor;
+        this.ctx.fillRect(cellX, cellY, this.cellSize, this.cellSize);
         
         // 确保没有任何边框或阴影效果
         this.ctx.shadowColor = 'transparent';
@@ -750,25 +753,17 @@ class MapEngine {
     }
     
     /**
+     * 绘制墙（完整45px格子）
+     */
+    drawWall(x, y, thickness) {
+        this.drawSolidCell(x, y, GAME_CONFIG.RENDER_COLORS.PIPE_BACKGROUND);
+    }
+    
+    /**
      * 绘制砖块（火箭创建的砖块）
      */
     drawBrick(x, y) {
-        const brickX = this.gridOffsetX + x * this.cellSize;
-        const brickY = this.gridOffsetY + y * this.cellSize;
-        
-        // 清除任何可能的边框设置
-        this.ctx.strokeStyle = 'transparent';
-        this.ctx.lineWidth = 0;
-        
-        // 绘制砖块背景（深灰色，与地图原有砖块一致）
-        this.ctx.fillStyle = GAME_CONFIG.RENDER_COLORS.PIPE_BACKGROUND;
-        this.ctx.fillRect(brickX, brickY, this.cellSize, this.cellSize);
-        
-        // 确保没有任何边框或阴影效果
-        this.ctx.shadowColor = 'transparent';
-        this.ctx.shadowBlur = 0;
-        this.ctx.shadowOffsetX = 0;
-        this.ctx.shadowOffsetY = 0;
+        this.drawSolidCell(x, y, GAME_CONFIG.RENDER_COLORS.PIPE_BACKGROUND);
     }
     
     /**

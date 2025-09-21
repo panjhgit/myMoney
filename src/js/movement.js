@@ -405,7 +405,7 @@ class MovementManager {
         }
         
         // 检查目标位置是否有效
-        if (!this.isValidTargetPosition(targetPos, gameEngine)) {
+        if (!gameEngine.collisionDetector.isValidPosition(targetPos.x, targetPos.y)) {
             console.warn(`[移动调试] 目标位置无效: (${targetPos.x}, ${targetPos.y})`);
             return false;
         }
@@ -470,7 +470,7 @@ class MovementManager {
      * @returns {boolean} 是否成功开始移动
      */
     dragMove(block, startPos, endPos, gameEngine) {
-        if (!block || !block.canMove() || !this.isValidTargetPosition(endPos, gameEngine)) {
+        if (!block || !block.canMove() || !gameEngine.collisionDetector.isValidPosition(endPos.x, endPos.y)) {
             return false;
         }
         
@@ -485,67 +485,7 @@ class MovementManager {
         return false;
     }
     
-    /**
-     * 检查目标位置是否有效
-     * @param {Object} targetPos - 目标位置 {x, y}
-     * @param {Object} gameEngine - 游戏引擎
-     * @returns {boolean} 是否有效
-     */
-    isValidTargetPosition(targetPos, gameEngine) {
-        // 直接使用碰撞检测器的逻辑，它已经包含了边界检查和墙/门检查
-        return gameEngine.collisionDetector.isValidPosition(targetPos.x, targetPos.y);
-    }
     
-    /**
-     * 获取屏幕坐标对应的格子位置
-     * @param {number} screenX - 屏幕X坐标
-     * @param {number} screenY - 屏幕Y坐标
-     * @param {Object} gameEngine - 游戏引擎
-     * @returns {Object} 格子位置 {x, y}
-     */
-    screenToGrid(screenX, screenY, gameEngine) {
-        if (!gameEngine || !gameEngine.mapEngine) {
-            return null;
-        }
-        
-        const mapEngine = gameEngine.mapEngine;
-        const cellSize = mapEngine.cellSize;
-        const offsetX = mapEngine.gridOffsetX;
-        const offsetY = mapEngine.gridOffsetY;
-        
-        // 计算相对于游戏区域的坐标
-        const relativeX = screenX - offsetX;
-        const relativeY = screenY - offsetY;
-        
-        // 转换为格子坐标
-        const gridX = Math.floor(relativeX / cellSize);
-        const gridY = Math.floor(relativeY / cellSize);
-        
-        return {x: gridX, y: gridY};
-    }
-    
-    /**
-     * 获取格子位置对应的屏幕坐标
-     * @param {Object} gridPos - 格子位置 {x, y}
-     * @param {Object} gameEngine - 游戏引擎
-     * @returns {Object} 屏幕坐标 {x, y}
-     */
-    gridToScreen(gridPos, gameEngine) {
-        if (!gameEngine || !gameEngine.mapEngine) {
-            return null;
-        }
-        
-        const mapEngine = gameEngine.mapEngine;
-        const cellSize = mapEngine.cellSize;
-        const offsetX = mapEngine.gridOffsetX;
-        const offsetY = mapEngine.gridOffsetY;
-        
-        // 计算屏幕坐标
-        const screenX = offsetX + gridPos.x * cellSize;
-        const screenY = offsetY + gridPos.y * cellSize;
-        
-        return {x: screenX, y: screenY};
-    }
     
     /**
      * 检查拖动是否有效（不能跨过障碍）
