@@ -44,6 +44,14 @@ class MapEngine {
         this.dragStartPos = null;
         this.dragStartScreenPos = null;
 
+        // 道具系统
+        this.items = {
+            colorChanger: { count: 3, name: '颜色转换剂', icon: '🎨' },
+            bomb: { count: 2, name: '炸弹', icon: '💣' },
+            shuffle: { count: 1, name: '重新打乱', icon: '🔀' }
+        };
+        this.selectedItem = null;
+
         // 如果提供了参数，立即设置渲染上下文
         if (ctx && systemInfo) {
             this.setRenderContext(ctx, systemInfo);
@@ -1047,6 +1055,9 @@ class MapEngine {
             this.ctx.fillText(`选中: ${this.selectedBlock.id}`, 20, infoY + 50);
         }
 
+        // 绘制道具栏
+        this.drawItemBar();
+        
         // 绘制移动提示
         if (this.selectedBlock) {
             this.ctx.fillStyle = 'rgba(255, 255, 0, 0.8)';
@@ -1055,6 +1066,78 @@ class MapEngine {
                 Number(this.systemInfo.windowHeight) || 667 : 667;
             this.ctx.fillText('点击目标位置移动方块', 20, windowHeight - 20);
         }
+    }
+
+    /**
+     * 绘制道具栏
+     */
+    drawItemBar() {
+        if (!this.ctx) return;
+
+        const windowWidth = this.systemInfo && this.systemInfo.windowWidth ? 
+            Number(this.systemInfo.windowWidth) || 375 : 375;
+        const windowHeight = this.systemInfo && this.systemInfo.windowHeight ? 
+            Number(this.systemInfo.windowHeight) || 667 : 667;
+
+        // 悬浮道具按钮位置：屏幕下方，稍微往上一点
+        const itemSize = 60;
+        const itemSpacing = 20;
+        const totalWidth = (itemSize + itemSpacing) * 3 - itemSpacing;
+        const startX = (windowWidth - totalWidth) / 2;
+        const itemY = windowHeight - itemSize - 30; // 距离底部30px
+
+        // 绘制三个道具
+        const itemKeys = Object.keys(this.items);
+        itemKeys.forEach((itemKey, index) => {
+            const item = this.items[itemKey];
+            const itemX = startX + index * (itemSize + itemSpacing);
+
+            // 绘制阴影效果（悬浮感）
+            this.ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
+            this.ctx.fillRect(itemX + 2, itemY + 2, itemSize, itemSize);
+
+            // 绘制道具背景
+            if (this.selectedItem === itemKey) {
+                // 选中状态：金色背景
+                this.ctx.fillStyle = 'rgba(255, 215, 0, 0.95)';
+            } else if (item.count > 0) {
+                // 可用状态：白色背景
+                this.ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
+            } else {
+                // 不可用状态：灰色背景
+                this.ctx.fillStyle = 'rgba(200, 200, 200, 0.7)';
+            }
+
+            this.ctx.fillRect(itemX, itemY, itemSize, itemSize);
+
+            // 绘制道具边框
+            if (this.selectedItem === itemKey) {
+                this.ctx.strokeStyle = 'rgba(255, 140, 0, 1)';
+                this.ctx.lineWidth = 3;
+            } else {
+                this.ctx.strokeStyle = 'rgba(0, 0, 0, 0.3)';
+                this.ctx.lineWidth = 2;
+            }
+            this.ctx.strokeRect(itemX, itemY, itemSize, itemSize);
+
+            // 绘制道具图标
+            this.ctx.font = '24px Arial';
+            this.ctx.fillStyle = item.count > 0 ? '#333333' : '#999999';
+            this.ctx.textAlign = 'center';
+            this.ctx.textBaseline = 'middle';
+            this.ctx.fillText(item.icon, itemX + itemSize / 2, itemY + itemSize / 2 - 5);
+
+            // 绘制道具数量
+            this.ctx.font = '12px Arial';
+            this.ctx.fillStyle = item.count > 0 ? '#333333' : '#999999';
+            this.ctx.fillText(item.count.toString(), itemX + itemSize / 2, itemY + itemSize - 8);
+
+            // 绘制道具名称
+            this.ctx.font = '10px Arial';
+            this.ctx.fillStyle = item.count > 0 ? '#333333' : '#999999';
+            this.ctx.fillText(item.name, itemX + itemSize / 2, itemY + itemSize + 12);
+        });
+
     }
 
     /**
@@ -1073,7 +1156,7 @@ class MapEngine {
 
 
     /**
-     * 处理点击事件 - 支持点击移动
+     * 处理点击事件 - 支持点击移动和道具栏
      */
     handleClick(x, y) {
         // 🔧 优化：触发重绘
@@ -1081,36 +1164,15 @@ class MapEngine {
         
         // 检查是否有方块正在移动
         if (this.isAnyBlockMoving()) {
-            console.log('[点击调试] 有方块正在移动，忽略点击');
+            return;
+        }
+        
+        // 检查是否点击了道具栏
+        if (this.handleItemBarClick(x, y)) {
             return;
         }
         
         const gridPos = this.screenToGrid(x, y);
-        
-        // 🔧 调试信息：打印点击位置
-        console.log(`[点击调试] 屏幕坐标: (${x}, ${y}) -> 网格坐标: (${gridPos.x}, ${gridPos.y})`);
-        
-        // 显示坐标类型
-        const boardWidth = this.boardWidth || 8;
-        const boardHeight = this.boardHeight || 8;
-        
-        if (gridPos.x < 0 || gridPos.x >= boardWidth || gridPos.y < 0 || gridPos.y >= boardHeight) {
-            console.log(`[点击调试] 坐标类型: 墙区域 (${gridPos.x}, ${gridPos.y})`);
-        } else {
-            console.log(`[点击调试] 坐标类型: 游戏区域 (${gridPos.x}, ${gridPos.y})`);
-        }
-
-        if (!this.collisionDetector.isValidPosition(gridPos.x, gridPos.y)) {
-            console.log(`[点击调试] 点击位置无效，忽略点击`);
-            const value = this.getCellValue(gridPos.x, gridPos.y);
-            console.log(`[点击调试] 位置矩阵值: ${value}`);
-            if (gridPos.x < 0 || gridPos.x >= boardWidth || gridPos.y < 0 || gridPos.y >= boardHeight) {
-                console.log(`[点击调试] 原因: 坐标超出${boardWidth}x${boardHeight}游戏区域边界`);
-            } else if (value === 1) {
-                console.log(`[点击调试] 原因: 位置是墙`);
-            }
-            return;
-        }
 
         const gridValue = this.grid[gridPos.y][gridPos.x];
 
@@ -1153,6 +1215,115 @@ class MapEngine {
         }
     }
     
+    /**
+     * 处理道具栏点击
+     */
+    handleItemBarClick(x, y) {
+        const windowHeight = this.systemInfo && this.systemInfo.windowHeight ? 
+            Number(this.systemInfo.windowHeight) || 667 : 667;
+        const windowWidth = this.systemInfo && this.systemInfo.windowWidth ? 
+            Number(this.systemInfo.windowWidth) || 375 : 375;
+
+        const itemSize = 60;
+        const itemSpacing = 20;
+        const totalWidth = (itemSize + itemSpacing) * 3 - itemSpacing;
+        const startX = (windowWidth - totalWidth) / 2;
+        const itemY = windowHeight - itemSize - 30;
+        
+        // 检查是否点击在悬浮按钮区域内
+        if (y < itemY || y > itemY + itemSize) {
+            return false;
+        }
+
+        // 检查点击了哪个道具
+        const itemKeys = Object.keys(this.items);
+        for (let i = 0; i < itemKeys.length; i++) {
+            const itemX = startX + i * (itemSize + itemSpacing);
+            
+            if (x >= itemX && x <= itemX + itemSize && y >= itemY && y <= itemY + itemSize) {
+                const itemKey = itemKeys[i];
+                const item = this.items[itemKey];
+                
+                if (item.count > 0) {
+                    // 切换选中状态
+                    if (this.selectedItem === itemKey) {
+                        this.selectedItem = null; // 取消选中
+                    } else {
+                        this.selectedItem = itemKey; // 选中道具
+                    }
+                    console.log(`[道具] ${this.selectedItem ? '选中' : '取消选中'} ${item.name}`);
+                } else {
+                    console.log(`[道具] ${item.name} 数量不足`);
+                }
+                return true;
+            }
+        }
+        
+        return false;
+    }
+
+    /**
+     * 使用选中的道具
+     */
+    useSelectedItem(targetPos = null) {
+        if (!this.selectedItem) {
+            console.log('[道具] 没有选中任何道具');
+            return false;
+        }
+
+        const item = this.items[this.selectedItem];
+        if (item.count <= 0) {
+            console.log(`[道具] ${item.name} 数量不足`);
+            return false;
+        }
+
+        console.log(`[道具] 使用 ${item.name}`);
+        
+        // 减少道具数量
+        item.count--;
+        
+        // 根据道具类型执行不同效果
+        switch (this.selectedItem) {
+            case 'colorChanger':
+                this.useColorChanger(targetPos);
+                break;
+            case 'bomb':
+                this.useBomb(targetPos);
+                break;
+            case 'shuffle':
+                this.useShuffle();
+                break;
+        }
+        
+        // 使用后取消选中
+        this.selectedItem = null;
+        return true;
+    }
+
+    /**
+     * 使用颜色转换剂（占位方法）
+     */
+    useColorChanger(targetPos) {
+        console.log('[道具] 颜色转换剂效果 - 待实现');
+        // TODO: 实现颜色转换功能
+    }
+
+    /**
+     * 使用炸弹（占位方法）
+     */
+    useBomb(targetPos) {
+        console.log('[道具] 炸弹效果 - 待实现');
+        // TODO: 实现炸弹功能
+    }
+
+    /**
+     * 使用重新打乱（占位方法）
+     */
+    useShuffle() {
+        console.log('[道具] 重新打乱效果 - 待实现');
+        // TODO: 实现重新打乱功能
+    }
+
     /**
      * 处理拖动事件 - 支持拖动移动
      * @param {number} startX - 起始X坐标
