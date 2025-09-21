@@ -1,5 +1,8 @@
 // 游戏统一配置 - 抖音小游戏专用
 const GAME_CONFIG = {
+  // 调试模式（生产环境设为false）
+  DEBUG_MODE: false,
+  
   // 核心尺寸配置 - 10x10矩阵包含墙和门，实际游戏区域最大8x8
   BOARD_MATRIX_SIZE: 10,  // 棋盘矩阵尺寸（10x10，最外层给墙和门预留）
   GRID_SIZE: 8,           // 游戏区域尺寸（8x8）

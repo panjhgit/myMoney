@@ -1210,9 +1210,11 @@ class MapEngine {
         // 🔧 优化：触发重绘
         this.triggerRedraw();
         
-        // 输出点击坐标
+        // 输出点击坐标（开发模式）
         const gridPos = this.screenToGrid(x, y);
-        console.log(`[点击坐标] 屏幕坐标: (${x}, ${y}) -> 网格坐标: (${gridPos.x}, ${gridPos.y})`);
+        if (GAME_CONFIG.DEBUG_MODE) {
+            console.log(`[点击坐标] 屏幕坐标: (${x}, ${y}) -> 网格坐标: (${gridPos.x}, ${gridPos.y})`);
+        }
         
         // 检查是否有方块正在移动
         if (this.isAnyBlockMoving()) {
@@ -1787,14 +1789,19 @@ class MapEngine {
      */
     screenToGrid(screenX, screenY) {
         // 确保坐标是有效数字
-        const x = Number(screenX) || 0;
-        const y = Number(screenY) || 0;
+        const x = +screenX || 0;
+        const y = +screenY || 0;
         
-        // 确保偏移量和格子大小是有效数字
-        const offsetX = Number(this.gridOffsetX) || 0;
-        const offsetY = Number(this.gridOffsetY) || 0;
-        const cellSize = Number(this.cellSize) || 45;
+        // 缓存偏移量和格子大小（避免重复计算）
+        if (!this._cachedOffsets) {
+            this._cachedOffsets = {
+                offsetX: +this.gridOffsetX || 0,
+                offsetY: +this.gridOffsetY || 0,
+                cellSize: +this.cellSize || 45
+            };
+        }
         
+        const { offsetX, offsetY, cellSize } = this._cachedOffsets;
         const gridX = Math.floor((x - offsetX) / cellSize);
         const gridY = Math.floor((y - offsetY) / cellSize);
         

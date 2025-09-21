@@ -124,7 +124,26 @@ class MovementManager {
      * 计算启发式函数（曼哈顿距离）
      */
     calculateHeuristic(pos1, pos2) {
-        return Math.abs(pos1.x - pos2.x) + Math.abs(pos1.y - pos2.y);
+        const key = `${pos1.x},${pos1.y},${pos2.x},${pos2.y}`;
+        if (this._mathCache && this._mathCache.has(key)) {
+            return this._mathCache.get(key);
+        }
+        
+        const distance = Math.abs(pos1.x - pos2.x) + Math.abs(pos1.y - pos2.y);
+        if (!this._mathCache) {
+            this._mathCache = new Map();
+        }
+        this._mathCache.set(key, distance);
+        return distance;
+    }
+
+    /**
+     * 清理数学计算缓存
+     */
+    clearMathCache() {
+        if (this._mathCache) {
+            this._mathCache.clear();
+        }
     }
 
     /**
