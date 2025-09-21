@@ -48,7 +48,7 @@ class MapEngine {
         this.items = {
             colorChanger: { count: 3, name: '颜色转换剂', icon: '🎨' },
             bomb: { count: 2, name: '炸弹', icon: '💣' },
-            shuffle: { count: 1, name: '重新打乱', icon: '🔀' }
+            rocket: { count: 1, name: '火箭', icon: '🚀' }
         };
         this.selectedItem = null;
 
@@ -576,6 +576,9 @@ class MapEngine {
         // 绘制俄罗斯方块（包括被冰块包裹的方块）
         this.drawTetrisBlocks();
 
+        // 绘制火箭创建的砖块（确保在方块之后绘制）
+        this.drawRocketBricks();
+
         // 绘制UI
         this.drawUI();
 
@@ -724,14 +727,41 @@ class MapEngine {
         const wallX = this.gridOffsetX + x * this.cellSize;
         const wallY = this.gridOffsetY + y * this.cellSize;
         
-        // 绘制墙背景（实心灰色）
+        // 清除任何可能的边框设置
+        this.ctx.strokeStyle = 'transparent';
+        this.ctx.lineWidth = 0;
+        
+        // 绘制墙背景（实心灰色，完全无边框）
         this.ctx.fillStyle = GAME_CONFIG.RENDER_COLORS.PIPE_BACKGROUND;
         this.ctx.fillRect(wallX, wallY, this.cellSize, this.cellSize);
         
-        // 绘制墙边框
-        this.ctx.strokeStyle = GAME_CONFIG.RENDER_COLORS.PIPE_BACKGROUND;
-        this.ctx.lineWidth = 2;
-        this.ctx.strokeRect(wallX, wallY, this.cellSize, this.cellSize);
+        // 确保没有任何边框或阴影效果
+        this.ctx.shadowColor = 'transparent';
+        this.ctx.shadowBlur = 0;
+        this.ctx.shadowOffsetX = 0;
+        this.ctx.shadowOffsetY = 0;
+    }
+    
+    /**
+     * 绘制砖块（火箭创建的砖块）
+     */
+    drawBrick(x, y) {
+        const brickX = this.gridOffsetX + x * this.cellSize;
+        const brickY = this.gridOffsetY + y * this.cellSize;
+        
+        // 清除任何可能的边框设置
+        this.ctx.strokeStyle = 'transparent';
+        this.ctx.lineWidth = 0;
+        
+        // 绘制砖块背景（深灰色，与地图原有砖块一致）
+        this.ctx.fillStyle = GAME_CONFIG.RENDER_COLORS.PIPE_BACKGROUND;
+        this.ctx.fillRect(brickX, brickY, this.cellSize, this.cellSize);
+        
+        // 确保没有任何边框或阴影效果
+        this.ctx.shadowColor = 'transparent';
+        this.ctx.shadowBlur = 0;
+        this.ctx.shadowOffsetX = 0;
+        this.ctx.shadowOffsetY = 0;
     }
     
     /**
@@ -1028,6 +1058,32 @@ class MapEngine {
     }
 
     /**
+     * 绘制火箭创建的砖块
+     */
+    drawRocketBricks() {
+        if (!this.grid || !this.ctx) return;
+        
+        const gridWidth = this.grid[0] ? this.grid[0].length : 0;
+        const gridHeight = this.grid.length;
+        
+        // 只遍历grid，绘制火箭创建的砖块
+        for (let y = 0; y < gridHeight; y++) {
+            for (let x = 0; x < gridWidth; x++) {
+                const gridValue = this.grid[y] && this.grid[y][x];
+                
+                // 只绘制火箭创建的砖块（grid值为1但不是boardMatrix原有的砖块）
+                if (gridValue === 1) {
+                    // 检查是否是火箭创建的砖块（boardMatrix中原本不是1）
+                    const originalElementType = this.boardMatrix && this.boardMatrix[y] && this.boardMatrix[y][x];
+                    if (originalElementType !== 1) {
+                        this.drawBrick(x, y); // 绘制砖块
+                    }
+                }
+            }
+        }
+    }
+
+    /**
      * 绘制UI
      */
     drawUI() {
@@ -1196,6 +1252,17 @@ class MapEngine {
                 return;
             }
             
+            // 检查是否选中了火箭道具
+            if (this.selectedItem === 'rocket') {
+                console.log(`[道具] 使用火箭对方块 ${clickedBlock.id} 进行发射`);
+                const success = this.useRocket(gridPos);
+                if (success) {
+                    // 减少道具数量
+                    this.items.rocket.count--;
+                }
+                return;
+            }
+            
             if (clickedBlock.movable) {
                 // 如果点击的是可移动方块，选择它
                 console.log(`[点击调试] 选中方块: ${clickedBlock.id}`);
@@ -1302,8 +1369,8 @@ class MapEngine {
             case 'bomb':
                 this.useBomb(targetPos);
                 break;
-            case 'shuffle':
-                this.useShuffle();
+            case 'rocket':
+                this.useRocket(targetPos);
                 break;
         }
         
@@ -1472,13 +1539,141 @@ class MapEngine {
     }
 
     /**
-     * 使用重新打乱（功能待开发）
-     * 计划：重新随机排列所有方块位置
+     * 使用火箭
+     * 选中的方块位置变成砖块，并移除该位置下方所有方块
      */
-    useShuffle() {
-        console.log('[道具] 重新打乱效果 - 功能待开发');
-        // 功能说明：重新随机排列所有可移动方块的位置
-        // 实现思路：1. 收集所有方块 2. 随机分配新位置 3. 检查碰撞并调整
+    useRocket(targetPos) {
+        console.log('[道具] 火箭效果 - 开始发射');
+        
+        // 1. 获取目标位置的方块
+        const targetBlock = this.getBlockAtPosition(targetPos.x, targetPos.y);
+        if (!targetBlock) {
+            console.log('[道具] 目标位置没有方块');
+            return false;
+        }
+        
+        console.log(`[道具] 火箭发射，目标方块: ${targetBlock.id} (${targetBlock.color})`);
+        
+        // 2. 获取目标方块的所有格子位置
+        const targetBlockCells = this.collisionDetector.getBlockCells(targetBlock);
+        console.log(`[道具] 目标方块占用格子:`, targetBlockCells);
+        
+        // 3. 移除目标方块（消除效果）
+        this.removeBlock(targetBlock.id);
+        console.log(`[火箭] 目标方块 ${targetBlock.id} 已消除`);
+        
+        // 4. 在目标方块占用的所有格子位置创建砖块（不可通行区域）
+        targetBlockCells.forEach(cell => {
+            this.createBrickAtPosition(cell.x, cell.y);
+        });
+        console.log(`[火箭] 在 ${targetBlockCells.length} 个格子位置创建砖块`);
+        
+        // 5. 消除目标方块占用的所有格子位置下方所有方块
+        this.removeBlocksBelowCells(targetBlockCells);
+        
+        // 6. 标记需要重绘
+        this.triggerRedraw();
+        
+        // 7. 取消道具选中状态
+        this.selectedItem = null;
+        
+        console.log('[道具] 火箭发射完成');
+        return true;
+    }
+    
+    /**
+     * 在指定位置创建砖块
+     * @param {number} x - X坐标
+     * @param {number} y - Y坐标
+     */
+    createBrickAtPosition(x, y) {
+        console.log(`[警告] 有代码在位置 (${x}, ${y}) 创建砖块！`);
+        console.log(`[警告] 调用堆栈:`, new Error().stack);
+        console.log(`[火箭] boardWidth: ${this.boardWidth}, boardHeight: ${this.boardHeight}`);
+        console.log(`[火箭] boardMatrix大小: ${this.boardMatrix ? this.boardMatrix.length : 'null'} x ${this.boardMatrix && this.boardMatrix[0] ? this.boardMatrix[0].length : 'null'}`);
+        
+        // 检查坐标是否在有效范围内
+        if (x >= 0 && x < this.boardWidth && y >= 0 && y < this.boardHeight) {
+            // 在网格中设置砖块标记
+            this.grid[y][x] = 1; // 1表示砖块
+            
+            // 在boardMatrix中也设置砖块标记（用于渲染）
+            if (this.boardMatrix && this.boardMatrix[y] && this.boardMatrix[y][x] !== undefined) {
+                this.boardMatrix[y][x] = 1; // 1表示砖块
+                console.log(`[火箭] 在boardMatrix位置 (${x}, ${y}) 创建砖块成功`);
+            } else {
+                console.log(`[火箭] boardMatrix位置 (${x}, ${y}) 无效或超出范围`);
+            }
+            
+            console.log(`[火箭] 在位置 (${x}, ${y}) 创建砖块完成`);
+        } else {
+            console.log(`[火箭] 位置 (${x}, ${y}) 超出游戏区域范围`);
+        }
+    }
+    
+    /**
+     * 消除目标方块占用的所有格子位置下方的方块
+     * @param {Array} targetCells - 目标方块占用的格子位置数组
+     */
+    removeBlocksBelowCells(targetCells) {
+        const blocksToRemove = [];
+        
+        // 遍历所有方块，检查是否在目标格子位置下方
+        for (const [blockId, block] of this.blocks) {
+            const blockCells = this.collisionDetector.getBlockCells(block);
+            
+            // 检查方块是否与任何目标格子位置有重叠（在下方）
+            const shouldRemove = blockCells.some(blockCell => {
+                return targetCells.some(targetCell => {
+                    // 检查是否在目标格子的正下方或重叠
+                    return blockCell.x === targetCell.x && blockCell.y >= targetCell.y;
+                });
+            });
+            
+            if (shouldRemove) {
+                blocksToRemove.push(blockId);
+                console.log(`[火箭] 标记消除方块: ${blockId} (位置: ${block.position.x}, ${block.position.y})`);
+            }
+        }
+        
+        // 消除所有标记的方块
+        blocksToRemove.forEach(blockId => {
+            this.removeBlock(blockId);
+        });
+        
+        console.log(`[火箭] 共消除 ${blocksToRemove.length} 个方块`);
+    }
+    
+    /**
+     * 消除指定位置下方的所有方块
+     * @param {number} x - X坐标
+     * @param {number} y - Y坐标
+     */
+    removeBlocksBelow(x, y) {
+        const blocksToRemove = [];
+        
+        // 遍历所有方块，检查是否在目标位置下方
+        for (const [blockId, block] of this.blocks) {
+            const blockCells = this.collisionDetector.getBlockCells(block);
+            
+            // 检查方块是否与目标位置有重叠（在下方）
+            const shouldRemove = blockCells.some(cell => {
+                // 检查是否在目标位置的正下方或重叠
+                return cell.x === x && cell.y >= y;
+            });
+            
+            if (shouldRemove) {
+                blocksToRemove.push(blockId);
+                console.log(`[火箭] 标记消除方块: ${blockId} (位置: ${block.position.x}, ${block.position.y})`);
+            }
+        }
+        
+        // 消除所有标记的方块
+        blocksToRemove.forEach(blockId => {
+            this.removeBlock(blockId);
+        });
+        
+        console.log(`[火箭] 共消除 ${blocksToRemove.length} 个方块`);
     }
 
     /**
