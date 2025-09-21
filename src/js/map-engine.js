@@ -1174,6 +1174,17 @@ class MapEngine {
             console.log(`[点击调试] 方块类型: ${clickedBlock.type}`);
             console.log(`[点击调试] 方块是否可移动: ${clickedBlock.movable ? '✅是' : '❌否'}`);
             
+            // 检查是否选中了颜色转换剂道具
+            if (this.selectedItem === 'colorChanger') {
+                console.log(`[道具] 使用颜色转换剂对方块 ${clickedBlock.id} 进行颜色转换`);
+                const success = this.useColorChanger(gridPos);
+                if (success) {
+                    // 减少道具数量
+                    this.items.colorChanger.count--;
+                }
+                return;
+            }
+            
             if (clickedBlock.movable) {
                 // 如果点击的是可移动方块，选择它
                 console.log(`[点击调试] 选中方块: ${clickedBlock.id}`);
@@ -1291,27 +1302,132 @@ class MapEngine {
     }
 
     /**
-     * 使用颜色转换剂（占位方法）
+     * 使用颜色转换剂
+     * 将选中方块的颜色转换为当前地图中可以通过的门颜色
      */
     useColorChanger(targetPos) {
-        console.log('[道具] 颜色转换剂效果 - 待实现');
-        // TODO: 实现颜色转换功能
+        console.log('[道具] 颜色转换剂效果 - 开始转换');
+        
+        // 1. 获取目标位置的方块
+        const targetBlock = this.getBlockAtPosition(targetPos.x, targetPos.y);
+        if (!targetBlock) {
+            console.log('[道具] 目标位置没有方块');
+            return false;
+        }
+        
+        // 2. 获取方块的最小尺寸（长或宽的最小值）
+        const blockBounds = this.collisionDetector.getBlockBounds(targetBlock);
+        const minBlockSize = Math.min(blockBounds.width, blockBounds.height);
+        console.log(`[道具] 方块最小尺寸: ${minBlockSize}`);
+        
+        // 3. 获取当前地图中所有的门
+        const availableGates = this.getAllGates();
+        console.log(`[道具] 当前地图门数量: ${availableGates.length}`);
+        
+        // 4. 筛选出可以通过的门（门的长度 >= 方块最小尺寸）
+        const passableGates = availableGates.filter(gate => {
+            const canPass = gate.length >= minBlockSize;
+            const isDifferentColor = gate.color !== targetBlock.color; // 排除当前颜色
+            console.log(`[道具] 门 ${gate.color} (长度:${gate.length}) 可通过: ${canPass}, 不同颜色: ${isDifferentColor}`);
+            return canPass && isDifferentColor;
+        });
+        
+        if (passableGates.length === 0) {
+            console.log('[道具] 没有可以通过的门');
+            return false;
+        }
+        
+        // 5. 从可通过的门中随机选择一个颜色
+        const randomGate = passableGates[Math.floor(Math.random() * passableGates.length)];
+        const newColor = randomGate.color;
+        
+        console.log(`[道具] 方块 ${targetBlock.id} 颜色从 ${targetBlock.color} 转换为 ${newColor}`);
+        
+        // 6. 更新方块颜色
+        targetBlock.color = newColor;
+        
+        // 6.1. 重新设置颜色数据（重要！）
+        if (typeof BLOCK_COLORS !== 'undefined' && BLOCK_COLORS[newColor]) {
+            targetBlock.colorData = BLOCK_COLORS[newColor];
+            console.log(`[道具] 方块颜色数据已更新: ${newColor}`);
+        } else {
+            console.error(`[道具] 无效的颜色: ${newColor}`);
+        }
+        
+        // 7. 标记需要重绘
+        this.triggerRedraw();
+        
+        // 8. 取消道具选中状态
+        this.selectedItem = null;
+        
+        console.log('[道具] 颜色转换完成');
+        return true;
+    }
+    
+    /**
+     * 获取指定位置的方块
+     * @param {number} x - X坐标
+     * @param {number} y - Y坐标
+     * @returns {Object|null} 方块对象或null
+     */
+    getBlockAtPosition(x, y) {
+        // 遍历所有方块，检查是否包含指定位置
+        for (const [blockId, block] of this.blocks) {
+            const blockCells = this.collisionDetector.getBlockCells(block);
+            
+            // 检查指定位置是否在方块的任何格子中
+            for (const cell of blockCells) {
+                if (cell.x === x && cell.y === y) {
+                    console.log(`[道具] 找到方块 ${blockId} 在位置 (${x}, ${y})`);
+                    return block;
+                }
+            }
+        }
+        
+        console.log(`[道具] 在位置 (${x}, ${y}) 没有找到方块`);
+        return null;
+    }
+    
+    /**
+     * 获取当前地图中所有的门
+     * @returns {Array} 门信息数组
+     */
+    getAllGates() {
+        const gates = [];
+        
+        // 遍历所有门
+        for (const [gateId, gate] of this.gates) {
+            gates.push({
+                id: gate.id,
+                color: gate.color,
+                length: gate.length,
+                direction: gate.direction,
+                x: gate.x,
+                y: gate.y
+            });
+        }
+        
+        return gates;
     }
 
     /**
-     * 使用炸弹（占位方法）
+     * 使用炸弹（功能待开发）
+     * 计划：清除目标位置周围的方块
      */
     useBomb(targetPos) {
-        console.log('[道具] 炸弹效果 - 待实现');
-        // TODO: 实现炸弹功能
+        console.log('[道具] 炸弹效果 - 功能待开发');
+        // 功能说明：清除目标位置周围3x3范围内的方块
+        // 实现思路：1. 计算爆炸范围 2. 移除范围内的方块 3. 更新网格
     }
 
     /**
-     * 使用重新打乱（占位方法）
+     * 使用重新打乱（功能待开发）
+     * 计划：重新随机排列所有方块位置
      */
     useShuffle() {
-        console.log('[道具] 重新打乱效果 - 待实现');
-        // TODO: 实现重新打乱功能
+        console.log('[道具] 重新打乱效果 - 功能待开发');
+        // 功能说明：重新随机排列所有可移动方块的位置
+        // 实现思路：1. 收集所有方块 2. 随机分配新位置 3. 检查碰撞并调整
     }
 
     /**
@@ -1415,17 +1531,6 @@ class MapEngine {
         }
     }
 
-    /**
-     * 直接移动方块到目标位置
-     */
-    moveBlockDirectly(block, targetPos) {
-        // 计算移动路径（直接路径）
-        const startPos = block.position;
-        const path = [{x: startPos.x, y: startPos.y}, {x: targetPos.x, y: targetPos.y}];
-        
-        // 执行移动
-        this.movementManager.executeMove(block, path, this);
-    }
 
     /**
      * 屏幕坐标转网格坐标

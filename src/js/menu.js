@@ -429,34 +429,26 @@ class MainMenu {
       completedLevels: this.levels.filter(level => level.completed).map(level => level.id)
     };
     
-    try {
-      tt.setStorageSync('gameProgress', progress);
-      console.log('游戏进度已保存');
-    } catch (error) {
-      console.log('保存进度失败:', error);
-    }
+    tt.setStorageSync('gameProgress', progress);
+    console.log('游戏进度已保存');
   }
   
   // 加载游戏进度
   loadProgress() {
-    try {
-      const progress = tt.getStorageSync('gameProgress');
-      if (progress) {
-        this.currentLevel = progress.currentLevel || 1;
-        this.maxUnlockedLevel = progress.maxUnlockedLevel || 1;
-        this.coins = progress.coins || 1905;
-        this.lives = progress.lives || 5;
-        
-        // 更新关卡状态
-        this.levels.forEach(level => {
-          level.unlocked = level.id <= this.maxUnlockedLevel;
-          level.completed = progress.completedLevels && progress.completedLevels.includes(level.id);
-        });
-        
-        console.log('游戏进度已加载');
-      }
-    } catch (error) {
-      console.log('加载进度失败:', error);
+    const progress = tt.getStorageSync('gameProgress');
+    if (progress) {
+      this.currentLevel = progress.currentLevel || 1;
+      this.maxUnlockedLevel = progress.maxUnlockedLevel || 1;
+      this.coins = progress.coins || 1905;
+      this.lives = progress.lives || 5;
+      
+      // 更新关卡状态
+      this.levels.forEach(level => {
+        level.unlocked = level.id <= this.maxUnlockedLevel;
+        level.completed = progress.completedLevels && progress.completedLevels.includes(level.id);
+      });
+      
+      console.log('游戏进度已加载');
     }
   }
   
@@ -472,12 +464,8 @@ class MainMenu {
       level.completed = false;
     });
     
-    try {
-      tt.removeStorageSync('gameProgress');
-      console.log('游戏进度已重置');
-    } catch (error) {
-      console.log('重置进度失败:', error);
-    }
+    tt.removeStorageSync('gameProgress');
+    console.log('游戏进度已重置');
   }
   
   // 解锁更多关卡（用于测试）

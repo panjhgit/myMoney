@@ -72,12 +72,8 @@ function startGame(levelId) {
     console.log('[游戏切换] 开始移除菜单事件监听器');
     // 使用事件管理器统一移除事件监听器
     if (mainMenu.canvas && mainMenu.boundHandlers) {
-      try {
-        EventManager.removeCanvasEvents(mainMenu.canvas, mainMenu.boundHandlers);
-        console.log('[游戏切换] 菜单事件监听器已移除');
-      } catch (error) {
-        console.log('[游戏切换] 移除事件监听器时出错:', error);
-      }
+      EventManager.removeCanvasEvents(mainMenu.canvas, mainMenu.boundHandlers);
+      console.log('[游戏切换] 菜单事件监听器已移除');
     }
     mainMenu = null;
     console.log('[游戏切换] 菜单实例已销毁');
@@ -167,14 +163,13 @@ function draw() {
   }
 }
 
-// 调度下一次绘制（只在需要时）
+// 调度下一次绘制（优化：统一使用抖音小游戏API）
 function scheduleNextDraw() {
-  if (typeof requestAnimationFrame !== 'undefined') {
-    requestAnimationFrame(draw);
-  } else if (typeof wx !== 'undefined' && wx.requestAnimationFrame) {
-    wx.requestAnimationFrame(draw);
-  } else if (typeof tt !== 'undefined' && tt.requestAnimationFrame) {
+  // 优先使用抖音小游戏的 requestAnimationFrame
+  if (typeof tt !== 'undefined' && tt.requestAnimationFrame) {
     tt.requestAnimationFrame(draw);
+  } else if (typeof requestAnimationFrame !== 'undefined') {
+    requestAnimationFrame(draw);
   } else {
     setTimeout(draw, DRAW_THROTTLE);
   }

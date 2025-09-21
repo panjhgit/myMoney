@@ -1,12 +1,12 @@
 {
     "setting": {
-        "urlCheck": true,
+        "urlCheck": false,
         "es6": true,
-        "postcss": true,
+        "postcss": false,
         "minified": true,
         "newFeature": true,
         "autoCompile": true,
-        "compileHotReLoad": true,
+        "compileHotReLoad": false,
         "nativeCompile": true
     },
     "appid": "testAppId",

@@ -347,7 +347,14 @@ const AnimationManager = {
             }
             
             if (progress < 1) {
-                requestAnimationFrame(animate);
+                // 优先使用抖音小游戏的 requestAnimationFrame
+                if (typeof tt !== 'undefined' && tt.requestAnimationFrame) {
+                    tt.requestAnimationFrame(animate);
+                } else if (typeof requestAnimationFrame !== 'undefined') {
+                    requestAnimationFrame(animate);
+                } else {
+                    setTimeout(animate, 16); // 约60fps
+                }
             } else {
                 if (onComplete) {
                     onComplete();
