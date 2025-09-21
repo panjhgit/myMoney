@@ -834,26 +834,16 @@ class MapEngine {
     }
 
     /**
-     * 获取方块颜色
+     * 获取方块颜色 - 统一使用 BLOCK_COLORS
      */
     getBlockColor(colorName) {
-        // 首先尝试从 BLOCK_COLORS 获取颜色数据
+        // 统一使用 BLOCK_COLORS 中的颜色定义
         if (typeof BLOCK_COLORS !== 'undefined' && BLOCK_COLORS[colorName]) {
-            const colorData = BLOCK_COLORS[colorName];
-            // 从渐变字符串中提取基础颜色
-            if (colorData.gradient) {
-                const gradientMatch = colorData.gradient.match(/#[0-9A-Fa-f]{6}/);
-                if (gradientMatch) {
-                    return gradientMatch[0];
-                }
-            }
+            return BLOCK_COLORS[colorName].hex;
         }
-
-        // 备用颜色定义
-        const colors = {
-            red: '#FF6B6B', blue: '#45B7D1', green: '#96CEB4', yellow: '#FFEAA7', purple: '#DDA0DD', orange: '#FFA500'
-        };
-        return colors[colorName] || '#CCCCCC';
+        
+        // 默认颜色
+        return '#CCCCCC';
     }
     
     /**

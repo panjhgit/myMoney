@@ -1,17 +1,9 @@
-// 游戏统一配置
+// 游戏统一配置 - 抖音小游戏专用
 const GAME_CONFIG = {
   // 核心尺寸配置 - 10x10矩阵包含墙和门，实际游戏区域最大8x8
-  CORE_SIZES: {
-    BOARD_MATRIX_SIZE: 10,  // 棋盘矩阵尺寸（10x10，最外层给墙和门预留）
-    MAX_GAME_AREA: 8,       // 最大游戏区域尺寸（8x8）
-    CELL_SIZE: 45,          // 标准格子大小
-    FIXED_CELL_SIZE: 45     // 固定格子大小（不缩放）
-  },
-  
-  // 兼容性别名 - 保持向后兼容
-  GRID_SIZE: 8, // 8x8网格
-  CELL_SIZE: 45, // 每个格子45px
-  FIXED_CELL_SIZE: 45, // 固定格子大小，不缩放
+  BOARD_MATRIX_SIZE: 10,  // 棋盘矩阵尺寸（10x10，最外层给墙和门预留）
+  GRID_SIZE: 8,           // 游戏区域尺寸（8x8）
+  CELL_SIZE: 45,          // 格子大小（固定45px）
   
   // 渲染颜色常量
   RENDER_COLORS: {
@@ -110,34 +102,33 @@ const GAME_CONFIG = {
 const ConfigUtils = {
   // 获取格子大小
   getCellSize: function() {
-    return GAME_CONFIG.CORE_SIZES.CELL_SIZE;
+    return GAME_CONFIG.CELL_SIZE;
   },
   
-  // 获取最大游戏区域尺寸（8x8）
+  // 获取游戏区域尺寸（8x8）
   getGridSize: function() {
-    return GAME_CONFIG.CORE_SIZES.MAX_GAME_AREA;
+    return GAME_CONFIG.GRID_SIZE;
   },
   
   // 获取棋盘矩阵尺寸（10x10，包含墙和门）
   getBoardMatrixSize: function() {
-    return GAME_CONFIG.CORE_SIZES.BOARD_MATRIX_SIZE;
+    return GAME_CONFIG.BOARD_MATRIX_SIZE;
   },
   
-  // 获取固定格子大小
+  // 获取固定格子大小（与CELL_SIZE相同）
   getFixedCellSize: function() {
-    return GAME_CONFIG.CORE_SIZES.FIXED_CELL_SIZE;
+    return GAME_CONFIG.CELL_SIZE;
   },
   
   // 检查配置一致性
   validateConfig: function() {
-    const core = GAME_CONFIG.CORE_SIZES;
     const creature = GAME_CONFIG.CREATURE_CONFIG;
     
     return {
-      cellSizeConsistent: core.CELL_SIZE === creature.CELL_SIZE,
-      maxGameAreaConsistent: core.MAX_GAME_AREA === this.getGridSize(),
-      boardMatrixSizeConsistent: core.BOARD_MATRIX_SIZE === this.getBoardMatrixSize(),
-      fixedSizeConsistent: core.FIXED_CELL_SIZE === GAME_CONFIG.FIXED_CELL_SIZE,
+      cellSizeConsistent: GAME_CONFIG.CELL_SIZE === creature.CELL_SIZE,
+      maxGameAreaConsistent: GAME_CONFIG.GRID_SIZE === this.getGridSize(),
+      boardMatrixSizeConsistent: GAME_CONFIG.BOARD_MATRIX_SIZE === this.getBoardMatrixSize(),
+      fixedSizeConsistent: GAME_CONFIG.CELL_SIZE === GAME_CONFIG.CELL_SIZE,
       // 设计说明：10x10矩阵最外层给墙和门预留，实际游戏区域最大8x8
       designNote: "10x10矩阵最外层给墙和门预留，实际游戏区域由墙(1)和门(2-9)围成，最大8x8"
     };

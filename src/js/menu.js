@@ -74,8 +74,8 @@ class MainMenu {
   
   // 开始进入动画
   startEntranceAnimation() {
-    // 检查 GSAP 是否可用
-    if (typeof gsap === 'undefined') {
+    // 使用动画管理器检查 GSAP 是否可用
+    if (!AnimationManager.isGSAPAvailable()) {
       console.log('GSAP 未加载，使用备用动画');
       this.startFallbackAnimation();
       return;
@@ -187,16 +187,15 @@ class MainMenu {
   }
   
   setupEventListeners() {
-    // 保存事件处理函数的引用，以便后续移除
-    this.boundHandleClick = (e) => this.handleClick(e);
-    this.boundHandleTouchStart = (e) => this.handleTouchStart(e);
-    this.boundHandleTouchMove = (e) => this.handleTouchMove(e);
-    this.boundHandleTouchEnd = (e) => this.handleTouchEnd(e);
+    const eventHandlers = {
+      click: (e) => this.handleClick(e),
+      touchstart: (e) => this.handleTouchStart(e),
+      touchmove: (e) => this.handleTouchMove(e),
+      touchend: (e) => this.handleTouchEnd(e)
+    };
     
-    this.canvas.addEventListener('click', this.boundHandleClick);
-    this.canvas.addEventListener('touchstart', this.boundHandleTouchStart, { passive: false });
-    this.canvas.addEventListener('touchmove', this.boundHandleTouchMove, { passive: false });
-    this.canvas.addEventListener('touchend', this.boundHandleTouchEnd, { passive: false });
+    // 使用事件管理器统一设置事件监听器
+    this.boundHandlers = EventManager.setupCanvasEvents(this.canvas, eventHandlers);
   }
   
   handleTouchStart(event) {
@@ -291,19 +290,13 @@ class MainMenu {
   
   // 关卡点击动画
   animateLevelClick(level) {
-    if (typeof gsap !== 'undefined') {
-      gsap.to(level, {
-        scale: 0.9,
-        duration: 0.1,
-        ease: "power2.out",
-        yoyo: true,
-        repeat: 1
-      });
-    } else {
-      // 备用动画
-      level.scale = 0.9;
-      setTimeout(() => { level.scale = 1; }, 100);
-    }
+    AnimationManager.createAnimation(level, {
+      scale: 0.9,
+      duration: 0.1,
+      ease: "power2.out",
+      yoyo: true,
+      repeat: 1
+    });
     
     // 添加粒子效果
     this.createClickParticles(level.x + 60, level.y + 60);
@@ -311,41 +304,29 @@ class MainMenu {
   
   // 锁定关卡动画
   animateLockedLevel(level) {
-    if (typeof gsap !== 'undefined') {
-      gsap.to(level, {
-        rotation: 5,
-        duration: 0.1,
-        ease: "power2.out",
-        yoyo: true,
-        repeat: 3
-      });
-    } else {
-      // 备用动画
-      level.rotation = 5;
-      setTimeout(() => { level.rotation = 0; }, 300);
-    }
+    AnimationManager.createAnimation(level, {
+      rotation: 5,
+      duration: 0.1,
+      ease: "power2.out",
+      yoyo: true,
+      repeat: 3
+    });
   }
   
   // Play按钮点击动画
   animatePlayButtonClick() {
-    if (typeof gsap !== 'undefined') {
-      gsap.to(this.animationState.playButton, {
-        scale: 0.9,
-        duration: 0.1,
-        ease: "power2.out",
-        yoyo: true,
-        repeat: 1
-      });
-    } else {
-      // 备用动画
-      this.animationState.playButton.scale = 0.9;
-      setTimeout(() => { this.animationState.playButton.scale = 1; }, 100);
-    }
+    AnimationManager.createAnimation(this.animationState.playButton, {
+      scale: 0.9,
+      duration: 0.1,
+      ease: "power2.out",
+      yoyo: true,
+      repeat: 1
+    });
   }
   
   // 创建点击粒子效果
   createClickParticles(x, y) {
-    if (typeof gsap === 'undefined') {
+    if (!AnimationManager.isGSAPAvailable()) {
       // 如果没有 GSAP，跳过粒子效果
       return;
     }
@@ -360,16 +341,15 @@ class MainMenu {
         size: Math.random() * 4 + 2
       };
       
-      gsap.to(particle, {
+      AnimationManager.createParticleAnimation(particle, {
         x: particle.x + particle.vx,
         y: particle.y + particle.vy,
         life: 0,
         size: 0,
         duration: 0.5,
-        ease: "power2.out",
-        onUpdate: () => {
-          this.drawParticle(particle);
-        }
+        ease: "power2.out"
+      }, () => {
+        this.drawParticle(particle);
       });
     }
   }
@@ -595,103 +575,23 @@ class MainMenu {
     
     // 绘制半透明背景 - 修复背景矩形计算
     this.ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
-    this.drawRoundedRect(15, topBarY, this.systemInfo.windowWidth - 30, 50, 10);
+    DrawUtils.drawRoundedRect(this.ctx, 15, topBarY, this.systemInfo.windowWidth - 30, 50, 10);
     
     // 货币显示
-    this.drawCoinIcon(25, topBarY + 10);
-    this.drawCurrencyText(55, topBarY + 10);
+    DrawUtils.drawCoinIcon(this.ctx, 25, topBarY + 10);
+    DrawUtils.drawCurrencyText(this.ctx, 55, topBarY + 10, this.coins);
     
     // 生命值显示
-    this.drawHeartIcon(this.systemInfo.windowWidth - 100, topBarY + 10);
-    this.drawLivesText(this.systemInfo.windowWidth - 60, topBarY + 10);
+    DrawUtils.drawHeartIcon(this.ctx, this.systemInfo.windowWidth - 100, topBarY + 10);
+    DrawUtils.drawLivesText(this.ctx, this.systemInfo.windowWidth - 60, topBarY + 10, this.lives);
     
     // 当前关卡显示
-    this.drawCurrentLevelText(this.systemInfo.windowWidth / 2, topBarY + 10);
+    DrawUtils.drawCurrentLevelText(this.ctx, this.systemInfo.windowWidth / 2, topBarY + 10, this.currentLevel);
     
     this.ctx.restore();
   }
   
-  // 绘制圆角矩形
-  drawRoundedRect(x, y, width, height, radius) {
-    this.ctx.beginPath();
-    this.ctx.moveTo(x + radius, y);
-    this.ctx.lineTo(x + width - radius, y);
-    this.ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
-    this.ctx.lineTo(x + width, y + height - radius);
-    this.ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
-    this.ctx.lineTo(x + radius, y + height);
-    this.ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
-    this.ctx.lineTo(x, y + radius);
-    this.ctx.quadraticCurveTo(x, y, x + radius, y);
-    this.ctx.closePath();
-    this.ctx.fill();
-  }
-  
-  drawCoinIcon(x, y) {
-    this.ctx.fillStyle = this.colors.coin;
-    this.ctx.beginPath();
-    this.ctx.arc(x + 15, y + 15, 15, 0, 2 * Math.PI);
-    this.ctx.fill();
-    
-    this.ctx.fillStyle = this.colors.text;
-    this.ctx.font = 'bold 12px Arial';
-    this.ctx.textAlign = 'center';
-    this.ctx.fillText('$', x + 15, y + 20);
-  }
-  
-  drawCurrencyText(x, y) {
-    this.ctx.fillStyle = this.colors.text;
-    this.ctx.font = 'bold 14px Arial';
-    this.ctx.textAlign = 'left';
-    this.ctx.fillText(this.coins.toString(), x, y + 15);
-    
-    // 加号按钮
-    this.ctx.fillStyle = '#4CAF50';
-    this.ctx.beginPath();
-    this.ctx.arc(x + 40, y + 15, 8, 0, 2 * Math.PI);
-    this.ctx.fill();
-    
-    this.ctx.fillStyle = this.colors.text;
-    this.ctx.font = 'bold 12px Arial';
-    this.ctx.textAlign = 'center';
-    this.ctx.fillText('+', x + 40, y + 19);
-  }
-  
-  drawHeartIcon(x, y) {
-    this.ctx.fillStyle = this.colors.heart;
-    this.ctx.beginPath();
-    this.ctx.moveTo(x + 15, y + 5);
-    this.ctx.bezierCurveTo(x + 5, y - 5, x - 5, y - 5, x - 5, y + 10);
-    this.ctx.bezierCurveTo(x - 5, y + 20, x + 15, y + 30, x + 15, y + 30);
-    this.ctx.bezierCurveTo(x + 15, y + 30, x + 35, y + 20, x + 35, y + 10);
-    this.ctx.bezierCurveTo(x + 35, y - 5, x + 25, y - 5, x + 15, y + 5);
-    this.ctx.fill();
-  }
-  
-  drawLivesText(x, y) {
-    this.ctx.fillStyle = this.colors.text;
-    this.ctx.font = 'bold 14px Arial';
-    this.ctx.textAlign = 'left';
-    this.ctx.fillText(`${this.lives}`, x, y + 15);
-    
-    // 加号按钮
-    this.ctx.fillStyle = '#4CAF50';
-    this.ctx.beginPath();
-    this.ctx.arc(x + 25, y + 15, 8, 0, 2 * Math.PI);
-    this.ctx.fill();
-    
-    this.ctx.fillStyle = this.colors.text;
-    this.ctx.font = 'bold 12px Arial';
-    this.ctx.textAlign = 'center';
-    this.ctx.fillText('+', x + 25, y + 19);
-  }
-  
-  drawCurrentLevelText(x, y) {
-    this.ctx.fillStyle = this.colors.text;
-    this.ctx.font = 'bold 16px Arial';
-    this.ctx.textAlign = 'center';
-    this.ctx.fillText(`关卡 ${this.currentLevel}`, x, y + 15);
-  }
+  // 绘制方法已移至 DrawUtils 公共工具类
   
   
   drawLevels() {
@@ -811,7 +711,7 @@ class MainMenu {
     
     // 背景
     this.ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
-    this.drawRoundedRect(indicatorX, indicatorY, indicatorWidth, indicatorHeight, 2);
+    DrawUtils.drawRoundedRect(this.ctx, indicatorX, indicatorY, indicatorWidth, indicatorHeight, 2);
     
     // 滚动条
     const scrollRatio = this.scrollY / this.maxScrollY;
@@ -819,7 +719,7 @@ class MainMenu {
     const scrollBarY = indicatorY + (indicatorHeight - scrollBarHeight) * scrollRatio;
     
     this.ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
-    this.drawRoundedRect(indicatorX, scrollBarY, indicatorWidth, scrollBarHeight, 2);
+    DrawUtils.drawRoundedRect(this.ctx, indicatorX, scrollBarY, indicatorWidth, scrollBarHeight, 2);
   }
   
   drawPlayButton() {
@@ -836,11 +736,11 @@ class MainMenu {
     
     // 按钮阴影
     this.ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
-    this.drawRoundedRect(centerX - 60, buttonY + 3, 120, 40, 8);
+    DrawUtils.drawRoundedRect(this.ctx, centerX - 60, buttonY + 3, 120, 40, 8);
     
     // 按钮主体
     this.ctx.fillStyle = this.colors.button;
-    this.drawRoundedRect(centerX - 60, buttonY - 20, 120, 40, 8);
+    DrawUtils.drawRoundedRect(this.ctx, centerX - 60, buttonY - 20, 120, 40, 8);
     
     // 按钮文字
     this.ctx.fillStyle = this.colors.text;

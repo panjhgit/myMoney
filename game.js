@@ -6,7 +6,6 @@ console.log(
 // 加载必要的库和模块
 require('./src/js/utils.js'); // 加载工具函数
 require('./src/js/config.js'); // 加载统一配置
-require('./src/js/creature.js'); // 加载生物系统
 require('./src/js/gsap.min.js');
 require('./src/js/block.js'); // 需要先加载，因为包含EYE_TYPES等常量
 require('./src/js/collision.js'); // 碰撞检测模块
@@ -71,23 +70,10 @@ function startGame(levelId) {
   // 销毁主菜单实例并移除事件监听器
   if (mainMenu) {
     console.log('[游戏切换] 开始移除菜单事件监听器');
-    // 移除主菜单的事件监听器
-    if (mainMenu.canvas) {
-      // 在抖音小游戏中，Canvas 对象没有 cloneNode 方法
-      // 使用保存的函数引用移除事件监听器
+    // 使用事件管理器统一移除事件监听器
+    if (mainMenu.canvas && mainMenu.boundHandlers) {
       try {
-        if (mainMenu.boundHandleClick) {
-          mainMenu.canvas.removeEventListener('click', mainMenu.boundHandleClick);
-        }
-        if (mainMenu.boundHandleTouchStart) {
-          mainMenu.canvas.removeEventListener('touchstart', mainMenu.boundHandleTouchStart);
-        }
-        if (mainMenu.boundHandleTouchMove) {
-          mainMenu.canvas.removeEventListener('touchmove', mainMenu.boundHandleTouchMove);
-        }
-        if (mainMenu.boundHandleTouchEnd) {
-          mainMenu.canvas.removeEventListener('touchend', mainMenu.boundHandleTouchEnd);
-        }
+        EventManager.removeCanvasEvents(mainMenu.canvas, mainMenu.boundHandlers);
         console.log('[游戏切换] 菜单事件监听器已移除');
       } catch (error) {
         console.log('[游戏切换] 移除事件监听器时出错:', error);
@@ -219,87 +205,18 @@ function drawGameInfo() {
   ctx.fillRect(15, 100, systemInfo.windowWidth - 30, 50);
   
   // 绘制金币
-  drawCoinIcon(25, 110);
-  drawCurrencyText(55, 110);
+  DrawUtils.drawCoinIcon(ctx, 25, 110);
+  DrawUtils.drawCurrencyText(ctx, 55, 110, '1905');
   
   // 绘制爱心
-  drawHeartIcon(systemInfo.windowWidth - 100, 110);
-  drawLivesText(systemInfo.windowWidth - 60, 110);
+  DrawUtils.drawHeartIcon(ctx, systemInfo.windowWidth - 100, 110);
+  DrawUtils.drawLivesText(ctx, systemInfo.windowWidth - 60, 110, '5');
   
   // 绘制当前关卡
-  drawCurrentLevelText(systemInfo.windowWidth / 2, 110);
+  DrawUtils.drawCurrentLevelText(ctx, systemInfo.windowWidth / 2, 110, '1');
 }
 
-// 绘制金币图标
-function drawCoinIcon(x, y) {
-  ctx.fillStyle = '#FFD700';
-  ctx.beginPath();
-  ctx.arc(x + 15, y + 15, 15, 0, 2 * Math.PI);
-  ctx.fill();
-  
-  ctx.fillStyle = '#FFFFFF';
-  ctx.font = 'bold 12px Arial';
-  ctx.textAlign = 'center';
-  ctx.fillText('$', x + 15, y + 20);
-}
-
-// 绘制金币数量
-function drawCurrencyText(x, y) {
-  ctx.fillStyle = '#FFFFFF';
-  ctx.font = 'bold 14px Arial';
-  ctx.textAlign = 'left';
-  ctx.fillText('1905', x, y + 15);
-  
-  // 加号按钮
-  ctx.fillStyle = '#4CAF50';
-  ctx.beginPath();
-  ctx.arc(x + 40, y + 15, 8, 0, 2 * Math.PI);
-  ctx.fill();
-  
-  ctx.fillStyle = '#FFFFFF';
-  ctx.font = 'bold 12px Arial';
-  ctx.textAlign = 'center';
-  ctx.fillText('+', x + 40, y + 19);
-}
-
-// 绘制爱心图标
-function drawHeartIcon(x, y) {
-  ctx.fillStyle = '#FF6B6B';
-  ctx.beginPath();
-  ctx.moveTo(x + 15, y + 5);
-  ctx.bezierCurveTo(x + 5, y - 5, x - 5, y - 5, x - 5, y + 10);
-  ctx.bezierCurveTo(x - 5, y + 20, x + 15, y + 30, x + 15, y + 30);
-  ctx.bezierCurveTo(x + 15, y + 30, x + 35, y + 20, x + 35, y + 10);
-  ctx.bezierCurveTo(x + 35, y - 5, x + 25, y - 5, x + 15, y + 5);
-  ctx.fill();
-}
-
-// 绘制生命值
-function drawLivesText(x, y) {
-  ctx.fillStyle = '#FFFFFF';
-  ctx.font = 'bold 14px Arial';
-  ctx.textAlign = 'left';
-  ctx.fillText('5', x, y + 15);
-  
-  // 加号按钮
-  ctx.fillStyle = '#4CAF50';
-  ctx.beginPath();
-  ctx.arc(x + 20, y + 15, 8, 0, 2 * Math.PI);
-  ctx.fill();
-  
-  ctx.fillStyle = '#FFFFFF';
-  ctx.font = 'bold 12px Arial';
-  ctx.textAlign = 'center';
-  ctx.fillText('+', x + 20, y + 19);
-}
-
-// 绘制当前关卡
-function drawCurrentLevelText(x, y) {
-  ctx.fillStyle = '#FFFFFF';
-  ctx.font = 'bold 14px Arial';
-  ctx.textAlign = 'center';
-  ctx.fillText('关卡 1', x, y + 15);
-}
+// 使用公共绘制工具 - 这些方法现在由 DrawUtils 提供
 
 // 默认绘制函数
 function drawDefault() {
@@ -325,79 +242,73 @@ function drawDefault() {
   };
 }
 
-// 设置游戏交互事件
+// 设置游戏交互事件 - 使用统一的事件管理器
 function setupGameEvents() {
-  // 鼠标点击事件
-  canvas.addEventListener('click', function(e) {
-    var coords = GameUtils.getEventCoordinates(e);
+  const eventHandlers = {
+    click: function(e) {
+      var coords = EventManager.getEventCoordinates(e);
+      
+      if (gameState === 'game' && mapEngine) {
+        mapEngine.handleClick(coords.x, coords.y);
+        markNeedsRedraw();
+      } else if (gameState === 'menu' && mainMenu) {
+        markNeedsRedraw();
+      }
+    },
     
-    if (gameState === 'game' && mapEngine) {
-      mapEngine.handleClick(coords.x, coords.y);
-      markNeedsRedraw();
-    } else if (gameState === 'menu' && mainMenu) {
-      markNeedsRedraw();
-    }
-  });
-  
-  // 鼠标按下事件（拖动开始）
-  canvas.addEventListener('mousedown', function(e) {
-    var coords = GameUtils.getEventCoordinates(e);
+    mousedown: function(e) {
+      var coords = EventManager.getEventCoordinates(e);
+      
+      if (gameState === 'game' && mapEngine) {
+        mapEngine.handleMouseDown(coords.x, coords.y);
+      }
+    },
     
-    if (gameState === 'game' && mapEngine) {
-      mapEngine.handleMouseDown(coords.x, coords.y);
-    }
-  });
-  
-  // 鼠标移动事件（拖动中）
-  canvas.addEventListener('mousemove', function(e) {
-    var coords = GameUtils.getEventCoordinates(e);
+    mousemove: function(e) {
+      var coords = EventManager.getEventCoordinates(e);
+      
+      if (gameState === 'game' && mapEngine) {
+        mapEngine.handleMouseMove(coords.x, coords.y);
+      }
+    },
     
-    if (gameState === 'game' && mapEngine) {
-      mapEngine.handleMouseMove(coords.x, coords.y);
-    }
-  });
-  
-  // 鼠标释放事件（拖动结束）
-  canvas.addEventListener('mouseup', function(e) {
-    var coords = GameUtils.getEventCoordinates(e);
+    mouseup: function(e) {
+      var coords = EventManager.getEventCoordinates(e);
+      
+      if (gameState === 'game' && mapEngine) {
+        mapEngine.handleMouseUp(coords.x, coords.y);
+        markNeedsRedraw();
+      }
+    },
     
-    if (gameState === 'game' && mapEngine) {
-      mapEngine.handleMouseUp(coords.x, coords.y);
-      markNeedsRedraw();
-    }
-  });
-  
-  // 触摸事件（移动端支持）
-  canvas.addEventListener('touchstart', function(e) {
-    e.preventDefault();
-    var coords = GameUtils.getTouchCoordinates(e);
+    touchstart: function(e) {
+      var coords = EventManager.getEventCoordinates(e);
+      
+      if (gameState === 'game' && mapEngine) {
+        mapEngine.handleMouseDown(coords.x, coords.y);
+      }
+    },
     
-    if (gameState === 'game' && mapEngine) {
-      mapEngine.handleMouseDown(coords.x, coords.y);
-    }
-  });
-  
-  canvas.addEventListener('touchmove', function(e) {
-    e.preventDefault();
-    var coords = GameUtils.getTouchCoordinates(e);
+    touchmove: function(e) {
+      var coords = EventManager.getEventCoordinates(e);
+      
+      if (gameState === 'game' && mapEngine) {
+        mapEngine.handleMouseMove(coords.x, coords.y);
+      }
+    },
     
-    if (gameState === 'game' && mapEngine) {
-      mapEngine.handleMouseMove(coords.x, coords.y);
+    touchend: function(e) {
+      var coords = EventManager.getEventCoordinates(e);
+      
+      if (gameState === 'game' && mapEngine) {
+        mapEngine.handleMouseUp(coords.x, coords.y);
+        markNeedsRedraw();
+      }
     }
-  });
+  };
   
-  canvas.addEventListener('touchend', function(e) {
-    e.preventDefault();
-    var coords = GameUtils.getTouchCoordinates(e);
-    
-    if (gameState === 'game' && mapEngine) {
-      mapEngine.handleMouseUp(coords.x, coords.y);
-      markNeedsRedraw();
-    }
-  });
-  
-  // 抖音小游戏不支持键盘事件，移除键盘监听
-  // 可以通过触摸手势或其他方式实现返回功能
+  // 使用事件管理器统一设置事件监听器
+  window.gameEventHandlers = EventManager.setupCanvasEvents(canvas, eventHandlers);
 }
 
 
