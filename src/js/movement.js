@@ -58,12 +58,16 @@ class MovementManager {
 
             // 如果到达目标
             if (currentPos.x === targetPos.x && currentPos.y === targetPos.y) {
-                console.log(`[A*路径] 成功找到路径: 从 (${startPos.x},${startPos.y}) 到 (${targetPos.x},${targetPos.y}), 路径长度: ${currentNode.g + 1}`);
-                return this.reconstructPath(currentNode);
+                const path = this.reconstructPath(currentNode);
+                const actualSteps = path.length - 1;
+                console.log(`[A*路径] 成功找到路径: 从 (${startPos.x},${startPos.y}) 到 (${targetPos.x},${targetPos.y}), 实际步数: ${actualSteps}`);
+                console.log(`[A*路径] 详细路径:`, path.map(p => `(${p.x},${p.y})`).join(' → '));
+                console.log(`[A*路径] 路径节点数: ${path.length}, g值: ${currentNode.g}`);
+                return path;
             }
 
-            // 修复最佳节点选择逻辑：同时考虑h值和g值
-            if (this.isBetterNode(currentNode, bestNode)) {
+            // 修复最佳节点选择逻辑：根据移动方向选择最佳对齐的节点
+            if (this.isBetterNode(currentNode, bestNode, startPos, targetPos)) {
                 bestNode = currentNode;
             }
 
@@ -79,6 +83,10 @@ class MovementManager {
 
                 const collisionResult = collisionDetector.checkCollision(block, newPos, grid, blocks, rocks, block.id);
                 if (collisionResult.collision) {
+                    // 添加碰撞调试信息
+                    if (Math.abs(newX - targetPos.x) <= 1 && Math.abs(newY - targetPos.y) <= 1) {
+                        console.log(`[A*碰撞] 位置 (${newX},${newY}) 有碰撞: ${collisionResult.reason}`, collisionResult);
+                    }
                     continue;
                 }
 
@@ -115,7 +123,10 @@ class MovementManager {
 
         // 如果无法到达目标，返回能到达的最远位置的路径
         if (bestNode && bestNode !== startNode) {
-            console.log(`[A*路径] 无法到达目标，返回最佳路径: 从 (${startPos.x},${startPos.y}) 到 (${bestNode.position.x},${bestNode.position.y}), h值: ${bestNode.h}, g值: ${bestNode.g}`);
+            const direction = this.getMainDirection(startPos, targetPos);
+            const score = this.calculateDirectionalScore(bestNode, direction, targetPos);
+            console.log(`[A*路径] 无法到达目标，返回最佳路径: 从 (${startPos.x},${startPos.y}) 到 (${bestNode.position.x},${bestNode.position.y})`);
+            console.log(`[A*路径] 移动方向: ${direction}, 方向得分: ${score}, h值: ${bestNode.h}, g值: ${bestNode.g}`);
             return this.reconstructPath(bestNode);
         }
 
@@ -132,22 +143,109 @@ class MovementManager {
 
     /**
      * 判断节点是否更好（用于最佳节点选择）
-     * 优先选择h值更小的节点，如果h值相同则选择g值更小的节点
+     * 根据移动方向选择最佳对齐的节点
      */
-    isBetterNode(node, bestNode) {
+    isBetterNode(node, bestNode, startPos, targetPos) {
         if (!bestNode) return true;
         
-        // 优先考虑启发式值(h值) - 距离目标更近
-        if (node.h < bestNode.h) {
+        // 计算主要移动方向
+        const direction = this.getMainDirection(startPos, targetPos);
+        
+        // 根据方向选择最佳节点
+        const nodeScore = this.calculateDirectionalScore(node, direction, targetPos);
+        const bestScore = this.calculateDirectionalScore(bestNode, direction, targetPos);
+        
+        // 优先选择方向得分更高的节点
+        if (nodeScore > bestScore) {
             return true;
         }
         
-        // 如果启发式值相同，选择实际成本更低的节点(g值更小)
-        if (node.h === bestNode.h && node.g < bestNode.g) {
-            return true;
+        // 如果方向得分相同，优先考虑启发式值(h值) - 距离目标更近
+        if (nodeScore === bestScore) {
+            if (node.h < bestNode.h) {
+                return true;
+            }
+            
+            // 如果启发式值相同，选择实际成本更低的节点(g值更小)
+            if (node.h === bestNode.h && node.g < bestNode.g) {
+                return true;
+            }
         }
         
         return false;
+    }
+    
+    /**
+     * 获取主要移动方向
+     */
+    getMainDirection(startPos, targetPos) {
+        const dx = targetPos.x - startPos.x;
+        const dy = targetPos.y - startPos.y;
+        
+        // 判断主要方向（绝对值较大的方向）
+        if (Math.abs(dx) > Math.abs(dy)) {
+            return dx > 0 ? 'right' : 'left';
+        } else if (Math.abs(dy) > Math.abs(dx)) {
+            return dy > 0 ? 'down' : 'up';
+        } else {
+            // 对角线移动，根据具体情况选择
+            if (dx > 0 && dy > 0) return 'down-right';
+            if (dx > 0 && dy < 0) return 'up-right';
+            if (dx < 0 && dy > 0) return 'down-left';
+            if (dx < 0 && dy < 0) return 'up-left';
+        }
+        
+        return 'none';
+    }
+    
+    /**
+     * 计算基于方向的节点得分
+     */
+    calculateDirectionalScore(node, direction, targetPos) {
+        const pos = node.position;
+        let score = 0;
+        
+        // 基础得分：距离目标越近得分越高
+        const distance = this.calculateHeuristic(pos, targetPos);
+        score += Math.max(0, 20 - distance); // 距离得分
+        
+        // 方向对齐得分：根据移动方向给予额外得分
+        switch (direction) {
+            case 'up':
+                // 向上移动：y坐标越小（越靠上）得分越高
+                score += Math.max(0, 10 - pos.y);
+                break;
+            case 'down':
+                // 向下移动：y坐标越大（越靠下）得分越高
+                score += pos.y;
+                break;
+            case 'left':
+                // 向左移动：x坐标越小（越靠左）得分越高
+                score += Math.max(0, 10 - pos.x);
+                break;
+            case 'right':
+                // 向右移动：x坐标越大（越靠右）得分越高
+                score += pos.x;
+                break;
+            case 'up-left':
+                // 左上移动：x和y都越小得分越高
+                score += Math.max(0, 10 - pos.x) + Math.max(0, 10 - pos.y);
+                break;
+            case 'up-right':
+                // 右上移动：x越大，y越小得分越高
+                score += pos.x + Math.max(0, 10 - pos.y);
+                break;
+            case 'down-left':
+                // 左下移动：x越小，y越大得分越高
+                score += Math.max(0, 10 - pos.x) + pos.y;
+                break;
+            case 'down-right':
+                // 右下移动：x和y都越大得分越高
+                score += pos.x + pos.y;
+                break;
+        }
+        
+        return score;
     }
 
     /**
@@ -309,6 +407,26 @@ class MovementManager {
         console.log(`[移动调试] 方块当前位置: (${block.position.x}, ${block.position.y})`);
         console.log(`[移动调试] 目标位置: (${targetPos.x}, ${targetPos.y})`);
         
+        const currentCells = block.getCells();
+        console.log(`[移动调试] 方块类型: ${block.type}, 占用格子:`, currentCells.map(c => `(${c.x},${c.y})`));
+        
+        // 检查点击的目标位置是否在方块当前占用的格子中
+        const isClickingOwnCell = currentCells.some(cell => cell.x === targetPos.x && cell.y === targetPos.y);
+        if (isClickingOwnCell) {
+            console.log(`[移动调试] 点击了方块自身的格子，不移动`);
+            return false;
+        }
+        
+        // 计算最优的方块目标位置（不是点击位置，而是方块锚点应该移动到的位置）
+        const optimalTargetPos = this.calculateOptimalBlockPosition(block, targetPos);
+        console.log(`[移动调试] 计算最优方块位置: 从 (${block.position.x}, ${block.position.y}) 到 (${optimalTargetPos.x}, ${optimalTargetPos.y})`);
+        
+        // 计算理论最短距离（基于方块整体移动）
+        const dx = Math.abs(optimalTargetPos.x - block.position.x);
+        const dy = Math.abs(optimalTargetPos.y - block.position.y);
+        const theoreticalMinSteps = dx + dy;
+        console.log(`[移动调试] 理论最短距离: ${theoreticalMinSteps} 步 (dx=${dx}, dy=${dy})`);
+        
         // 显示坐标类型
         const boardWidth = gameEngine.boardWidth || 8;
         const boardHeight = gameEngine.boardHeight || 8;
@@ -340,16 +458,17 @@ class MovementManager {
             return false;
         }
         
-        // 计算移动路径
+        // 计算移动路径（使用最优目标位置）
         const startPos = block.position;
-        console.log(`[移动调试] 开始计算路径: 从 (${startPos.x}, ${startPos.y}) 到 (${targetPos.x}, ${targetPos.y})`);
+        console.log(`[移动调试] 开始计算路径: 从 (${startPos.x}, ${startPos.y}) 到 (${optimalTargetPos.x}, ${optimalTargetPos.y})`);
         
-        const path = this.calculatePath(block, startPos, targetPos, 
+        const path = this.calculatePath(block, startPos, optimalTargetPos, 
             gameEngine.collisionDetector, gameEngine.grid, 
             gameEngine.blocks, 
             gameEngine.rocks);
         
-        console.log(`[移动调试] 路径计算结果: ${path ? `路径长度 ${path.length}` : '无路径'}`);
+        const actualSteps = path ? path.length - 1 : 0;
+        console.log(`[移动调试] 路径计算结果: ${path ? `${actualSteps} 步移动` : '无路径'}`);
         
         if (path && path.length > 1) {
             console.log(`[移动调试] 开始执行移动`);
@@ -361,6 +480,56 @@ class MovementManager {
         }
     }
     
+    /**
+     * 计算最优的方块位置
+     * 根据点击的目标位置，计算方块锚点应该移动到的最优位置
+     * @param {Block} block - 方块
+     * @param {Object} clickedPos - 点击的位置
+     * @returns {Object} 最优的方块锚点位置
+     */
+    calculateOptimalBlockPosition(block, clickedPos) {
+        const currentCells = block.getCells();
+        const blockPos = block.position;
+        
+        // 找到点击位置最近的方块格子
+        let nearestCell = currentCells[0];
+        let minDistance = Infinity;
+        
+        currentCells.forEach(cell => {
+            const distance = Math.abs(cell.x - clickedPos.x) + Math.abs(cell.y - clickedPos.y);
+            if (distance < minDistance) {
+                minDistance = distance;
+                nearestCell = cell;
+            }
+        });
+        
+        console.log(`[位置计算] 最近的方块格子: (${nearestCell.x}, ${nearestCell.y}), 距离: ${minDistance}`);
+        
+        // 计算从最近格子到点击位置的偏移
+        const offsetX = clickedPos.x - nearestCell.x;
+        const offsetY = clickedPos.y - nearestCell.y;
+        
+        console.log(`[位置计算] 偏移量: (${offsetX}, ${offsetY})`);
+        
+        // 应用偏移到方块锚点位置
+        const newBlockPos = {
+            x: blockPos.x + offsetX,
+            y: blockPos.y + offsetY
+        };
+        
+        console.log(`[位置计算] 新方块位置: (${newBlockPos.x}, ${newBlockPos.y})`);
+        
+        // 验证新位置后方块的所有格子
+        const newCells = block.typeData.blocks.map(relativePos => ({
+            x: newBlockPos.x + relativePos[0],
+            y: newBlockPos.y + relativePos[1]
+        }));
+        
+        console.log(`[位置计算] 新位置后方块占用格子:`, newCells.map(c => `(${c.x},${c.y})`));
+        
+        return newBlockPos;
+    }
+
     /**
      * 拖动移动 - 拖动方块到目标位置
      * @param {Block} block - 要移动的方块
