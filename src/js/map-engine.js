@@ -1185,6 +1185,17 @@ class MapEngine {
                 return;
             }
             
+            // 检查是否选中了炸弹道具
+            if (this.selectedItem === 'bomb') {
+                console.log(`[道具] 使用炸弹对方块 ${clickedBlock.id} 进行爆炸`);
+                const success = this.useBomb(gridPos);
+                if (success) {
+                    // 减少道具数量
+                    this.items.bomb.count--;
+                }
+                return;
+            }
+            
             if (clickedBlock.movable) {
                 // 如果点击的是可移动方块，选择它
                 console.log(`[点击调试] 选中方块: ${clickedBlock.id}`);
@@ -1411,13 +1422,53 @@ class MapEngine {
     }
 
     /**
-     * 使用炸弹（功能待开发）
-     * 计划：清除目标位置周围的方块
+     * 使用炸弹
+     * 直接移除目标位置的方块
      */
     useBomb(targetPos) {
-        console.log('[道具] 炸弹效果 - 功能待开发');
-        // 功能说明：清除目标位置周围3x3范围内的方块
-        // 实现思路：1. 计算爆炸范围 2. 移除范围内的方块 3. 更新网格
+        console.log('[道具] 炸弹效果 - 开始爆炸');
+        
+        // 1. 获取目标位置的方块
+        const targetBlock = this.getBlockAtPosition(targetPos.x, targetPos.y);
+        if (!targetBlock) {
+            console.log('[道具] 目标位置没有方块');
+            return false;
+        }
+        
+        console.log(`[道具] 炸弹爆炸，移除方块: ${targetBlock.id} (${targetBlock.color})`);
+        
+        // 2. 从数据结构中移除方块
+        this.removeBlock(targetBlock.id);
+        
+        // 3. 标记需要重绘
+        this.triggerRedraw();
+        
+        // 4. 取消道具选中状态
+        this.selectedItem = null;
+        
+        console.log('[道具] 炸弹爆炸完成');
+        return true;
+    }
+    
+    /**
+     * 移除方块
+     * @param {string} blockId - 方块ID
+     */
+    removeBlock(blockId) {
+        // 从方块Map中移除
+        if (this.blocks.has(blockId)) {
+            this.blocks.delete(blockId);
+            console.log(`[方块移除] 方块 ${blockId} 已从数据结构中移除`);
+        }
+        
+        // 更新网格
+        this.updateGrid();
+        
+        // 如果移除的是当前选中的方块，清除选中状态
+        if (this.selectedBlock && this.selectedBlock.id === blockId) {
+            this.selectedBlock = null;
+            console.log(`[方块移除] 清除选中状态`);
+        }
     }
 
     /**
