@@ -509,10 +509,7 @@ class Block {
             }
         });
         
-        // 绘制选择效果
-        if (this.isSelected) {
-            this._drawSelectionEffect(ctx, startX, startY, cellSize);
-        }
+        // 选中效果现在在_drawBlockCell中处理，这里不需要额外绘制
         
         // 恢复变换（如果应用了缩放）
         if (this.state === BlockStates.eliminating) {
@@ -527,18 +524,47 @@ class Block {
      * @private
      */
     _drawBlockCell(ctx, x, y, size) {
-        // 使用颜色数据绘制
-        ctx.fillStyle = this.colorData.hex;
-        ctx.fillRect(x, y, size, size);
-
-        // 绘制边框
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
-        ctx.lineWidth = 2;
-        ctx.strokeRect(x, y, size, size);
+        // 检查是否是选中状态
+        const isSelected = this.isSelected;
         
-        // 绘制高光效果
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
-        ctx.fillRect(x, y, size * 0.3, size * 0.3);
+        // 选中状态：变大5px并悬浮
+        if (isSelected) {
+            const scaleFactor = 1.1; // 变大10%（约5px）
+            const hoverOffset = 3; // 悬浮高度3px
+            const scaledSize = size * scaleFactor;
+            const offsetX = (size - scaledSize) / 2;
+            const offsetY = (size - scaledSize) / 2 - hoverOffset;
+            
+            // 绘制阴影（悬浮效果）
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
+            ctx.fillRect(x + offsetX + 2, y + offsetY + 2, scaledSize, scaledSize);
+            
+            // 绘制放大的方块
+            ctx.fillStyle = this.colorData.hex;
+            ctx.fillRect(x + offsetX, y + offsetY, scaledSize, scaledSize);
+            
+            // 绘制边框
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+            ctx.lineWidth = 3;
+            ctx.strokeRect(x + offsetX, y + offsetY, scaledSize, scaledSize);
+            
+            // 绘制高光效果
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+            ctx.fillRect(x + offsetX, y + offsetY, scaledSize * 0.3, scaledSize * 0.3);
+        } else {
+            // 正常状态
+            ctx.fillStyle = this.colorData.hex;
+            ctx.fillRect(x, y, size, size);
+
+            // 绘制边框
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(x, y, size, size);
+            
+            // 绘制高光效果
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
+            ctx.fillRect(x, y, size * 0.3, size * 0.3);
+        }
     }
     
     /**

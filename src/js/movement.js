@@ -310,6 +310,13 @@ class MovementManager {
             onComplete: () => {
                 block.isMoving = false;
                 block.state = 'idle';
+                
+                // 动画完成后清除选中状态
+                if (block.isSelected) {
+                    block.isSelected = false;
+                    gameEngine.selectedBlock = null;
+                }
+                
                 gameEngine.updateGrid();
                 gameEngine.processIceBlocks(block);
                 gameEngine.checkGateExit(block);
@@ -391,6 +398,12 @@ class MovementManager {
         // 更新状态
         block.isMoving = false;
         block.state = 'idle';
+        
+        // 移动完成后清除选中状态
+        if (block.isSelected) {
+            block.isSelected = false;
+            gameEngine.selectedBlock = null;
+        }
         
         // 更新游戏状态
         gameEngine.updateGrid();

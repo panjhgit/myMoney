@@ -243,6 +243,13 @@ class MapEngine {
         console.log(`[选择调试] 方块位置: (${block.position.x}, ${block.position.y})`);
         console.log(`[选择调试] 方块类型: ${block.type}`);
         
+        // 清除之前选中方块的选中状态
+        if (this.selectedBlock) {
+            this.selectedBlock.isSelected = false;
+        }
+        
+        // 设置新选中方块的选中状态
+        block.isSelected = true;
         this.selectedBlock = block;
         
         // 🔧 优化：选择方块后触发重绘
