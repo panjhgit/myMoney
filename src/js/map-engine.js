@@ -687,20 +687,96 @@ class MapEngine {
         const matrixWidth = matrix[0].length;
         const matrixHeight = matrix.length;
         
-        // 检测边缘并绘制边框
-        const borders = this.detectBorders(matrix);
-        this.renderBorders(borders, borderWidth);
-        
-        // 仍然需要绘制内部的砖块（火箭创建的）
+        // 遍历所有格子，找到游戏区域(0)的边界，然后绘制对应的门/墙边框
         for (let y = 0; y < matrixHeight; y++) {
             for (let x = 0; x < matrixWidth; x++) {
                 const elementType = matrix[y][x];
-                if (elementType === GAME_CONFIG.BOARD_SYSTEM.ELEMENT_TYPES.BRICK) {
-                    // 绘制砖块（仍然占据完整格子）
-                    this.drawBrick(x, y);
+                
+                // 只处理游戏区域(0)
+                if (elementType === 0) {
+                    // 检查四个方向，找到相邻的门/墙
+                    const directions = [
+                        { dx: 0, dy: -1, side: 'top' },    // 上边
+                        { dx: 0, dy: 1, side: 'bottom' },  // 下边
+                        { dx: -1, dy: 0, side: 'left' },   // 左边
+                        { dx: 1, dy: 0, side: 'right' }    // 右边
+                    ];
+                    
+                    for (const dir of directions) {
+                        const adjX = x + dir.dx;
+                        const adjY = y + dir.dy;
+                        
+                        // 检查相邻格子是否是门/墙
+                        if (adjX >= 0 && adjX < matrixWidth && adjY >= 0 && adjY < matrixHeight) {
+                            const adjElementType = matrix[adjY][adjX];
+                            
+                            // 如果是门(2-9)或墙(1)，绘制边框
+                            if (adjElementType === 1 || (adjElementType >= 2 && adjElementType <= 9)) {
+                                this.drawBorderForGameArea(x, y, dir.side, adjElementType, borderWidth);
+                            }
+                        }
+                    }
                 }
             }
         }
+    }
+    
+    /**
+     * 为游戏区域绘制边框（紧贴游戏区域外边缘）
+     * @param {number} gameAreaX - 游戏区域X坐标
+     * @param {number} gameAreaY - 游戏区域Y坐标
+     * @param {string} side - 边框方向 ('top', 'bottom', 'left', 'right')
+     * @param {number} elementType - 相邻的门/墙类型
+     * @param {number} borderWidth - 边框宽度
+     */
+    drawBorderForGameArea(gameAreaX, gameAreaY, side, elementType, borderWidth) {
+        const cellSize = this.cellSize;
+        let borderX, borderY, borderW, borderH;
+        
+        // 设置边框颜色
+        let borderColor;
+        if (elementType === 1) {
+            // 墙：深灰色
+            borderColor = GAME_CONFIG.RENDER_COLORS.PIPE_BACKGROUND;
+        } else if (elementType >= 2 && elementType <= 9) {
+            // 门：对应颜色
+            const gateColor = this.getBlockColor(GAME_CONFIG.BOARD_SYSTEM.GATE_COLOR_MAP[elementType]);
+            borderColor = gateColor;
+        }
+        
+        // 计算边框位置（紧贴游戏区域外边缘）
+        if (side === 'top') {
+            // 上边框：在游戏区域上方
+            borderX = this.gridOffsetX + gameAreaX * cellSize;
+            borderY = this.gridOffsetY + gameAreaY * cellSize - borderWidth;
+            borderW = cellSize;
+            borderH = borderWidth;
+            
+        } else if (side === 'bottom') {
+            // 下边框：在游戏区域下方
+            borderX = this.gridOffsetX + gameAreaX * cellSize;
+            borderY = this.gridOffsetY + (gameAreaY + 1) * cellSize;
+            borderW = cellSize;
+            borderH = borderWidth;
+            
+        } else if (side === 'left') {
+            // 左边框：在游戏区域左方
+            borderX = this.gridOffsetX + gameAreaX * cellSize - borderWidth;
+            borderY = this.gridOffsetY + gameAreaY * cellSize;
+            borderW = borderWidth;
+            borderH = cellSize;
+            
+        } else if (side === 'right') {
+            // 右边框：在游戏区域右方
+            borderX = this.gridOffsetX + (gameAreaX + 1) * cellSize;
+            borderY = this.gridOffsetY + gameAreaY * cellSize;
+            borderW = borderWidth;
+            borderH = cellSize;
+        }
+        
+        // 绘制边框
+        this.ctx.fillStyle = borderColor;
+        this.ctx.fillRect(borderX, borderY, borderW, borderH);
     }
     
     /**
@@ -758,7 +834,7 @@ class MapEngine {
             // 检查相邻格子是否是游戏区域(0)或超出边界
             const isAdjacentToGameArea = 
                 (adjX < 0 || adjX >= matrixWidth || adjY < 0 || adjY >= matrixHeight) ||
-                (matrix[adjY] && matrix[adjY][adjX] === 0);
+                (adjY >= 0 && adjY < matrixHeight && adjX >= 0 && adjX < matrixWidth && matrix[adjY][adjX] === 0);
             
             if (isAdjacentToGameArea) {
                 segments.push({
@@ -932,6 +1008,11 @@ class MapEngine {
         // 绘制边框（只绘制实心边框，不添加额外描边）
         this.ctx.fillStyle = borderColor;
         this.ctx.fillRect(borderX, borderY, borderW, borderH);
+        
+        // 临时调试：绘制边框编号
+        this.ctx.fillStyle = 'white';
+        this.ctx.font = '8px Arial';
+        this.ctx.fillText(border.side[0], borderX + borderW/2, borderY + borderH/2);
     }
     
     /**
@@ -1235,26 +1316,22 @@ class MapEngine {
     }
 
     /**
-     * 绘制火箭创建的砖块
+     * 绘制所有砖块（包括原始砖块和火箭创建的砖块）
      */
     drawRocketBricks() {
-        if (!this.grid || !this.ctx) return;
+        if (!this.boardMatrix || !this.ctx) return;
         
-        const gridWidth = this.grid[0] ? this.grid[0].length : 0;
-        const gridHeight = this.grid.length;
+        const matrixWidth = this.boardMatrix[0].length;
+        const matrixHeight = this.boardMatrix.length;
         
-        // 只遍历grid，绘制火箭创建的砖块
-        for (let y = 0; y < gridHeight; y++) {
-            for (let x = 0; x < gridWidth; x++) {
-                const gridValue = this.grid[y] && this.grid[y][x];
+        // 遍历boardMatrix，绘制所有砖块
+        for (let y = 0; y < matrixHeight; y++) {
+            for (let x = 0; x < matrixWidth; x++) {
+                const elementType = this.boardMatrix[y][x];
                 
-                // 只绘制火箭创建的砖块（grid值为10但不是boardMatrix原有的砖块）
-                if (gridValue === GAME_CONFIG.BOARD_SYSTEM.ELEMENT_TYPES.BRICK) {
-                    // 检查是否是火箭创建的砖块（boardMatrix中原本不是10）
-                    const originalElementType = this.boardMatrix && this.boardMatrix[y] && this.boardMatrix[y][x];
-                    if (originalElementType !== GAME_CONFIG.BOARD_SYSTEM.ELEMENT_TYPES.BRICK) {
-                        this.drawBrick(x, y); // 绘制砖块
-                    }
+                // 绘制所有类型为砖块的位置
+                if (elementType === GAME_CONFIG.BOARD_SYSTEM.ELEMENT_TYPES.BRICK) {
+                    this.drawBrick(x, y);
                 }
             }
         }

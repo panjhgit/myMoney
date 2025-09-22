@@ -539,29 +539,19 @@ class Block {
             ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
             ctx.fillRect(x + offsetX + 2, y + offsetY + 2, scaledSize, scaledSize);
             
-            // 绘制放大的方块
+            // 绘制放大的方块（移除边框）
             ctx.fillStyle = this.colorData.hex;
             ctx.fillRect(x + offsetX, y + offsetY, scaledSize, scaledSize);
             
-            // 绘制边框
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
-            ctx.lineWidth = 3;
-            ctx.strokeRect(x + offsetX, y + offsetY, scaledSize, scaledSize);
-            
-            // 绘制高光效果
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
-            ctx.fillRect(x + offsetX, y + offsetY, scaledSize * 0.3, scaledSize * 0.3);
+            // 绘制高光效果（增强选中视觉效果）
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+            ctx.fillRect(x + offsetX, y + offsetY, scaledSize * 0.4, scaledSize * 0.4);
         } else {
-            // 正常状态
+            // 正常状态（移除边框绘制）
             ctx.fillStyle = this.colorData.hex;
             ctx.fillRect(x, y, size, size);
-
-            // 绘制边框
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
-            ctx.lineWidth = 2;
-            ctx.strokeRect(x, y, size, size);
             
-            // 绘制高光效果
+            // 绘制高光效果（保留，增加立体感）
             ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
             ctx.fillRect(x, y, size * 0.3, size * 0.3);
         }
@@ -574,14 +564,9 @@ class Block {
     _drawIceEffect(ctx, x, y, size) {
         if (!this.ice.isRevealed) return;
         
-        // 冰块覆盖层
+        // 冰块覆盖层（移除边框）
         ctx.fillStyle = `rgba(173, 216, 230, ${0.3 + this.ice.meltProgress * 0.4})`;
         ctx.fillRect(x, y, size, size);
-        
-        // 冰块边框
-        ctx.strokeStyle = 'rgba(135, 206, 235, 0.8)';
-        ctx.lineWidth = 1;
-        ctx.strokeRect(x, y, size, size);
         
         // 融化效果
         if (this.ice.isMelting) {
