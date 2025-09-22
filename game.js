@@ -96,6 +96,8 @@ function startGame(levelId) {
     mapData = map1;
   } else if (levelId === 2 && typeof map2 !== 'undefined') {
     mapData = map2;
+  } else if (levelId === 99 && typeof mapTestBorder !== 'undefined') {
+    mapData = mapTestBorder; // 测试地图
   } else {
     console.error(`地图数据未找到，关卡 ${levelId} 不存在`);
     return;

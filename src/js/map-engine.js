@@ -651,7 +651,7 @@ class MapEngine {
     }
     
     /**
-     * 绘制游戏区域（根据boardMatrix绘制不规则游戏区域）
+     * 计算游戏区域位置（不绘制任何背景，只计算偏移量）
      */
     drawGameArea(matrix) {
         if (!matrix || matrix.length === 0) return;
@@ -671,67 +671,267 @@ class MapEngine {
         const centerX = (canvasWidth - totalSize) / 2;
         const centerY = (canvasHeight - totalSize) / 2;
         
-        // 绘制游戏区域背景（浅蓝色）
-        this.ctx.fillStyle = GAME_CONFIG.RENDER_COLORS.GAME_AREA_BACKGROUND;
-        this.ctx.fillRect(centerX, centerY, totalSize, totalSize);
-        
-        // 绘制外边框（细线）
-        this.ctx.strokeStyle = GAME_CONFIG.RENDER_COLORS.GAME_AREA_BORDER;
-        this.ctx.lineWidth = GAME_CONFIG.STYLES.LINE_WIDTH_THIN;
-        this.ctx.strokeRect(centerX, centerY, totalSize, totalSize);
-        
-        // 绘制内部网格线（分隔所有格子）
-        for (let i = 1; i < maxSize; i++) {
-            const lineX = centerX + i * this.cellSize;
-            const lineY = centerY + i * this.cellSize;
-            
-            // 垂直线
-            this.ctx.beginPath();
-            this.ctx.moveTo(lineX, centerY);
-            this.ctx.lineTo(lineX, centerY + totalSize);
-            this.ctx.stroke();
-            
-            // 水平线
-            this.ctx.beginPath();
-            this.ctx.moveTo(centerX, lineY);
-            this.ctx.lineTo(centerX + totalSize, lineY);
-            this.ctx.stroke();
-        }
-        
-        // 更新偏移量，让方块绘制知道游戏区域的位置
+        // 只计算偏移量，不绘制任何背景
+        // 游戏区域的视觉边界完全由门和墙的内边缘来提供
         this.gridOffsetX = centerX;
         this.gridOffsetY = centerY;
     }
     
     /**
-     * 绘制管道边框（门和墙，根据boardMatrix绘制不规则边界）
+     * 绘制管道边框（门和墙作为棋盘边框，而非占据格子）
      */
     drawPipeBorder(matrix) {
         if (!matrix || matrix.length === 0) return;
         
-        const pipeThickness = 8; // 管道厚度
+        const borderWidth = 10; // 固定边框宽度
         const matrixWidth = matrix[0].length;
         const matrixHeight = matrix.length;
         
+        // 检测边缘并绘制边框
+        const borders = this.detectBorders(matrix);
+        this.renderBorders(borders, borderWidth);
         
+        // 仍然需要绘制内部的砖块（火箭创建的）
+        for (let y = 0; y < matrixHeight; y++) {
+            for (let x = 0; x < matrixWidth; x++) {
+                const elementType = matrix[y][x];
+                if (elementType === GAME_CONFIG.BOARD_SYSTEM.ELEMENT_TYPES.BRICK) {
+                    // 绘制砖块（仍然占据完整格子）
+                    this.drawBrick(x, y);
+                }
+            }
+        }
+    }
+    
+    /**
+     * 检测boardMatrix中的边缘，识别需要绘制边框的位置
+     * @param {Array} matrix - boardMatrix
+     * @returns {Array} 边框数据数组
+     */
+    detectBorders(matrix) {
+        const borders = [];
+        const matrixWidth = matrix[0].length;
+        const matrixHeight = matrix.length;
         
-        // 根据boardMatrix绘制墙和门
+        // 遍历所有非游戏区域的格子（门和墙）
         for (let y = 0; y < matrixHeight; y++) {
             for (let x = 0; x < matrixWidth; x++) {
                 const elementType = matrix[y][x];
                 
-                if (elementType === 1) {
-                    // 绘制墙
-                    this.drawWall(x, y, pipeThickness);
-                } else if (elementType === GAME_CONFIG.BOARD_SYSTEM.ELEMENT_TYPES.BRICK) {
-                    // 绘制砖块
-                    this.drawBrick(x, y);
-                } else if (elementType >= 2 && elementType <= 9) {
-                    // 绘制门
-                    this.drawGate(x, y, elementType, pipeThickness);
+                // 只处理门(2-9)和墙(1)
+                if (elementType === 1 || (elementType >= 2 && elementType <= 9)) {
+                    const borderSegments = this.detectBorderSegments(matrix, x, y, elementType);
+                    borders.push(...borderSegments);
                 }
             }
         }
+        
+        // 合并相邻的同类型边框段
+        return this.mergeBorderSegments(borders);
+    }
+    
+    /**
+     * 检测单个格子的边框段
+     * @param {Array} matrix - boardMatrix
+     * @param {number} x - X坐标
+     * @param {number} y - Y坐标
+     * @param {number} elementType - 元素类型
+     * @returns {Array} 边框段数组
+     */
+    detectBorderSegments(matrix, x, y, elementType) {
+        const segments = [];
+        const matrixWidth = matrix[0].length;
+        const matrixHeight = matrix.length;
+        
+        // 检查四个边，只有与游戏区域(0)相邻的边才需要绘制边框
+        const directions = [
+            { dx: 0, dy: -1, side: 'top' },    // 上边
+            { dx: 0, dy: 1, side: 'bottom' },  // 下边
+            { dx: -1, dy: 0, side: 'left' },   // 左边
+            { dx: 1, dy: 0, side: 'right' }    // 右边
+        ];
+        
+        for (const dir of directions) {
+            const adjX = x + dir.dx;
+            const adjY = y + dir.dy;
+            
+            // 检查相邻格子是否是游戏区域(0)或超出边界
+            const isAdjacentToGameArea = 
+                (adjX < 0 || adjX >= matrixWidth || adjY < 0 || adjY >= matrixHeight) ||
+                (matrix[adjY] && matrix[adjY][adjX] === 0);
+            
+            if (isAdjacentToGameArea) {
+                segments.push({
+                    x: x,
+                    y: y,
+                    side: dir.side,
+                    elementType: elementType,
+                    color: elementType >= 2 && elementType <= 9 ? 
+                        GAME_CONFIG.BOARD_SYSTEM.GATE_COLOR_MAP[elementType] : null
+                });
+            }
+        }
+        
+        return segments;
+    }
+    
+    /**
+     * 合并相邻的同类型边框段为连续的边框线
+     * @param {Array} segments - 边框段数组
+     * @returns {Array} 合并后的边框线数组
+     */
+    mergeBorderSegments(segments) {
+        const lines = [];
+        const processed = new Set();
+        
+        for (const segment of segments) {
+            const key = `${segment.x},${segment.y},${segment.side}`;
+            if (processed.has(key)) continue;
+            
+            // 创建新的边框线
+            const line = {
+                startX: segment.x,
+                startY: segment.y,
+                endX: segment.x,
+                endY: segment.y,
+                side: segment.side,
+                elementType: segment.elementType,
+                color: segment.color,
+                segments: [segment]
+            };
+            
+            // 尝试向一个方向延伸
+            this.extendBorderLine(line, segments, processed, 1);
+            // 尝试向另一个方向延伸
+            this.extendBorderLine(line, segments, processed, -1);
+            
+            lines.push(line);
+        }
+        
+        return lines;
+    }
+    
+    /**
+     * 向指定方向延伸边框线
+     * @param {Object} line - 边框线对象
+     * @param {Array} segments - 所有边框段
+     * @param {Set} processed - 已处理的段
+     * @param {number} direction - 延伸方向 (1 或 -1)
+     */
+    extendBorderLine(line, segments, processed, direction) {
+        let currentX = direction > 0 ? line.endX : line.startX;
+        let currentY = direction > 0 ? line.endY : line.startY;
+        
+        while (true) {
+            // 计算下一个位置
+            let nextX = currentX;
+            let nextY = currentY;
+            
+            if (line.side === 'top' || line.side === 'bottom') {
+                nextX += direction; // 水平延伸
+            } else {
+                nextY += direction; // 垂直延伸
+            }
+            
+            // 查找匹配的段
+            const matchingSegment = segments.find(s => 
+                s.x === nextX && s.y === nextY && s.side === line.side && 
+                s.elementType === line.elementType
+            );
+            
+            if (!matchingSegment) break;
+            
+            const key = `${nextX},${nextY},${line.side}`;
+            if (processed.has(key)) break;
+            
+            // 延伸边框线
+            if (direction > 0) {
+                line.endX = nextX;
+                line.endY = nextY;
+            } else {
+                line.startX = nextX;
+                line.startY = nextY;
+            }
+            
+            line.segments.push(matchingSegment);
+            processed.add(key);
+            
+            currentX = nextX;
+            currentY = nextY;
+        }
+        
+        // 标记起始段为已处理
+        for (const segment of line.segments) {
+            const key = `${segment.x},${segment.y},${segment.side}`;
+            processed.add(key);
+        }
+    }
+    
+    /**
+     * 渲染边框线
+     * @param {Array} borders - 边框线数组
+     * @param {number} borderWidth - 边框宽度
+     */
+    renderBorders(borders, borderWidth) {
+        for (const border of borders) {
+            this.renderSingleBorder(border, borderWidth);
+        }
+    }
+    
+    /**
+     * 渲染单个边框线（在门/墙的内边缘，贴着游戏区域外边缘）
+     * @param {Object} border - 边框线对象
+     * @param {number} borderWidth - 边框宽度
+     */
+    renderSingleBorder(border, borderWidth) {
+        const cellSize = this.cellSize;
+        
+        // 关键改动：边框渲染在门/墙的内边缘，即贴着游戏区域的外边缘
+        let borderX, borderY, borderW, borderH;
+        
+        if (border.side === 'top') {
+            // 上边框：门/墙在游戏区域上方，边框在门/墙的下边缘（贴着游戏区域上边缘）
+            borderX = this.gridOffsetX + border.startX * cellSize;
+            borderY = this.gridOffsetY + (border.startY + 1) * cellSize - borderWidth; // 门/墙内边缘
+            borderW = (border.endX - border.startX + 1) * cellSize;
+            borderH = borderWidth;
+            
+        } else if (border.side === 'bottom') {
+            // 下边框：门/墙在游戏区域下方，边框在门/墙的上边缘（贴着游戏区域下边缘）
+            borderX = this.gridOffsetX + border.startX * cellSize;
+            borderY = this.gridOffsetY + border.startY * cellSize; // 门/墙内边缘
+            borderW = (border.endX - border.startX + 1) * cellSize;
+            borderH = borderWidth;
+            
+        } else if (border.side === 'left') {
+            // 左边框：门/墙在游戏区域左方，边框在门/墙的右边缘（贴着游戏区域左边缘）
+            borderX = this.gridOffsetX + (border.startX + 1) * cellSize - borderWidth; // 门/墙内边缘
+            borderY = this.gridOffsetY + border.startY * cellSize;
+            borderW = borderWidth;
+            borderH = (border.endY - border.startY + 1) * cellSize;
+            
+        } else if (border.side === 'right') {
+            // 右边框：门/墙在游戏区域右方，边框在门/墙的左边缘（贴着游戏区域右边缘）
+            borderX = this.gridOffsetX + border.startX * cellSize; // 门/墙内边缘
+            borderY = this.gridOffsetY + border.startY * cellSize;
+            borderW = borderWidth;
+            borderH = (border.endY - border.startY + 1) * cellSize;
+        }
+        
+        // 设置边框颜色
+        let borderColor;
+        if (border.elementType === 1) {
+            // 墙：深灰色
+            borderColor = GAME_CONFIG.RENDER_COLORS.PIPE_BACKGROUND;
+        } else if (border.elementType >= 2 && border.elementType <= 9) {
+            // 门：对应颜色
+            const gateColor = this.getBlockColor(border.color);
+            borderColor = gateColor;
+        }
+        
+        // 绘制边框（只绘制实心边框，不添加额外描边）
+        this.ctx.fillStyle = borderColor;
+        this.ctx.fillRect(borderX, borderY, borderW, borderH);
     }
     
     /**
@@ -760,50 +960,22 @@ class MapEngine {
     }
     
     /**
-     * 绘制墙（完整45px格子）
-     */
-    drawWall(x, y, thickness) {
-        this.drawSolidCell(x, y, GAME_CONFIG.RENDER_COLORS.PIPE_BACKGROUND);
-    }
-    
-    /**
-     * 绘制砖块（火箭创建的砖块）
+     * 绘制砖块（火箭创建的砖块，仍然占据完整格子）
      */
     drawBrick(x, y) {
         this.drawSolidCell(x, y, GAME_CONFIG.RENDER_COLORS.PIPE_BACKGROUND);
     }
     
-    /**
-     * 绘制门（完整45px格子）
-     */
-    drawGate(x, y, gateType, thickness) {
-        const gateX = this.gridOffsetX + x * this.cellSize;
-        const gateY = this.gridOffsetY + y * this.cellSize;
-        
-        // 获取门颜色
-        const color = GAME_CONFIG.BOARD_SYSTEM.GATE_COLOR_MAP[gateType];
-        const gateColor = this.getBlockColor(color);
-        
-        // 绘制门背景（实心彩色）
-        this.ctx.fillStyle = this.convertToRgba(gateColor, 1.0);
-        this.ctx.fillRect(gateX, gateY, this.cellSize, this.cellSize);
-        
-        // 绘制门边框
-        this.ctx.strokeStyle = gateColor;
-        this.ctx.lineWidth = 2;
-        this.ctx.strokeRect(gateX, gateY, this.cellSize, this.cellSize);
-    }
-    
     
     /**
-     * 绘制坐标标签（适应不规则地图）
+     * 绘制坐标标签（适应边框渲染模式）
      */
     drawCoordinateLabels() {
         if (!this.ctx || !this.boardMatrix) return;
         
         const matrixWidth = this.boardMatrix[0].length;
         const matrixHeight = this.boardMatrix.length;
-        const pipeThickness = 12; // 管道厚度
+        const borderWidth = 10; // 边框宽度
         
         // 设置文字样式
         this.ctx.font = '12px Arial';
@@ -811,65 +983,61 @@ class MapEngine {
         this.ctx.textAlign = 'center';
         this.ctx.textBaseline = 'middle';
         
-        // 绘制X轴坐标标签（列号）
-        for (let x = 0; x < matrixWidth; x++) {
+        // 只绘制游戏区域的坐标标签
+        const gameAreaBounds = this.getGameAreaBounds();
+        
+        // 绘制X轴坐标标签（只标记游戏区域）
+        for (let x = gameAreaBounds.minX; x <= gameAreaBounds.maxX; x++) {
             const labelX = this.gridOffsetX + x * this.cellSize + this.cellSize / 2;
-            const labelY = this.gridOffsetY - pipeThickness / 2;
+            const topLabelY = this.gridOffsetY + gameAreaBounds.minY * this.cellSize - borderWidth - 10;
+            const bottomLabelY = this.gridOffsetY + (gameAreaBounds.maxY + 1) * this.cellSize + borderWidth + 10;
             
             // 顶部标签
-            this.ctx.fillText(x.toString(), labelX, labelY);
+            this.ctx.fillText(x.toString(), labelX, topLabelY);
             
             // 底部标签
-            const bottomLabelY = this.gridOffsetY + matrixHeight * this.cellSize + pipeThickness / 2;
             this.ctx.fillText(x.toString(), labelX, bottomLabelY);
         }
         
-        // 绘制Y轴坐标标签（行号）
-        for (let y = 0; y < matrixHeight; y++) {
-            const labelX = this.gridOffsetX - pipeThickness / 2;
+        // 绘制Y轴坐标标签（只标记游戏区域）
+        for (let y = gameAreaBounds.minY; y <= gameAreaBounds.maxY; y++) {
+            const leftLabelX = this.gridOffsetX + gameAreaBounds.minX * this.cellSize - borderWidth - 10;
+            const rightLabelX = this.gridOffsetX + (gameAreaBounds.maxX + 1) * this.cellSize + borderWidth + 10;
             const labelY = this.gridOffsetY + y * this.cellSize + this.cellSize / 2;
             
             // 左侧标签
-            this.ctx.fillText(y.toString(), labelX, labelY);
+            this.ctx.fillText(y.toString(), leftLabelX, labelY);
             
             // 右侧标签
-            const rightLabelX = this.gridOffsetX + matrixWidth * this.cellSize + pipeThickness / 2;
             this.ctx.fillText(y.toString(), rightLabelX, labelY);
         }
-        
-        // 绘制墙和门的坐标标签
-        this.drawWallAndGateLabels(matrixWidth, matrixHeight, pipeThickness);
     }
     
     /**
-     * 绘制墙和门的坐标标签（适合45px格子）
+     * 获取游戏区域的边界（从boardMatrix中找到值为0的区域）
      */
-    drawWallAndGateLabels(matrixWidth, matrixHeight, pipeThickness) {
-        // 设置标签样式
-        this.ctx.font = '12px Arial';
-        this.ctx.textAlign = 'center';
-        this.ctx.textBaseline = 'middle';
-        
-        // 遍历boardMatrix，为墙和门添加标签
-        for (let y = 0; y < matrixHeight; y++) {
-            for (let x = 0; x < matrixWidth; x++) {
-                const elementType = this.boardMatrix[y][x];
-                
-                if (elementType === 1) {
-                    // 墙标签
-                    this.ctx.fillStyle = '#FFFFFF'; // 白色，在灰色墙上更清楚
-                    const labelX = this.gridOffsetX + x * this.cellSize + this.cellSize / 2;
-                    const labelY = this.gridOffsetY + y * this.cellSize + this.cellSize / 2;
-                    this.ctx.fillText('墙', labelX, labelY);
-                } else if (elementType >= 2 && elementType <= 9) {
-                    // 门标签
-                    this.ctx.fillStyle = '#FFFFFF'; // 白色，在各种颜色门上更清楚
-                    const labelX = this.gridOffsetX + x * this.cellSize + this.cellSize / 2;
-                    const labelY = this.gridOffsetY + y * this.cellSize + this.cellSize / 2;
-                    this.ctx.fillText(`${elementType}`, labelX, labelY); // 只显示门编号，更简洁
+    getGameAreaBounds() {
+        if (this.boardMatrix) {
+            // 从boardMatrix中找到值为0的区域边界
+            const matrix = this.boardMatrix;
+            let minX = Infinity, maxX = -1, minY = Infinity, maxY = -1;
+            
+            for (let y = 0; y < matrix.length; y++) {
+                for (let x = 0; x < matrix[y].length; x++) {
+                    if (matrix[y][x] === 0) { // 0表示游戏区域
+                        minX = Math.min(minX, x);
+                        maxX = Math.max(maxX, x);
+                        minY = Math.min(minY, y);
+                        maxY = Math.max(maxY, y);
+                    }
                 }
             }
+            
+            return { minX, maxX, minY, maxY };
         }
+        
+        // 如果没有boardMatrix，使用默认的8x8区域 (0,0)到(7,7)
+        return { minX: 0, maxX: this.GRID_SIZE - 1, minY: 0, maxY: this.GRID_SIZE - 1 };
     }
 
     /**
