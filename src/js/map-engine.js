@@ -709,11 +709,13 @@ class MapEngine {
                         const adjX = x + dir.dx;
                         const adjY = y + dir.dy;
                         
+                        let adjElementType;
+                        
                         // 检查相邻格子是否是门/墙
                         if (adjX >= 0 && adjX < matrixWidth && adjY >= 0 && adjY < matrixHeight) {
                             const adjElementType = matrix[adjY][adjX];
                             
-                            // 如果是门(2-9)或墙(1)，绘制边框
+                            // 如果是门(2-9)或墙(1)，绘制边框（-1是填充，不需要处理）
                             if (adjElementType === 1 || (adjElementType >= 2 && adjElementType <= 9)) {
                                 // 创建边框的唯一标识，避免重复绘制
                                 const borderKey = `${x},${y},${dir.side}`;
@@ -782,6 +784,7 @@ class MapEngine {
             borderW = borderWidth;
             borderH = cellSize;
         }
+        
         
         // 绘制边框
         this.ctx.fillStyle = borderColor;
@@ -1797,6 +1800,9 @@ class MapEngine {
         
         // 更新网格
         this.updateGrid();
+        
+        // 处理冰块显露（炸弹爆炸后显露下层冰块）
+        this.processIceBlocks();
         
         // 如果移除的是当前选中的方块，清除选中状态
         if (this.selectedBlock && this.selectedBlock.id === blockId) {
