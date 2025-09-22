@@ -687,6 +687,9 @@ class MapEngine {
         const matrixWidth = matrix[0].length;
         const matrixHeight = matrix.length;
         
+        // 使用Set来避免重复绘制边框
+        const drawnBorders = new Set();
+        
         // 遍历所有格子，找到游戏区域(0)的边界，然后绘制对应的门/墙边框
         for (let y = 0; y < matrixHeight; y++) {
             for (let x = 0; x < matrixWidth; x++) {
@@ -712,7 +715,13 @@ class MapEngine {
                             
                             // 如果是门(2-9)或墙(1)，绘制边框
                             if (adjElementType === 1 || (adjElementType >= 2 && adjElementType <= 9)) {
-                                this.drawBorderForGameArea(x, y, dir.side, adjElementType, borderWidth);
+                                // 创建边框的唯一标识，避免重复绘制
+                                const borderKey = `${x},${y},${dir.side}`;
+                                
+                                if (!drawnBorders.has(borderKey)) {
+                                    this.drawBorderForGameArea(x, y, dir.side, adjElementType, borderWidth);
+                                    drawnBorders.add(borderKey);
+                                }
                             }
                         }
                     }
