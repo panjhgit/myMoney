@@ -43,5 +43,7 @@ var map2 = {
     rocks: []
 };
 
-// ES6 导出
-export { map2 };
+// CommonJS 导出（抖音小游戏规范）
+module.exports = {
+    map2: map2
+};

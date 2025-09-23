@@ -3,11 +3,11 @@
  * 核心特性：8*8网格 + 多层结构 + 智能路径规划 + 颜色通关
  */
 
-// 导入依赖
-import { CollisionDetector } from './collision.js';
-import { MovementManager } from './movement.js';
-import { Block, BLOCK_COLORS, BLOCK_TYPES } from './block.js';
-import { GAME_CONFIG, ConfigUtils } from './config.js';
+// CommonJS 导入依赖
+const { CollisionDetector } = require('./collision.js');
+const { MovementManager } = require('./movement.js');
+const { Block, BLOCK_COLORS, BLOCK_TYPES } = require('./block.js');
+const { GAME_CONFIG, ConfigUtils } = require('./config.js');
 
 class MapEngine {
     constructor(canvas, ctx, systemInfo) {
@@ -511,8 +511,8 @@ class MapEngine {
      */
     onGameComplete() {
         console.log('游戏完成！');
-        if (window.onLevelComplete) {
-            window.onLevelComplete(this.currentLevel);
+        if (globalThis.onLevelComplete) {
+            globalThis.onLevelComplete(this.currentLevel);
         }
     }
 
@@ -2126,5 +2126,8 @@ class MapEngine {
 
 }
 
-export { MapEngine };
+// CommonJS 导出（抖音小游戏规范）
+module.exports = {
+    MapEngine: MapEngine
+};
 

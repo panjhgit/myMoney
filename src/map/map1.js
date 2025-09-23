@@ -52,8 +52,10 @@ var map1 = {
 };
 
 // 导出地图数据
-// ES6 导出
-export { map1 };
+// CommonJS 导出（抖音小游戏规范）
+module.exports = {
+    map1: map1
+};
 
 // 自动验证地图布局
 if (typeof globalThis.MapLayoutValidator !== 'undefined') {

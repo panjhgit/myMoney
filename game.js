@@ -3,9 +3,21 @@ console.log(
   'https://developer.open-douyin.com/docs/resource/zh-CN/mini-game/guide/minigame/introduction',
 );
 
-// ES6 导入
-import { GameUtils, DrawUtils, EventManager, AnimationManager } from './src/js/utils.js';
-import { GAME_CONFIG, ConfigUtils } from './src/js/config.js'; // 导入配置
+// 抖音小游戏环境检测和全局对象设置
+const isDouYinMiniGame = typeof tt !== 'undefined';
+if (isDouYinMiniGame) {
+    console.log('[环境检测] 检测到抖音小游戏环境');
+    
+    // 设置全局对象为GameGlobal（抖音小游戏规范）
+    if (typeof GameGlobal !== 'undefined') {
+        globalThis.GameGlobal = GameGlobal;
+        console.log('[环境设置] 使用GameGlobal作为全局对象');
+    } else {
+        console.log('[环境设置] GameGlobal未定义，使用globalThis');
+    }
+} else {
+    console.log('[环境检测] 标准Web环境');
+}
 
 // 尝试导入GSAP - 使用动态导入来确保正确加载
 import('./src/js/gsap.min.js').then((gsapModule) => {
@@ -44,13 +56,16 @@ setTimeout(() => {
     }
 }, 100);
 
-import { BlockStates, BLOCK_COLORS, BLOCK_TYPES, Block } from './src/js/block.js';
-import { CollisionDetector } from './src/js/collision.js';
-import { MovementManager } from './src/js/movement.js';
-import { MainMenu } from './src/js/menu.js';
-import { MapEngine } from './src/js/map-engine.js';
-import { map1 } from './src/map/map1.js';
-import { map2 } from './src/map/map2.js';
+// 使用CommonJS导入（抖音小游戏规范）
+const { GameUtils, DrawUtils, EventManager, AnimationManager } = require('./src/js/utils.js');
+const { GAME_CONFIG, ConfigUtils } = require('./src/js/config.js');
+const { BlockStates, BLOCK_COLORS, BLOCK_TYPES, Block } = require('./src/js/block.js');
+const { CollisionDetector } = require('./src/js/collision.js');
+const { MovementManager } = require('./src/js/movement.js');
+const { MainMenu } = require('./src/js/menu.js');
+const { MapEngine } = require('./src/js/map-engine.js');
+const { map1 } = require('./src/map/map1.js');
+const { map2 } = require('./src/map/map2.js');
 
 // 验证配置一致性
 const validation = ConfigUtils.validateConfig();

@@ -1,5 +1,5 @@
-// 导入依赖
-import { EventManager, AnimationManager, DrawUtils, GameUtils } from './utils.js';
+// CommonJS 导入依赖
+const { EventManager, AnimationManager, DrawUtils, GameUtils } = require('./utils.js');
 
 // 主菜单类
 class MainMenu {
@@ -202,18 +202,48 @@ class MainMenu {
   }
   
   handleTouchStart(event) {
-    event.preventDefault();
-    this.touchStartY = event.touches[0].clientY;
+    // 抖音小游戏环境中的事件对象可能没有preventDefault方法
+    if (event.preventDefault && typeof event.preventDefault === 'function') {
+      event.preventDefault();
+    }
+    
+    // 安全获取触摸坐标
+    let touchY = 0;
+    if (event.touches && event.touches.length > 0) {
+      touchY = event.touches[0].clientY;
+    } else if (event.changedTouches && event.changedTouches.length > 0) {
+      touchY = event.changedTouches[0].clientY;
+    } else if ('clientY' in event) {
+      touchY = event.clientY;
+    } else if ('y' in event) {
+      touchY = event.y;
+    }
+    
+    this.touchStartY = touchY;
     this.touchStartTime = Date.now();
     this.isScrolling = false;
     this.scrollVelocity = 0;
   }
   
   handleTouchMove(event) {
-    event.preventDefault();
+    // 抖音小游戏环境中的事件对象可能没有preventDefault方法
+    if (event.preventDefault && typeof event.preventDefault === 'function') {
+      event.preventDefault();
+    }
     if (!this.touchStartY) return;
     
-    const touchY = event.touches[0].clientY;
+    // 安全获取触摸坐标
+    let touchY = 0;
+    if (event.touches && event.touches.length > 0) {
+      touchY = event.touches[0].clientY;
+    } else if (event.changedTouches && event.changedTouches.length > 0) {
+      touchY = event.changedTouches[0].clientY;
+    } else if ('clientY' in event) {
+      touchY = event.clientY;
+    } else if ('y' in event) {
+      touchY = event.y;
+    }
+    
     const deltaY = this.touchStartY - touchY;
     
     // 更新滚动位置
@@ -223,11 +253,26 @@ class MainMenu {
   }
   
   handleTouchEnd(event) {
-    event.preventDefault();
+    // 抖音小游戏环境中的事件对象可能没有preventDefault方法
+    if (event.preventDefault && typeof event.preventDefault === 'function') {
+      event.preventDefault();
+    }
     if (!this.touchStartY) return;
     
     const touchDuration = Date.now() - this.touchStartTime;
-    const touchY = event.changedTouches[0].clientY;
+    
+    // 安全获取触摸坐标
+    let touchY = 0;
+    if (event.changedTouches && event.changedTouches.length > 0) {
+      touchY = event.changedTouches[0].clientY;
+    } else if (event.touches && event.touches.length > 0) {
+      touchY = event.touches[0].clientY;
+    } else if ('clientY' in event) {
+      touchY = event.clientY;
+    } else if ('y' in event) {
+      touchY = event.y;
+    }
+    
     const deltaY = this.touchStartY - touchY;
     
     // 计算滚动速度
@@ -246,21 +291,43 @@ class MainMenu {
   
   handleClick(event) {
     // 检查游戏状态，如果不在菜单状态，则不处理点击事件
-    if (window.gameState && window.gameState !== 'menu') {
+    if (globalThis.gameState && globalThis.gameState !== 'menu') {
       return;
     }
     
-    // 在抖音小游戏中，直接使用事件坐标
+    // 在抖音小游戏中，事件对象结构可能不同
     let clickX, clickY;
     
+    console.log('[菜单调试] 事件对象结构:', {
+      type: event.type,
+      hasTouches: !!event.touches,
+      hasChangedTouches: !!event.changedTouches,
+      hasClientX: 'clientX' in event,
+      hasClientY: 'clientY' in event,
+      touchesLength: event.touches ? event.touches.length : 0,
+      changedTouchesLength: event.changedTouches ? event.changedTouches.length : 0
+    });
+    
+    // 尝试多种方式获取坐标
     if (event.touches && event.touches.length > 0) {
-      // 触摸事件
+      // 标准触摸事件
       clickX = event.touches[0].clientX;
       clickY = event.touches[0].clientY;
-    } else {
-      // 鼠标事件
+    } else if (event.changedTouches && event.changedTouches.length > 0) {
+      // 触摸结束事件
+      clickX = event.changedTouches[0].clientX;
+      clickY = event.changedTouches[0].clientY;
+    } else if ('clientX' in event && 'clientY' in event) {
+      // 直接包含坐标的事件对象
       clickX = event.clientX;
       clickY = event.clientY;
+    } else if (event.x !== undefined && event.y !== undefined) {
+      // 抖音小游戏可能使用 x, y 属性
+      clickX = event.x;
+      clickY = event.y;
+    } else {
+      console.warn('[菜单调试] 无法获取事件坐标，事件对象:', event);
+      return;
     }
     
     // 调整坐标以考虑滚动
@@ -410,8 +477,8 @@ class MainMenu {
     // 更新当前关卡
     this.currentLevel = levelId;
     // 这里可以触发游戏开始事件
-    if (window.onLevelStart) {
-      window.onLevelStart(levelId);
+    if (globalThis.onLevelStart) {
+      globalThis.onLevelStart(levelId);
     }
   }
   
@@ -779,4 +846,7 @@ class MainMenu {
   }
 }
 
-export { MainMenu };
+// CommonJS 导出（抖音小游戏规范）
+module.exports = {
+    MainMenu: MainMenu
+};

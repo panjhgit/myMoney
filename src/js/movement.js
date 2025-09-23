@@ -3,8 +3,8 @@
  * 负责处理方块的移动、路径规划和动画
  */
 
-// 导入依赖
-import { GAME_CONFIG } from './config.js';
+// CommonJS 导入依赖
+const { GAME_CONFIG } = require('./config.js');
 
 class MovementManager {
     constructor(gridSize) {
@@ -555,4 +555,7 @@ class MovementManager {
 
 }
 
-export { MovementManager };
+// CommonJS 导出（抖音小游戏规范）
+module.exports = {
+    MovementManager: MovementManager
+};

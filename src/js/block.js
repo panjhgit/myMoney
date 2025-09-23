@@ -731,5 +731,10 @@ class Block {
 
 // 便捷函数已移除，直接使用 Block 类
 
-// ES6 导出
-export { BlockStates, BLOCK_COLORS, BLOCK_TYPES, Block };
+// CommonJS 导出（抖音小游戏规范）
+module.exports = {
+    BlockStates: BlockStates,
+    BLOCK_COLORS: BLOCK_COLORS,
+    BLOCK_TYPES: BLOCK_TYPES,
+    Block: Block
+};

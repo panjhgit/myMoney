@@ -139,5 +139,8 @@ const ConfigUtils = {
   }
 };
 
-// ES6 导出
-export { GAME_CONFIG, ConfigUtils };
+// CommonJS 导出（抖音小游戏规范）
+module.exports = {
+    GAME_CONFIG: GAME_CONFIG,
+    ConfigUtils: ConfigUtils
+};

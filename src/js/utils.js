@@ -4,7 +4,7 @@
  */
 
 // 坐标获取工具
-export const GameUtils = {
+const GameUtils = {
     /**
      * 从事件对象获取坐标
      * @param {Event} event - 事件对象
@@ -62,7 +62,7 @@ export const GameUtils = {
 };
 
 // 公共绘制工具类
-export const DrawUtils = {
+const DrawUtils = {
     /**
      * 绘制金币图标
      * @param {CanvasRenderingContext2D} ctx - 画布上下文
@@ -193,7 +193,7 @@ export const DrawUtils = {
 };
 
 // 事件管理器 - 统一事件处理（抖音小游戏优化版）
-export const EventManager = {
+const EventManager = {
     /**
      * 设置画布事件监听器 - 优先使用抖音小游戏API
      * @param {HTMLCanvasElement} canvas - 画布元素
@@ -411,7 +411,7 @@ export const EventManager = {
 };
 
 // 动画管理器 - 统一动画处理
-export const AnimationManager = {
+const AnimationManager = {
     /**
      * 检查GSAP是否可用
      * @returns {boolean} GSAP是否可用
@@ -550,4 +550,12 @@ export const AnimationManager = {
     isGSAPAvailable: function() {
         return typeof gsap !== 'undefined' && gsap !== null;
     }
+};
+
+// CommonJS 导出（抖音小游戏规范）
+module.exports = {
+    GameUtils: GameUtils,
+    DrawUtils: DrawUtils,
+    EventManager: EventManager,
+    AnimationManager: AnimationManager
 };

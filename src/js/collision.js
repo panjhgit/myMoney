@@ -3,8 +3,8 @@
  * 负责处理方块与各种元素的碰撞检测
  */
 
-// 导入依赖
-import { Block } from './block.js';
+// CommonJS 导入依赖
+const { Block } = require('./block.js');
 
 class CollisionDetector {
     constructor(gridSize) {
@@ -368,4 +368,7 @@ class CollisionDetector {
     }
 }
 
-export { CollisionDetector };
+// CommonJS 导出（抖音小游戏规范）
+module.exports = {
+    CollisionDetector: CollisionDetector
+};
