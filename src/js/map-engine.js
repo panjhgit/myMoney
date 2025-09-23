@@ -203,7 +203,7 @@ class MapEngine {
                 this.rocks.forEach(rockKey => {
                     const [x, y] = rockKey.split(',').map(Number);
                     // 检查位置是否在有效范围内（不检查boardMatrix值，因为石块可以放在门的位置）
-                    if (x >= 0 && x < this.boardWidth && y >= 0 && y < this.boardHeight) {
+                    if (this.isInBounds(x, y)) {
                         this.grid[y][x] = 'rock';
                     }
                 });
@@ -711,27 +711,21 @@ class MapEngine {
 
         // 使用新的棋盘矩阵系统绘制
         if (this.boardMatrix) {
-            this.drawNewBoard();
+            const matrix = this.boardMatrix;
+
+            // 1. 绘制8×8游戏区域
+            this.drawGameArea(matrix);
+
+            // 2. 绘制管道边框（门和墙，贴着棋盘边缘）
+            this.drawPipeBorder(matrix);
+
+            // 3. 绘制坐标标签
+            this.drawCoordinateLabels();
         } else {
             console.warn('drawBoard: 未加载棋盘矩阵，无法绘制。');
         }
     }
 
-    /**
-     * 使用棋盘矩阵绘制新棋盘 - 绘制8×8游戏区域和管道边框
-     */
-    drawNewBoard() {
-        const matrix = this.boardMatrix;
-
-        // 1. 绘制8×8游戏区域
-        this.drawGameArea(matrix);
-
-        // 2. 绘制管道边框（门和墙，贴着棋盘边缘）
-        this.drawPipeBorder(matrix);
-
-        // 3. 绘制坐标标签
-        this.drawCoordinateLabels();
-    }
 
     /**
      * 计算游戏区域位置并绘制网格线
@@ -1140,18 +1134,27 @@ class MapEngine {
     }
 
 
-    drawRect(x, y, width, height, fill = true, stroke = true) {
+    /**
+     * 🔧 优化：统一的绘制矩形方法
+     * @param {number} x - X坐标
+     * @param {number} y - Y坐标
+     * @param {number} width - 宽度
+     * @param {number} height - 高度
+     * @param {boolean} fill - 是否填充
+     * @param {boolean} stroke - 是否描边
+     * @param {number} offset - 偏移量（可选）
+     */
+    drawRect(x, y, width, height, fill = true, stroke = true, offset = 0) {
+        const drawX = x + offset;
+        const drawY = y + offset;
+        const drawWidth = width - offset * 2;
+        const drawHeight = height - offset * 2;
+        
         if (fill) {
-            this.ctx.fillRect(x, y, width, height);
+            this.ctx.fillRect(drawX, drawY, drawWidth, drawHeight);
         }
         if (stroke) {
-            this.ctx.strokeRect(x, y, width, height);
-        }
-    }
-
-    drawRectWithOffset(x, y, width, height, offset, fill = true) {
-        if (fill) {
-            this.ctx.fillRect(x + offset, y + offset, width - offset * 2, height - offset * 2);
+            this.ctx.strokeRect(drawX, drawY, drawWidth, drawHeight);
         }
     }
 
@@ -1173,13 +1176,13 @@ class MapEngine {
         // 纹理
         if (style.textureColor) {
             this.ctx.fillStyle = style.textureColor;
-            this.drawRectWithOffset(x, y, this.cellSize, this.cellSize, 2);
+            this.drawRect(x, y, this.cellSize, this.cellSize, true, false, 2);
         }
 
         // 高光
         if (style.highlightColor) {
             this.ctx.fillStyle = style.highlightColor;
-            this.drawRectWithOffset(x, y, this.cellSize, this.cellSize, 4);
+            this.drawRect(x, y, this.cellSize, this.cellSize, true, false, 4);
         }
     }
 
@@ -1705,7 +1708,7 @@ class MapEngine {
         console.log(`[火箭] boardMatrix大小: ${this.boardMatrix ? this.boardMatrix.length : 'null'} x ${this.boardMatrix && this.boardMatrix[0] ? this.boardMatrix[0].length : 'null'}`);
 
         // 检查坐标是否在有效范围内
-        if (x >= 0 && x < this.boardWidth && y >= 0 && y < this.boardHeight) {
+        if (this.isInBounds(x, y)) {
             // 在网格中设置砖块标记
             this.grid[y][x] = GAME_CONFIG.BOARD_SYSTEM.ELEMENT_TYPES.BRICK; // 10表示砖块
 
@@ -2083,27 +2086,11 @@ class MapEngine {
 
         // 执行移动
         try {
-            // 🔧 修复：清除方块所有格子的当前位置
-            const oldCells = this.selectedBlock.getCells();
-            for (const cell of oldCells) {
-                const cellX = currentPos.x + cell.x;
-                const cellY = currentPos.y + cell.y;
-                if (this.grid[cellY] && this.grid[cellY][cellX] === this.selectedBlock.id) {
-                    this.grid[cellY][cellX] = 0;
-                }
-            }
-            
-            // 更新方块位置
+            // 🔧 优化：使用通用方法更新网格
+            this.updateBlockGridState(this.selectedBlock, currentPos, 0); // 清除旧位置
             this.selectedBlock.position.x = nextPos.x;
             this.selectedBlock.position.y = nextPos.y;
-            
-            // 🔧 修复：更新方块所有格子的新位置
-            const newCells = this.selectedBlock.getCells();
-            for (const cell of newCells) {
-                const cellX = nextPos.x + cell.x;
-                const cellY = nextPos.y + cell.y;
-                this.grid[cellY][cellX] = this.selectedBlock.id;
-            }
+            this.updateBlockGridState(this.selectedBlock, nextPos, this.selectedBlock.id); // 设置新位置
             
             // 验证移动结果
             if (!this.validateMoveResult(nextPos.x, nextPos.y)) {
@@ -2395,7 +2382,7 @@ class MapEngine {
     }
 
     /**
-     * 检查位置是否是有效的棋盘区域
+     * 🔧 优化：检查位置是否是有效的棋盘区域
      * 注意：screenToGrid返回的坐标需要转换为boardMatrix坐标
      * @param {number} x - X坐标 (来自screenToGrid)
      * @param {number} y - Y坐标 (来自screenToGrid)
@@ -2404,8 +2391,8 @@ class MapEngine {
     isValidBoardPosition(x, y) {
         if (!this.boardMatrix) return false;
 
-        // 如果坐标超出boardMatrix范围，则不可移动
-        if (x < 0 || x >= this.boardWidth || y < 0 || y >= this.boardHeight) {
+        // 使用通用边界检查方法
+        if (!this.isInBounds(x, y)) {
             return false;
         }
 
@@ -2413,6 +2400,35 @@ class MapEngine {
 
         // 只有值为0的位置才是可移动的游戏区域
         return value === GAME_CONFIG.BOARD_SYSTEM.ELEMENT_TYPES.BOARD;
+    }
+
+    /**
+     * 🔧 新增：通用方法 - 检查坐标是否在有效范围内
+     * @param {number} x - X坐标
+     * @param {number} y - Y坐标
+     * @returns {boolean} 是否在有效范围内
+     */
+    isInBounds(x, y) {
+        return x >= 0 && x < this.boardWidth && y >= 0 && y < this.boardHeight;
+    }
+
+    /**
+     * 🔧 新增：通用方法 - 更新方块在网格中的状态
+     * @param {Block} block - 方块对象
+     * @param {Object} position - 位置 {x, y}
+     * @param {string|number} value - 要设置的值（方块ID或0）
+     */
+    updateBlockGridState(block, position, value) {
+        const cells = block.getCells();
+        for (const cell of cells) {
+            const cellX = position.x + cell.x;
+            const cellY = position.y + cell.y;
+            
+            // 使用通用边界检查方法
+            if (this.isInBounds(cellX, cellY)) {
+                this.grid[cellY][cellX] = value;
+            }
+        }
     }
 
     /**
@@ -2425,8 +2441,8 @@ class MapEngine {
     isValidMovePosition(x, y, block) {
         if (!this.boardMatrix) return false;
 
-        // 基本边界检查
-        if (x < 0 || x >= this.boardWidth || y < 0 || y >= this.boardHeight) {
+        // 使用通用边界检查方法
+        if (!this.isInBounds(x, y)) {
             return false;
         }
 
@@ -2804,29 +2820,15 @@ class MapEngine {
         if (!this.selectedBlock) return;
         
         try {
-            // 🔧 修复：清除失败位置的所有格子
-            const currentCells = this.selectedBlock.getCells();
-            for (const cell of currentCells) {
-                const cellX = this.selectedBlock.position.x + cell.x;
-                const cellY = this.selectedBlock.position.y + cell.y;
-                if (this.grid[cellY] && this.grid[cellY][cellX] === this.selectedBlock.id) {
-                    this.grid[cellY][cellX] = 0;
-                }
-            }
+            // 🔧 优化：使用通用方法清除失败位置
+            this.updateBlockGridState(this.selectedBlock, this.selectedBlock.position, 0);
             
             // 恢复原始位置
             this.selectedBlock.position.x = originalPos.x;
             this.selectedBlock.position.y = originalPos.y;
             
-            // 🔧 修复：恢复原始位置的所有格子
-            const originalCells = this.selectedBlock.getCells();
-            for (const cell of originalCells) {
-                const cellX = originalPos.x + cell.x;
-                const cellY = originalPos.y + cell.y;
-                if (this.grid[cellY] && this.grid[cellY][cellX] !== undefined) {
-                    this.grid[cellY][cellX] = this.selectedBlock.id;
-                }
-            }
+            // 🔧 优化：使用通用方法恢复原始位置
+            this.updateBlockGridState(this.selectedBlock, originalPos, this.selectedBlock.id);
             
             console.log('[回滚] 已恢复到原始位置:', originalPos);
         } catch (error) {
