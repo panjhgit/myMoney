@@ -4,15 +4,15 @@
  */
 
 // 坐标获取工具
-var GameUtils = {
+export const GameUtils = {
     /**
      * 从事件对象获取坐标
      * @param {Event} event - 事件对象
      * @returns {Object} 包含x, y坐标的对象
      */
-    getEventCoordinates: function(event) {
-        var x = event.clientX || event.pageX || event.x || 0;
-        var y = event.clientY || event.pageY || event.y || 0;
+    getEventCoordinates(event) {
+        const x = event.clientX || event.pageX || event.x || 0;
+        const y = event.clientY || event.pageY || event.y || 0;
         return {x: x, y: y};
     },
 
@@ -21,12 +21,12 @@ var GameUtils = {
      * @param {TouchEvent} event - 触摸事件对象
      * @returns {Object} 包含x, y坐标的对象
      */
-    getTouchCoordinates: function(event) {
-        var touch = event.touches[0] || event.changedTouches[0];
+    getTouchCoordinates(event) {
+        const touch = event.touches[0] || event.changedTouches[0];
         if (!touch) return {x: 0, y: 0};
         
-        var x = touch.clientX || touch.pageX || touch.x || 0;
-        var y = touch.clientY || touch.pageY || touch.y || 0;
+        const x = touch.clientX || touch.pageX || touch.x || 0;
+        const y = touch.clientY || touch.pageY || touch.y || 0;
         return {x: x, y: y};
     },
 
@@ -36,8 +36,8 @@ var GameUtils = {
      * @param {number} defaultValue - 默认值
      * @returns {number} 转换后的数值
      */
-    safeNumber: function(value, defaultValue) {
-        var num = Number(value);
+    safeNumber(value, defaultValue) {
+        const num = Number(value);
         return isNaN(num) ? defaultValue : num;
     },
 
@@ -46,7 +46,7 @@ var GameUtils = {
      * @param {*} value - 要检查的值
      * @returns {boolean} 是否有效
      */
-    isValid: function(value) {
+    isValid(value) {
         return value !== null && value !== undefined && value !== '';
     },
 
@@ -56,13 +56,13 @@ var GameUtils = {
      * @param {string} message - 消息
      * @returns {string} 格式化后的日志
      */
-    formatLog: function(module, message) {
-        return '[' + module + '] ' + message;
+    formatLog(module, message) {
+        return `[${module}] ${message}`;
     }
 };
 
 // 公共绘制工具类
-const DrawUtils = {
+export const DrawUtils = {
     /**
      * 绘制金币图标
      * @param {CanvasRenderingContext2D} ctx - 画布上下文
@@ -70,7 +70,7 @@ const DrawUtils = {
      * @param {number} y - Y坐标
      * @param {string} coinColor - 金币颜色，默认为金色
      */
-    drawCoinIcon: function(ctx, x, y, coinColor = '#FFD700') {
+    drawCoinIcon(ctx, x, y, coinColor = '#FFD700') {
         ctx.fillStyle = coinColor;
         ctx.beginPath();
         ctx.arc(x + 15, y + 15, 15, 0, 2 * Math.PI);
@@ -90,7 +90,7 @@ const DrawUtils = {
      * @param {number|string} amount - 金币数量
      * @param {string} textColor - 文字颜色，默认为白色
      */
-    drawCurrencyText: function(ctx, x, y, amount, textColor = '#FFFFFF') {
+    drawCurrencyText(ctx, x, y, amount, textColor = '#FFFFFF') {
         ctx.fillStyle = textColor;
         ctx.font = 'bold 14px Arial';
         ctx.textAlign = 'left';
@@ -115,7 +115,7 @@ const DrawUtils = {
      * @param {number} y - Y坐标
      * @param {string} heartColor - 爱心颜色，默认为红色
      */
-    drawHeartIcon: function(ctx, x, y, heartColor = '#FF6B6B') {
+    drawHeartIcon(ctx, x, y, heartColor = '#FF6B6B') {
         ctx.fillStyle = heartColor;
         ctx.beginPath();
         ctx.moveTo(x + 15, y + 5);
@@ -134,7 +134,7 @@ const DrawUtils = {
      * @param {number|string} lives - 生命值数量
      * @param {string} textColor - 文字颜色，默认为白色
      */
-    drawLivesText: function(ctx, x, y, lives, textColor = '#FFFFFF') {
+    drawLivesText(ctx, x, y, lives, textColor = '#FFFFFF') {
         ctx.fillStyle = textColor;
         ctx.font = 'bold 14px Arial';
         ctx.textAlign = 'left';
@@ -160,7 +160,7 @@ const DrawUtils = {
      * @param {number|string} level - 关卡数
      * @param {string} textColor - 文字颜色，默认为白色
      */
-    drawCurrentLevelText: function(ctx, x, y, level, textColor = '#FFFFFF') {
+    drawCurrentLevelText(ctx, x, y, level, textColor = '#FFFFFF') {
         ctx.fillStyle = textColor;
         ctx.font = 'bold 14px Arial';
         ctx.textAlign = 'center';
@@ -176,7 +176,7 @@ const DrawUtils = {
      * @param {number} height - 高度
      * @param {number} radius - 圆角半径
      */
-    drawRoundedRect: function(ctx, x, y, width, height, radius) {
+    drawRoundedRect(ctx, x, y, width, height, radius) {
         ctx.beginPath();
         ctx.moveTo(x + radius, y);
         ctx.lineTo(x + width - radius, y);
@@ -192,97 +192,205 @@ const DrawUtils = {
     }
 };
 
-// 事件管理器 - 统一事件处理
-const EventManager = {
+// 事件管理器 - 统一事件处理（抖音小游戏优化版）
+export const EventManager = {
     /**
-     * 设置画布事件监听器
+     * 设置画布事件监听器 - 优先使用抖音小游戏API
      * @param {HTMLCanvasElement} canvas - 画布元素
      * @param {Object} handlers - 事件处理函数对象
      * @returns {Object} 绑定的事件处理函数引用
      */
-    setupCanvasEvents: function(canvas, handlers) {
+    setupCanvasEvents(canvas, handlers) {
         const boundHandlers = {};
         
-        // 鼠标事件
-        if (handlers.click) {
-            boundHandlers.boundHandleClick = (e) => handlers.click(e);
-            canvas.addEventListener('click', boundHandlers.boundHandleClick);
-        }
+        // 检查是否在抖音小游戏环境中
+        const isDouYinMiniGame = typeof tt !== 'undefined';
         
-        if (handlers.mousedown) {
-            boundHandlers.boundHandleMouseDown = (e) => handlers.mousedown(e);
-            canvas.addEventListener('mousedown', boundHandlers.boundHandleMouseDown);
-        }
-        
-        if (handlers.mousemove) {
-            boundHandlers.boundHandleMouseMove = (e) => handlers.mousemove(e);
-            canvas.addEventListener('mousemove', boundHandlers.boundHandleMouseMove);
-        }
-        
-        if (handlers.mouseup) {
-            boundHandlers.boundHandleMouseUp = (e) => handlers.mouseup(e);
-            canvas.addEventListener('mouseup', boundHandlers.boundHandleMouseUp);
-        }
-        
-        // 触摸事件
-        if (handlers.touchstart) {
-            boundHandlers.boundHandleTouchStart = (e) => {
-                e.preventDefault();
-                handlers.touchstart(e);
-            };
-            canvas.addEventListener('touchstart', boundHandlers.boundHandleTouchStart, { passive: false });
-        }
-        
-        if (handlers.touchmove) {
-            boundHandlers.boundHandleTouchMove = (e) => {
-                e.preventDefault();
-                handlers.touchmove(e);
-            };
-            canvas.addEventListener('touchmove', boundHandlers.boundHandleTouchMove, { passive: false });
-        }
-        
-        if (handlers.touchend) {
-            boundHandlers.boundHandleTouchEnd = (e) => {
-                e.preventDefault();
-                handlers.touchend(e);
-            };
-            canvas.addEventListener('touchend', boundHandlers.boundHandleTouchEnd, { passive: false });
+        if (isDouYinMiniGame) {
+            console.log('[EventManager] 检测到抖音小游戏环境，使用tt API');
+            
+            // 使用抖音小游戏官方API - 根据官方文档优化
+            console.log('[EventManager] 使用抖音小游戏官方触摸事件API');
+            
+            // 监听开始触摸事件 tt.onTouchStart
+            if (handlers.touchstart) {
+                boundHandlers.boundHandleTouchStart = (e) => {
+                    console.log('[EventManager] onTouchStart 触发');
+                    // 抖音小游戏环境中的事件对象可能没有preventDefault方法
+                    if (e.preventDefault && typeof e.preventDefault === 'function') {
+                        e.preventDefault();
+                    }
+                    handlers.touchstart(e);
+                };
+                tt.onTouchStart(boundHandlers.boundHandleTouchStart);
+            }
+            
+            // 监听触点移动事件 tt.onTouchMove
+            if (handlers.touchmove) {
+                boundHandlers.boundHandleTouchMove = (e) => {
+                    console.log('[EventManager] onTouchMove 触发');
+                    // 抖音小游戏环境中的事件对象可能没有preventDefault方法
+                    if (e.preventDefault && typeof e.preventDefault === 'function') {
+                        e.preventDefault();
+                    }
+                    handlers.touchmove(e);
+                };
+                tt.onTouchMove(boundHandlers.boundHandleTouchMove);
+            }
+            
+            // 监听触摸结束事件 tt.onTouchEnd
+            if (handlers.touchend) {
+                boundHandlers.boundHandleTouchEnd = (e) => {
+                    console.log('[EventManager] onTouchEnd 触发');
+                    // 抖音小游戏环境中的事件对象可能没有preventDefault方法
+                    if (e.preventDefault && typeof e.preventDefault === 'function') {
+                        e.preventDefault();
+                    }
+                    handlers.touchend(e);
+                };
+                tt.onTouchEnd(boundHandlers.boundHandleTouchEnd);
+            }
+            
+            // 监听触点失效事件 tt.onTouchCancel - 官方文档新增支持
+            if (handlers.touchcancel) {
+                boundHandlers.boundHandleTouchCancel = (e) => {
+                    console.log('[EventManager] onTouchCancel 触发');
+                    // 抖音小游戏环境中的事件对象可能没有preventDefault方法
+                    if (e.preventDefault && typeof e.preventDefault === 'function') {
+                        e.preventDefault();
+                    }
+                    handlers.touchcancel(e);
+                };
+                tt.onTouchCancel(boundHandlers.boundHandleTouchCancel);
+            }
+            
+            // 在抖音小游戏中，点击事件通常通过touchend处理
+            if (handlers.click && !handlers.touchend) {
+                boundHandlers.boundHandleClick = (e) => {
+                    console.log('[EventManager] click事件通过onTouchEnd处理');
+                    // 抖音小游戏环境中的事件对象可能没有preventDefault方法
+                    if (e.preventDefault && typeof e.preventDefault === 'function') {
+                        e.preventDefault();
+                    }
+                    handlers.click(e);
+                };
+                tt.onTouchEnd(boundHandlers.boundHandleClick);
+            }
+            
+        } else {
+            console.log('[EventManager] 使用标准Web API');
+            
+            // 标准Web环境 - 鼠标事件
+            if (handlers.click) {
+                boundHandlers.boundHandleClick = (e) => handlers.click(e);
+                canvas.addEventListener('click', boundHandlers.boundHandleClick);
+            }
+            
+            if (handlers.mousedown) {
+                boundHandlers.boundHandleMouseDown = (e) => handlers.mousedown(e);
+                canvas.addEventListener('mousedown', boundHandlers.boundHandleMouseDown);
+            }
+            
+            if (handlers.mousemove) {
+                boundHandlers.boundHandleMouseMove = (e) => handlers.mousemove(e);
+                canvas.addEventListener('mousemove', boundHandlers.boundHandleMouseMove);
+            }
+            
+            if (handlers.mouseup) {
+                boundHandlers.boundHandleMouseUp = (e) => handlers.mouseup(e);
+                canvas.addEventListener('mouseup', boundHandlers.boundHandleMouseUp);
+            }
+            
+            // 触摸事件
+            if (handlers.touchstart) {
+                boundHandlers.boundHandleTouchStart = (e) => {
+                    e.preventDefault();
+                    handlers.touchstart(e);
+                };
+                canvas.addEventListener('touchstart', boundHandlers.boundHandleTouchStart, { passive: false });
+            }
+            
+            if (handlers.touchmove) {
+                boundHandlers.boundHandleTouchMove = (e) => {
+                    e.preventDefault();
+                    handlers.touchmove(e);
+                };
+                canvas.addEventListener('touchmove', boundHandlers.boundHandleTouchMove, { passive: false });
+            }
+            
+            if (handlers.touchend) {
+                boundHandlers.boundHandleTouchEnd = (e) => {
+                    e.preventDefault();
+                    handlers.touchend(e);
+                };
+                canvas.addEventListener('touchend', boundHandlers.boundHandleTouchEnd, { passive: false });
+            }
         }
         
         return boundHandlers;
     },
     
     /**
-     * 移除画布事件监听器
+     * 移除画布事件监听器 - 支持抖音小游戏环境
      * @param {HTMLCanvasElement} canvas - 画布元素
      * @param {Object} boundHandlers - 绑定的事件处理函数引用
      */
-    removeCanvasEvents: function(canvas, boundHandlers) {
+    removeCanvasEvents(canvas, boundHandlers) {
         if (!canvas || !boundHandlers) return;
         
-        // 移除鼠标事件
-        if (boundHandlers.boundHandleClick) {
-            canvas.removeEventListener('click', boundHandlers.boundHandleClick);
-        }
-        if (boundHandlers.boundHandleMouseDown) {
-            canvas.removeEventListener('mousedown', boundHandlers.boundHandleMouseDown);
-        }
-        if (boundHandlers.boundHandleMouseMove) {
-            canvas.removeEventListener('mousemove', boundHandlers.boundHandleMouseMove);
-        }
-        if (boundHandlers.boundHandleMouseUp) {
-            canvas.removeEventListener('mouseup', boundHandlers.boundHandleMouseUp);
-        }
+        // 检查是否在抖音小游戏环境中
+        const isDouYinMiniGame = typeof tt !== 'undefined';
         
-        // 移除触摸事件
-        if (boundHandlers.boundHandleTouchStart) {
-            canvas.removeEventListener('touchstart', boundHandlers.boundHandleTouchStart);
-        }
-        if (boundHandlers.boundHandleTouchMove) {
-            canvas.removeEventListener('touchmove', boundHandlers.boundHandleTouchMove);
-        }
-        if (boundHandlers.boundHandleTouchEnd) {
-            canvas.removeEventListener('touchend', boundHandlers.boundHandleTouchEnd);
+        if (isDouYinMiniGame) {
+            console.log('[EventManager] 移除抖音小游戏事件监听器');
+            
+            // 抖音小游戏环境 - 使用tt API移除事件
+            if (boundHandlers.boundHandleTouchStart) {
+                tt.offTouchStart(boundHandlers.boundHandleTouchStart);
+            }
+            if (boundHandlers.boundHandleTouchMove) {
+                tt.offTouchMove(boundHandlers.boundHandleTouchMove);
+            }
+            if (boundHandlers.boundHandleTouchEnd) {
+                tt.offTouchEnd(boundHandlers.boundHandleTouchEnd);
+            }
+            if (boundHandlers.boundHandleTouchCancel) {
+                tt.offTouchCancel(boundHandlers.boundHandleTouchCancel);
+            }
+            if (boundHandlers.boundHandleClick) {
+                tt.offTouchEnd(boundHandlers.boundHandleClick);
+            }
+            
+        } else {
+            console.log('[EventManager] 移除标准Web事件监听器');
+            
+            // 标准Web环境 - 移除鼠标事件
+            if (boundHandlers.boundHandleClick) {
+                canvas.removeEventListener('click', boundHandlers.boundHandleClick);
+            }
+            if (boundHandlers.boundHandleMouseDown) {
+                canvas.removeEventListener('mousedown', boundHandlers.boundHandleMouseDown);
+            }
+            if (boundHandlers.boundHandleMouseMove) {
+                canvas.removeEventListener('mousemove', boundHandlers.boundHandleMouseMove);
+            }
+            if (boundHandlers.boundHandleMouseUp) {
+                canvas.removeEventListener('mouseup', boundHandlers.boundHandleMouseUp);
+            }
+            
+            // 移除触摸事件
+            if (boundHandlers.boundHandleTouchStart) {
+                canvas.removeEventListener('touchstart', boundHandlers.boundHandleTouchStart);
+            }
+            if (boundHandlers.boundHandleTouchMove) {
+                canvas.removeEventListener('touchmove', boundHandlers.boundHandleTouchMove);
+            }
+            if (boundHandlers.boundHandleTouchEnd) {
+                canvas.removeEventListener('touchend', boundHandlers.boundHandleTouchEnd);
+            }
+            if (boundHandlers.boundHandleTouchCancel) {
+                canvas.removeEventListener('touchcancel', boundHandlers.boundHandleTouchCancel);
+            }
         }
     },
     
@@ -291,7 +399,7 @@ const EventManager = {
      * @param {Event} event - 事件对象
      * @returns {Object} 包含x, y坐标的对象
      */
-    getEventCoordinates: function(event) {
+    getEventCoordinates(event) {
         if (event.touches && event.touches.length > 0) {
             // 触摸事件
             return GameUtils.getTouchCoordinates(event);
@@ -303,12 +411,12 @@ const EventManager = {
 };
 
 // 动画管理器 - 统一动画处理
-const AnimationManager = {
+export const AnimationManager = {
     /**
      * 检查GSAP是否可用
      * @returns {boolean} GSAP是否可用
      */
-    isGSAPAvailable: function() {
+    isGSAPAvailable() {
         return typeof gsap !== 'undefined';
     },
     
@@ -319,7 +427,7 @@ const AnimationManager = {
      * @param {number} duration - 动画持续时间（毫秒）
      * @param {Function} onComplete - 完成回调
      */
-    createFallbackAnimation: function(target, properties, duration, onComplete) {
+    createFallbackAnimation(target, properties, duration, onComplete) {
         const startTime = Date.now();
         const startValues = {};
         
@@ -372,7 +480,7 @@ const AnimationManager = {
      * @param {Object} options - 动画选项
      * @returns {Object} 动画对象
      */
-    createAnimation: function(target, properties, options = {}) {
+    createAnimation(target, properties, options = {}) {
         if (this.isGSAPAvailable()) {
             // 使用GSAP
             return gsap.to(target, {
@@ -392,7 +500,7 @@ const AnimationManager = {
      * @param {Object} options - 时间线选项
      * @returns {Object} 时间线对象
      */
-    createTimeline: function(options = {}) {
+    createTimeline(options = {}) {
         if (this.isGSAPAvailable()) {
             return gsap.timeline(options);
         } else {
@@ -421,7 +529,7 @@ const AnimationManager = {
      * @param {Function} onUpdate - 更新回调
      * @param {Function} onComplete - 完成回调
      */
-    createParticleAnimation: function(particle, properties, onUpdate, onComplete) {
+    createParticleAnimation(particle, properties, onUpdate, onComplete) {
         if (this.isGSAPAvailable()) {
             return gsap.to(particle, {
                 ...properties,
@@ -433,11 +541,13 @@ const AnimationManager = {
             this.createFallbackAnimation(particle, properties, duration, onComplete);
             return { kill: () => {} };
         }
+    },
+
+    /**
+     * 检查GSAP是否可用
+     * @returns {boolean} GSAP是否可用
+     */
+    isGSAPAvailable: function() {
+        return typeof gsap !== 'undefined' && gsap !== null;
     }
 };
-
-// 导出到全局作用域
-window.GameUtils = GameUtils;
-window.DrawUtils = DrawUtils;
-window.EventManager = EventManager;
-window.AnimationManager = AnimationManager;

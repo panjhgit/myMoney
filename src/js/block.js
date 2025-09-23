@@ -731,8 +731,5 @@ class Block {
 
 // 便捷函数已移除，直接使用 Block 类
 
-// 确保在抖音小游戏环境中可用
-window.BlockStates = BlockStates;
-window.BLOCK_COLORS = BLOCK_COLORS;
-window.BLOCK_TYPES = BLOCK_TYPES;
-window.Block = Block;
+// ES6 导出
+export { BlockStates, BLOCK_COLORS, BLOCK_TYPES, Block };

@@ -52,12 +52,13 @@ var map1 = {
 };
 
 // 导出地图数据
-window.map1 = map1;
+// ES6 导出
+export { map1 };
 
 // 自动验证地图布局
-if (typeof window.MapLayoutValidator !== 'undefined') {
+if (typeof globalThis.MapLayoutValidator !== 'undefined') {
     console.log('正在验证 map1 布局...');
-    const validationResult = window.validateMapLayout(map1);
+    const validationResult = globalThis.validateMapLayout(map1);
     if (!validationResult.isValid) {
         console.error('Map1 布局验证失败！');
     } else {

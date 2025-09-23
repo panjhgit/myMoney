@@ -1,3 +1,6 @@
+// 导入依赖
+import { EventManager, AnimationManager, DrawUtils, GameUtils } from './utils.js';
+
 // 主菜单类
 class MainMenu {
   constructor(canvas, ctx, systemInfo) {
@@ -300,6 +303,21 @@ class MainMenu {
     
     // 添加粒子效果
     this.createClickParticles(level.x + 60, level.y + 60);
+  }
+
+  /**
+   * 开始指定关卡
+   * @param {number} levelId - 关卡ID
+   */
+  startLevel(levelId) {
+    console.log(`[菜单] 开始关卡 ${levelId}`);
+    
+    // 调用全局的关卡开始函数
+    if (typeof globalThis.onLevelStart === 'function') {
+      globalThis.onLevelStart(levelId);
+    } else {
+      console.error('[菜单] onLevelStart 函数未找到');
+    }
   }
   
   // 锁定关卡动画
@@ -755,11 +773,10 @@ class MainMenu {
 
   triggerRedraw() {
     this.hasDrawn = false;
-    if (window.markNeedsRedraw) {
-      window.markNeedsRedraw();
+    if (globalThis.markNeedsRedraw) {
+      globalThis.markNeedsRedraw();
     }
   }
 }
 
-// 确保 MainMenu 类在全局作用域中可用
-window.MainMenu = MainMenu;
+export { MainMenu };

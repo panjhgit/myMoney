@@ -139,6 +139,5 @@ const ConfigUtils = {
   }
 };
 
-// 导出到全局作用域
-window.GAME_CONFIG = GAME_CONFIG;
-window.ConfigUtils = ConfigUtils;
+// ES6 导出
+export { GAME_CONFIG, ConfigUtils };

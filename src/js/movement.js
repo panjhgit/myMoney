@@ -3,6 +3,9 @@
  * 负责处理方块的移动、路径规划和动画
  */
 
+// 导入依赖
+import { GAME_CONFIG } from './config.js';
+
 class MovementManager {
     constructor(gridSize) {
         this.GRID_SIZE = gridSize;
@@ -552,5 +555,4 @@ class MovementManager {
 
 }
 
-// 导出到全局作用域
-window.MovementManager = MovementManager;
+export { MovementManager };

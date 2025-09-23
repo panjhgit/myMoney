@@ -43,5 +43,5 @@ var map2 = {
     rocks: []
 };
 
-// 导出地图数据
-window.map2 = map2;
+// ES6 导出
+export { map2 };

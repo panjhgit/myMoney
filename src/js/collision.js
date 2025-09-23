@@ -3,6 +3,9 @@
  * 负责处理方块与各种元素的碰撞检测
  */
 
+// 导入依赖
+import { Block } from './block.js';
+
 class CollisionDetector {
     constructor(gridSize) {
         this.GRID_SIZE = gridSize;
@@ -365,5 +368,4 @@ class CollisionDetector {
     }
 }
 
-// 导出到全局作用域
-window.CollisionDetector = CollisionDetector;
+export { CollisionDetector };

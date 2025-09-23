@@ -3,23 +3,58 @@ console.log(
   'https://developer.open-douyin.com/docs/resource/zh-CN/mini-game/guide/minigame/introduction',
 );
 
-// 加载必要的库和模块
-require('./src/js/utils.js'); // 加载工具函数
-require('./src/js/config.js'); // 加载统一配置
-require('./src/js/gsap.min.js');
-require('./src/js/block.js'); // 需要先加载，因为包含EYE_TYPES等常量
-require('./src/js/collision.js'); // 碰撞检测模块
-require('./src/js/movement.js'); // 移动逻辑模块
-require('./src/js/menu.js');
-require('./src/js/map-engine.js');
-require('./src/map/map1.js');
-require('./src/map/map2.js');
+// ES6 导入
+import { GameUtils, DrawUtils, EventManager, AnimationManager } from './src/js/utils.js';
+import { GAME_CONFIG, ConfigUtils } from './src/js/config.js'; // 导入配置
+
+// 尝试导入GSAP - 使用动态导入来确保正确加载
+import('./src/js/gsap.min.js').then((gsapModule) => {
+    console.log('GSAP模块导入成功:', typeof gsapModule);
+    console.log('GSAP模块内容:', Object.keys(gsapModule));
+    
+    // 尝试不同的导出方式
+    if (gsapModule.default) {
+        globalThis.gsap = gsapModule.default;
+        console.log('GSAP已通过default导出设置为全局变量');
+    } else if (gsapModule.gsap) {
+        globalThis.gsap = gsapModule.gsap;
+        console.log('GSAP已通过命名导出设置为全局变量');
+    } else {
+        // 直接使用整个模块
+        globalThis.gsap = gsapModule;
+        console.log('GSAP已直接设置为全局变量');
+    }
+    
+    // 验证设置是否成功
+    console.log('验证GSAP状态...');
+    console.log('typeof gsap:', typeof gsap);
+    console.log('typeof globalThis.gsap:', typeof globalThis.gsap);
+    
+}).catch((error) => {
+    console.error('GSAP模块导入失败:', error);
+    console.warn('将使用备用动画系统');
+});
+
+// 备用检查
+setTimeout(() => {
+    if (typeof gsap === 'undefined') {
+        console.warn('GSAP未能正确加载到全局作用域，将使用备用动画');
+    } else {
+        console.log('GSAP已成功加载到全局作用域');
+    }
+}, 100);
+
+import { BlockStates, BLOCK_COLORS, BLOCK_TYPES, Block } from './src/js/block.js';
+import { CollisionDetector } from './src/js/collision.js';
+import { MovementManager } from './src/js/movement.js';
+import { MainMenu } from './src/js/menu.js';
+import { MapEngine } from './src/js/map-engine.js';
+import { map1 } from './src/map/map1.js';
+import { map2 } from './src/map/map2.js';
 
 // 验证配置一致性
-if (window.ConfigUtils) {
-  const validation = ConfigUtils.validateConfig();
-  console.log('配置一致性检查:', validation);
-}
+const validation = ConfigUtils.validateConfig();
+console.log('配置一致性检查:', validation);
 
 let systemInfo = tt.getSystemInfoSync();
 let canvas = tt.createCanvas(),
@@ -52,8 +87,8 @@ function initMainMenu() {
   
   mainMenu = new MainMenu(canvas, ctx, systemInfo);
   
-// 设置关卡开始回调
-window.onLevelStart = function(levelId) {
+// 设置关卡开始回调（使用全局作用域）
+globalThis.onLevelStart = function(levelId) {
   console.log('开始关卡 ' + levelId);
   startGame(levelId);
 };
@@ -111,8 +146,8 @@ function startGame(levelId) {
   // 创建地图引擎实例
   mapEngine = new MapEngine(canvas, ctx, systemInfo);
   
-  // 设置关卡完成回调
-  window.onLevelComplete = function(completedLevelId) {
+  // 设置关卡完成回调（使用全局作用域）
+  globalThis.onLevelComplete = function(completedLevelId) {
     console.log('关卡 ' + completedLevelId + ' 完成！');
     
     // 更新主菜单的进度
@@ -142,8 +177,8 @@ function markNeedsRedraw() {
   needsRedraw = true;
 }
 
-// 将markNeedsRedraw设置为全局函数
-window.markNeedsRedraw = markNeedsRedraw;
+// 将markNeedsRedraw设置为全局函数（使用全局作用域）
+globalThis.markNeedsRedraw = markNeedsRedraw;
 
 // 主绘制函数 - 适配抖音小游戏环境
 function draw() {
@@ -304,8 +339,8 @@ function setupGameEvents() {
     }
   };
   
-  // 使用事件管理器统一设置事件监听器
-  window.gameEventHandlers = EventManager.setupCanvasEvents(canvas, eventHandlers);
+  // 使用事件管理器统一设置事件监听器（存储到全局作用域）
+  globalThis.gameEventHandlers = EventManager.setupCanvasEvents(canvas, eventHandlers);
 }
 
 

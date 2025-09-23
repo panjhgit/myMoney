@@ -1,0 +1,90 @@
+触摸事件
+抖音小游戏提供了以下基础触摸事件监听接口
+•
+监听开始触摸事件tt.onTouchStart
+•
+监听触点移动事件tt.onTouchMove
+•
+监听触摸结束事件tt.onTouchEnd
+•
+监听触点失效事件tt.onTouchCancel
+
+
+场景值概述
+场景值用于追踪用户进入小游戏的来源路径。完整场景值定义请参考场景值列表
+系统限制说明
+由于Android系统限制，以下情况无法获取准确场景值：
+热启动时，拿到的场景值是首次冷启动的值
+用户通过 Home 键退出游戏后，再次从桌面图标进入时，无法获取准确场景值
+系统将保留上一次的场景值记录
+获取场景值
+建议同时使用两种方式以确保场景值获取的准确性
+开发者可通过以下API获取场景值信息：
+同步获取方式
+通过 tt.getLaunchOptionsSync 获取游戏启动时的初始场景值
+
+事件监听方式
+监听游戏显示事件，通过  tt.onShow 获取当前场景值
+
+模块化
+模块导出机制
+开发者可以将公共代码封装为独立的JS模块文件，通过module.exports或exports对外暴露接口。需要特别注意：
+1. exports实质是module.exports的引用，修改exports指向可能导致异常，建议优先使用module.exports
+2. 抖音小游戏暂不支持直接引入node_modules，推荐以下解决方案：
+•
+ 将所需依赖代码手动拷贝至项目目录
+使用平台支持的npm管理功能
+// common.js
+function sayHello(name) { console.log(`Hello ${name} !`) }
+function sayGoodbye(name) { console.log(`Goodbye ${name} !`) }
+
+module.exports.sayHello = sayHello
+exports.sayGoodbye = sayGoodbye
+作用域规则
+文件作用域
+JS文件中声明的变量/函数默认具有文件级作用域，不同文件中的同名变量不会相互影响。
+全局对象
+抖音小游戏提供全局对象GameGlobal（类比浏览器的window对象），可用于跨文件数据共享：
+// a.js
+GameGlobal.appConfig = {
+ version: '1.0.0'
+}
+
+// b.js
+console.log(GameGlobal.appConfig.version) // 输出"1.0.0"
+注意事项
+1. 模块加载采用CommonJS规范
+2. 循环引用可能导致未定义行为
+3. 全局变量应谨慎使用，避免命名冲突
+
+
+渲染
+更新时间 2025-06-16 11:31:18
+
+收藏
+我的收藏
+画布类型说明
+抖音小游戏采用单上屏画布+多离屏画布的设计模式
+// 创建画布对象（首个创建默认为上屏画布）
+const mainCanvas = tt.createCanvas();
+
+// 后续创建均为离屏画布
+const offscreenCanvas1 = tt.createCanvas();
+const offscreenCanvas2 = tt.createCanvas();
+绘图上下文
+通过 Canvas.getContext 可以创建绘图上下文。返回的具体绘图上下文类型可参考 RenderingContext。
+// 获取2D绘图上下文
+const ctx = mainCanvas.getContext('2d');
+
+// 获取WebGL上下文（需基础库1.31.0+）
+const gl = mainCanvas.getContext('webgl');
+锁帧
+使用 tt.setPreferredFramesPerSecond 接口可以实现锁帧
+// 设置目标帧率（30/60fps）
+tt.setPreferredFramesPerSecond(60);
+使用压缩纹理
+抖音小游戏在 Android 及 iOS 平台支持 ETC2、ASTC 纹理压缩(历史支持的 ETC、PVR 格式因维护价值较低不再详细描述)
+
+// 加载压缩纹理示例
+const texture = gl.createTexture();
+gl.compressedTexImage2D(..., texture);

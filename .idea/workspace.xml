@@ -2,8 +2,18 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="842b0837-53e1-475e-965f-f46a59ec03bf" name="Changes" comment="init">
+      <change afterPath="$PROJECT_DIR$/doc.txt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/game.js" beforeDir="false" afterPath="$PROJECT_DIR$/game.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/js/block.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/js/block.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/js/collision.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/js/collision.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/js/config.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/js/config.js" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/js/map-engine.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/js/map-engine.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/js/menu.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/js/menu.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/js/movement.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/js/movement.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/js/utils.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/js/utils.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/map/map1.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/map/map1.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/map/map2.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/map/map2.js" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -55,14 +65,7 @@
       <workItem from="1757141668417" duration="817000" />
       <workItem from="1757160499781" duration="32856000" />
       <workItem from="1757292812096" duration="4412000" />
-      <workItem from="1757349357807" duration="124402000" />
-    </task>
-    <task id="LOCAL-00068" summary="init">
-      <created>1757774043366</created>
-      <option name="number" value="00068" />
-      <option name="presentableId" value="LOCAL-00068" />
-      <option name="project" value="LOCAL" />
-      <updated>1757774043366</updated>
+      <workItem from="1757349357807" duration="126872000" />
     </task>
     <task id="LOCAL-00069" summary="init">
       <created>1757785491512</created>
@@ -400,7 +403,14 @@
       <option name="project" value="LOCAL" />
       <updated>1758546122603</updated>
     </task>
-    <option name="localTasksCounter" value="117" />
+    <task id="LOCAL-00117" summary="init">
+      <created>1758547104297</created>
+      <option name="number" value="00117" />
+      <option name="presentableId" value="LOCAL-00117" />
+      <option name="project" value="LOCAL" />
+      <updated>1758547104298</updated>
+    </task>
+    <option name="localTasksCounter" value="118" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">

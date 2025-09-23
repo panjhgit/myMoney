@@ -3,6 +3,12 @@
  * 核心特性：8*8网格 + 多层结构 + 智能路径规划 + 颜色通关
  */
 
+// 导入依赖
+import { CollisionDetector } from './collision.js';
+import { MovementManager } from './movement.js';
+import { Block, BLOCK_COLORS, BLOCK_TYPES } from './block.js';
+import { GAME_CONFIG, ConfigUtils } from './config.js';
+
 class MapEngine {
     constructor(canvas, ctx, systemInfo) {
         // 基础配置
@@ -262,8 +268,8 @@ class MapEngine {
      * 触发重绘（统一方法）
      */
     triggerRedraw() {
-        if (typeof markNeedsRedraw === 'function') {
-            markNeedsRedraw();
+        if (typeof globalThis.markNeedsRedraw === 'function') {
+            globalThis.markNeedsRedraw();
         }
     }
 
@@ -362,8 +368,8 @@ class MapEngine {
         const timeline = gsap.timeline({
             onUpdate: () => {
                 // 动画进行时持续重绘
-                if (typeof markNeedsRedraw === 'function') {
-                    markNeedsRedraw();
+                if (typeof globalThis.markNeedsRedraw === 'function') {
+                    globalThis.markNeedsRedraw();
                 }
             },
             onComplete: () => {
@@ -1255,6 +1261,17 @@ class MapEngine {
             return;
         }
         
+        // 检查grid是否已初始化和边界检查
+        if (!this.grid || 
+            !this.grid[gridPos.y] || 
+            gridPos.x < 0 || 
+            gridPos.y < 0 || 
+            gridPos.y >= this.grid.length || 
+            gridPos.x >= this.grid[0].length) {
+            console.warn(`[点击错误] 无效的网格坐标: (${gridPos.x}, ${gridPos.y}), grid状态:`, this.grid ? 'initialized' : 'null');
+            return;
+        }
+        
         const gridValue = this.grid[gridPos.y][gridPos.x];
 
         if (gridValue && this.blocks.has(gridValue)) {
@@ -2109,6 +2126,5 @@ class MapEngine {
 
 }
 
-// 导出到全局作用域
-window.MapEngine = MapEngine;
+export { MapEngine };
 
