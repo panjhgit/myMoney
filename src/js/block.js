@@ -346,9 +346,10 @@ class Block {
      * @returns {Array} 格子位置数组
      */
     getCells() {
+        // 🔧 修复：返回相对坐标，避免双重计算
         return this.typeData.blocks.map(block => ({
-            x: this.position.x + block[0],
-            y: this.position.y + block[1]
+            x: block[0],  // 相对坐标
+            y: block[1]   // 相对坐标
         }));
     }
     

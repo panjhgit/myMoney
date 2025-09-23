@@ -418,7 +418,11 @@ class MovementManager {
         const currentCells = block.getCells();
         
         // 检查点击的目标位置是否在方块当前占用的格子中
-        const isClickingOwnCell = currentCells.some(cell => cell.x === targetPos.x && cell.y === targetPos.y);
+        const isClickingOwnCell = currentCells.some(cell => {
+            const cellX = block.position.x + cell.x;
+            const cellY = block.position.y + cell.y;
+            return cellX === targetPos.x && cellY === targetPos.y;
+        });
         if (isClickingOwnCell) {
             return false;
         }
@@ -468,10 +472,12 @@ class MovementManager {
         let minDistance = Infinity;
         
         currentCells.forEach(cell => {
-            const distance = Math.abs(cell.x - clickedPos.x) + Math.abs(cell.y - clickedPos.y);
+            const cellX = blockPos.x + cell.x;
+            const cellY = blockPos.y + cell.y;
+            const distance = Math.abs(cellX - clickedPos.x) + Math.abs(cellY - clickedPos.y);
             if (distance < minDistance) {
                 minDistance = distance;
-                nearestCell = cell;
+                nearestCell = { x: cellX, y: cellY };
             }
         });
         
@@ -523,25 +529,31 @@ class MovementManager {
      * @returns {boolean} 是否有效
      */
     isValidDrag(block, startPos, endPos, gameEngine) {
-        // 检查起始和结束位置是否相邻（拖动应该是相邻移动）
-        const dx = Math.abs(endPos.x - startPos.x);
-        const dy = Math.abs(endPos.y - startPos.y);
-        
-        // 只允许相邻移动（上下左右）
-        if (dx + dy !== 1) {
+        // 检查目标位置是否在游戏区域内
+        if (!gameEngine.collisionDetector.isValidPosition(endPos.x, endPos.y)) {
             return false;
         }
         
-        // 检查目标位置是否有障碍
-        const collisionResult = gameEngine.collisionDetector.checkCollision(
-            block, endPos, gameEngine.grid, 
-            gameEngine.blocks, 
-            gameEngine.rocks, 
-            block.id
-        );
+        // 检查目标位置是否在值为0的区域（游戏区域）
+        if (!gameEngine.boardMatrix) {
+            return false;
+        }
         
-        return !collisionResult.collision;
+        // 检查目标位置在boardMatrix中是否为0（游戏区域）
+        const boardValue = gameEngine.getCellValue(endPos.x, endPos.y);
+        if (boardValue !== 0) {
+            return false; // 不能在非0区域（墙、门、砖块等）
+        }
+        
+        // 检查目标位置是否有其他方块
+        const targetGridValue = gameEngine.grid[endPos.y][endPos.x];
+        if (targetGridValue && targetGridValue !== block.id) {
+            return false;
+        }
+        
+        return true;
     }
+    
 
 
 

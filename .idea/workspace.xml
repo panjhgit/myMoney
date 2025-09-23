@@ -3,14 +3,10 @@
   <component name="ChangeListManager">
     <list default="true" id="842b0837-53e1-475e-965f-f46a59ec03bf" name="Changes" comment="init">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/doc.txt" beforeDir="false" afterPath="$PROJECT_DIR$/doc.txt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/game.js" beforeDir="false" afterPath="$PROJECT_DIR$/game.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/js/gsap.min.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/js/block.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/js/block.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/js/collision.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/js/collision.js" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/js/map-engine.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/js/map-engine.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/js/menu.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/js/menu.js" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/js/movement.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/js/movement.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/js/utils.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/js/utils.js" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -62,14 +58,7 @@
       <workItem from="1757141668417" duration="817000" />
       <workItem from="1757160499781" duration="32856000" />
       <workItem from="1757292812096" duration="4412000" />
-      <workItem from="1757349357807" duration="129622000" />
-    </task>
-    <task id="LOCAL-00071" summary="init">
-      <created>1757821270626</created>
-      <option name="number" value="00071" />
-      <option name="presentableId" value="LOCAL-00071" />
-      <option name="project" value="LOCAL" />
-      <updated>1757821270626</updated>
+      <workItem from="1757349357807" duration="130649000" />
     </task>
     <task id="LOCAL-00072" summary="init">
       <created>1757825410737</created>
@@ -407,7 +396,14 @@
       <option name="project" value="LOCAL" />
       <updated>1758589122197</updated>
     </task>
-    <option name="localTasksCounter" value="120" />
+    <task id="LOCAL-00120" summary="init">
+      <created>1758633431995</created>
+      <option name="number" value="00120" />
+      <option name="presentableId" value="LOCAL-00120" />
+      <option name="project" value="LOCAL" />
+      <updated>1758633431995</updated>
+    </task>
+    <option name="localTasksCounter" value="121" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">

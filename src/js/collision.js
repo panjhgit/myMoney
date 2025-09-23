@@ -39,8 +39,8 @@ class CollisionDetector {
         // 使用 Block 类的方法获取方块格子
         if (block.getCells && typeof block.getCells === 'function') {
             return block.getCells().map(cell => ({
-                x: pos.x + (cell.x - block.position.x),
-                y: pos.y + (cell.y - block.position.y)
+                x: pos.x + cell.x,  // cell 现在是相对坐标
+                y: pos.y + cell.y   // cell 现在是相对坐标
             }));
         }
         

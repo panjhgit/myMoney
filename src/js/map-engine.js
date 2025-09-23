@@ -293,7 +293,9 @@ class MapEngine {
             block.movable = true;
         }
 
-        this.updateGrid();
+        // 🔧 修复：冰块融化后需要重新初始化网格状态
+        console.log(`[冰块融化] 方块 ${block.id} 从第1层显露到第0层，重新初始化网格`);
+        this.reinitializeGrid();
     }
 
     /**
@@ -513,6 +515,9 @@ class MapEngine {
     render() {
         if (!this.ctx) return;
 
+        // 🔧 渲染前进行碰撞检测和状态同步
+        this.validateAndSyncBlockPositions();
+
         // 绘制背景
         this.drawBackground();
 
@@ -539,6 +544,139 @@ class MapEngine {
 
         // 绘制弹窗
         this.drawDialog();
+    }
+
+    /**
+     * 验证并同步方块位置（渲染前碰撞检测）
+     */
+    validateAndSyncBlockPositions() {
+        if (!this.blocks || !this.grid) return;
+
+        // 🔧 修复：只检查第0层的方块（可移动的方块）
+        const topLayerBlocks = this.getBlocksByLayer(0);
+        console.log(`[渲染前检测] 检查 ${topLayerBlocks.length} 个第0层方块`);
+
+        // 检查所有第0层方块的位置是否有效
+        topLayerBlocks.forEach(block => {
+            const pos = block.position;
+            
+            // 🔧 调试：打印方块详细信息
+            console.log(`[调试] 检查方块 ${block.id}:`, {
+                position: pos,
+                blockType: block.blockType,
+                typeData: block.typeData
+            });
+            console.log(`[调试] 方块 ${block.id} 位置: x=${pos.x}, y=${pos.y}`);
+            
+            // 检查边界
+            if (!this.collisionDetector.isValidPosition(pos.x, pos.y)) {
+                console.warn(`[渲染前检测] 方块 ${block.id} 位置超出边界:`, pos);
+                return;
+            }
+            
+            // 检查方块的每个格子是否都在0区域（游戏区域）
+            const cells = block.getCells();
+            console.log(`[调试] 方块 ${block.id} 的格子:`, cells);
+            
+            for (let i = 0; i < cells.length; i++) {
+                const cell = cells[i];
+                const cellX = pos.x + cell.x;
+                const cellY = pos.y + cell.y;
+                
+                console.log(`[调试] 格子${i}: 相对坐标(${cell.x},${cell.y}) + 方块位置(${pos.x},${pos.y}) = 绝对坐标(${cellX},${cellY})`);
+                
+                // 检查边界
+                if (!this.collisionDetector.isValidPosition(cellX, cellY)) {
+                    console.warn(`[渲染前检测] 方块 ${block.id} 格子超出边界:`, { cellX, cellY });
+                    console.warn(`[调试] 边界检查失败详情:`, {
+                        cellX, cellY,
+                        boardWidth: this.boardWidth,
+                        boardHeight: this.boardHeight,
+                        isValidPosition: this.collisionDetector.isValidPosition(cellX, cellY)
+                    });
+                    return;
+                }
+                
+                // 检查是否为0区域（游戏区域）
+                const boardValue = this.getCellValue(cellX, cellY);
+                if (boardValue !== 0) {
+                    console.warn(`[渲染前检测] 方块 ${block.id} 格子不在游戏区域:`, { cellX, cellY }, 'boardValue:', boardValue);
+                    return;
+                }
+            }
+            
+            // 检查网格状态是否一致
+            const gridValue = this.grid[pos.y][pos.x];
+            if (gridValue !== block.id) {
+                console.warn(`[渲染前检测] 方块 ${block.id} 网格状态不一致:`, pos, 'gridValue:', gridValue, 'blockId:', block.id);
+                // 修复网格状态
+                this.grid[pos.y][pos.x] = block.id;
+            }
+        });
+    }
+
+    /**
+     * 重新初始化网格状态（修复初始化问题）
+     */
+    reinitializeGrid() {
+        if (!this.blocks || !this.grid) return;
+
+        console.log('[网格重新初始化] 开始重新初始化网格状态...');
+
+        // 清空网格
+        for (let y = 0; y < this.grid.length; y++) {
+            for (let x = 0; x < this.grid[y].length; x++) {
+                this.grid[y][x] = 0;
+            }
+        }
+
+        // 🔧 修复：只处理第0层的方块（可移动的方块）
+        const topLayerBlocks = this.getBlocksByLayer(0);
+        console.log(`[网格重新初始化] 找到 ${topLayerBlocks.length} 个第0层方块`);
+
+        // 重新设置方块位置
+        topLayerBlocks.forEach(block => {
+            const pos = block.position;
+            
+            // 检查边界
+            if (this.collisionDetector.isValidPosition(pos.x, pos.y)) {
+                // 检查方块的每个格子是否都在0区域（游戏区域）
+                const cells = block.getCells();
+                let canPlace = true;
+                
+                for (const cell of cells) {
+                    const cellX = pos.x + cell.x;
+                    const cellY = pos.y + cell.y;
+                    
+                    // 检查边界
+                    if (!this.collisionDetector.isValidPosition(cellX, cellY)) {
+                        console.warn(`[网格重新初始化] 方块 ${block.id} 格子超出边界:`, { cellX, cellY });
+                        canPlace = false;
+                        break;
+                    }
+                    
+                    // 检查是否为0区域（游戏区域）
+                    const boardValue = this.getCellValue(cellX, cellY);
+                    if (boardValue !== 0) {
+                        console.warn(`[网格重新初始化] 方块 ${block.id} 格子不在游戏区域:`, { cellX, cellY }, 'boardValue:', boardValue);
+                        canPlace = false;
+                        break;
+                    }
+                }
+                
+                if (canPlace) {
+                    // 设置网格状态
+                    this.grid[pos.y][pos.x] = block.id;
+                    console.log(`[网格重新初始化] 方块 ${block.id} 位置设置成功:`, pos);
+                } else {
+                    console.warn(`[网格重新初始化] 方块 ${block.id} 无法放置，跳过`);
+                }
+            } else {
+                console.warn(`[网格重新初始化] 方块 ${block.id} 位置超出边界:`, pos);
+            }
+        });
+
+        console.log('[网格重新初始化] 网格状态重新初始化完成');
     }
 
     /**
@@ -1632,7 +1770,10 @@ class MapEngine {
         const endGridPos = this.screenToGrid(endX, endY);
 
         console.log('[拖动调试] 屏幕坐标:', {startX, startY, endX, endY});
-        console.log('[拖动调试] 网格坐标:', {startGridPos, endGridPos});
+        console.log('[拖动调试] 网格坐标:', {
+            startGridPos: {x: startGridPos.x, y: startGridPos.y},
+            endGridPos: {x: endGridPos.x, y: endGridPos.y}
+        });
 
         // 检查起始位置是否有方块
         if (!this.collisionDetector.isValidPosition(startGridPos.x, startGridPos.y)) {
@@ -1659,26 +1800,13 @@ class MapEngine {
 
         console.log('[拖动调试] 移动距离:', {dx, dy, distance, isAdjacent: distance === 1});
 
-        // 检查目标位置是否在游戏区域内
-        if (!this.collisionDetector.isValidPosition(endGridPos.x, endGridPos.y)) {
-            console.warn('[拖动调试] 目标位置超出游戏区域:', endGridPos);
-            return;
-        }
-
-        // 检查目标位置是否有其他方块
-        const targetGridValue = this.grid[endGridPos.y][endGridPos.x];
-        if (targetGridValue && targetGridValue !== draggedBlock.id) {
-            console.warn('[拖动调试] 目标位置已有其他方块:', targetGridValue);
-            return;
-        }
-
-        // 检查拖动是否有效（相邻移动且无障碍）
+        // 检查拖动是否有效（在碰撞检测范围内自由拖动）
         if (this.movementManager.isValidDrag(draggedBlock, startGridPos, endGridPos, this)) {
             // 执行拖动移动
             this.movementManager.dragMove(draggedBlock, startGridPos, endGridPos, this);
             console.log('[拖动调试] 拖动成功');
         } else {
-            console.warn('拖动无效：不能跨过障碍或移动距离过远');
+            console.warn('拖动无效：目标位置有障碍或超出游戏区域');
         }
     }
 
@@ -1732,9 +1860,88 @@ class MapEngine {
      * @param {number} y - Y坐标
      */
     handleMouseMove(x, y) {
-        if (this.isDragging && this.dragStartPos) {
-            // 可以在这里添加拖动预览效果
-            // 比如高亮目标位置或显示移动路径
+        if (this.isDragging && this.selectedBlock) {
+            // 实时跟随拖动：方块逐步移动到触摸位置
+            const gridPos = this.screenToGrid(x, y);
+            const currentPos = this.selectedBlock.position;
+            
+            console.log('[逐步移动调试] 当前位置:', currentPos, '目标位置:', gridPos);
+            
+            // 计算移动方向（只能上下左右移动一个格子）
+            const dx = gridPos.x - currentPos.x;
+            const dy = gridPos.y - currentPos.y;
+            
+            console.log('[逐步移动调试] 移动方向:', { dx, dy });
+            
+            // 如果移动距离超过1个格子，只移动一个格子
+            let nextX = currentPos.x;
+            let nextY = currentPos.y;
+            
+            if (Math.abs(dx) > 0) {
+                nextX = currentPos.x + (dx > 0 ? 1 : -1);
+            } else if (Math.abs(dy) > 0) {
+                nextY = currentPos.y + (dy > 0 ? 1 : -1);
+            }
+            
+            console.log('[逐步移动调试] 下一个位置:', { nextX, nextY });
+            
+            // 检查下一个位置是否有效
+            if (this.collisionDetector.isValidPosition(nextX, nextY)) {
+                // 检查方块的每个格子是否都在0区域（游戏区域）
+                const cells = this.selectedBlock.getCells();
+                let canMove = true;
+                
+                for (const cell of cells) {
+                    const cellX = nextX + cell.x;
+                    const cellY = nextY + cell.y;
+                    
+                    // 检查边界
+                    if (!this.collisionDetector.isValidPosition(cellX, cellY)) {
+                        console.log('[逐步移动调试] 方块格子超出边界:', { cellX, cellY });
+                        canMove = false;
+                        break;
+                    }
+                    
+                    // 检查是否为0区域（游戏区域）
+                    const boardValue = this.getCellValue(cellX, cellY);
+                    if (boardValue !== 0) {
+                        console.log('[逐步移动调试] 方块格子不在游戏区域:', { cellX, cellY }, 'boardValue:', boardValue);
+                        canMove = false;
+                        break;
+                    }
+                    
+                    // 检查是否有其他方块占据
+                    const gridValue = this.grid[cellY][cellX];
+                    if (gridValue && gridValue !== this.selectedBlock.id) {
+                        console.log('[逐步移动调试] 方块格子被其他方块占据:', { cellX, cellY }, 'gridValue:', gridValue);
+                        canMove = false;
+                        break;
+                    }
+                }
+                
+                if (canMove) {
+                    console.log('[逐步移动调试] 开始移动到:', { nextX, nextY });
+                    
+                    // 临时清除当前方块在网格中的位置
+                    this.grid[currentPos.y][currentPos.x] = 0;
+                    
+                    // 更新方块位置
+                    this.selectedBlock.position.x = nextX;
+                    this.selectedBlock.position.y = nextY;
+                    
+                    // 更新网格中的方块位置
+                    this.grid[nextY][nextX] = this.selectedBlock.id;
+                    
+                    // 触发重绘
+                    this.triggerRedraw();
+                    
+                    console.log('[逐步移动调试] 移动完成，新位置:', this.selectedBlock.position);
+                } else {
+                    console.log('[逐步移动调试] 移动被阻止，存在碰撞');
+                }
+            } else {
+                console.log('[逐步移动调试] 下一个位置超出边界');
+            }
         }
     }
 
@@ -1744,19 +1951,25 @@ class MapEngine {
      * @param {number} y - Y坐标
      */
     handleMouseUp(x, y) {
-        if (this.isDragging && this.dragStartPos && this.selectedBlock) {
-            const endGridPos = this.screenToGrid(x, y);
-
-            // 检查是否移动到了不同的格子
-            if (endGridPos.x !== this.dragStartPos.x || endGridPos.y !== this.dragStartPos.y) {
-                // 执行拖动移动
-                this.handleDrag(this.dragStartScreenPos.x, this.dragStartScreenPos.y, x, y);
-            }
-
+        if (this.isDragging && this.selectedBlock) {
+            // 实时拖动模式下，方块位置已经在handleMouseMove中更新
+            // 这里只需要更新网格状态
+            
+            // 更新网格以反映方块的新位置
+            this.updateGrid();
+            
+            // 处理冰块逻辑
+            this.processIceBlocks(this.selectedBlock);
+            
+            // 检查是否通过门
+            this.checkGateExit(this.selectedBlock);
+            
             // 重置拖动状态，但保持选中状态
             this.isDragging = false;
             this.dragStartPos = null;
             this.dragStartScreenPos = null;
+            
+            console.log('[拖动完成] 方块位置已更新:', this.selectedBlock.position);
         }
     }
 
