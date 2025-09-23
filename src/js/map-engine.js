@@ -563,7 +563,7 @@ class MapEngine {
             // 🔧 调试：打印方块详细信息
             console.log(`[调试] 检查方块 ${block.id}:`, {
                 position: pos,
-                blockType: block.blockType,
+                type: block.type,
                 typeData: block.typeData
             });
             console.log(`[调试] 方块 ${block.id} 位置: x=${pos.x}, y=${pos.y}`);
