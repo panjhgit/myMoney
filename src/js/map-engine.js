@@ -30,6 +30,10 @@ class MapEngine {
         this.gameState = 'ready';
         this.selectedBlock = null;
         this.currentLevel = 1;
+        this.lastMoveTime = 0; // 🔧 移动时间限制
+        this.lastAStarTime = 0; // 🔧 A*算法调用时间限制
+        this.cachedOptimalPosition = null; // 🔧 缓存的最优位置
+        this.cachedTargetPosition = null; // 🔧 缓存的目标位置
 
         // 渲染相关
         this.ctx = null;
@@ -1855,93 +1859,266 @@ class MapEngine {
     }
 
     /**
-     * 处理鼠标移动事件
+     * 🔧 重构：智能触摸移动系统
      * @param {number} x - X坐标
      * @param {number} y - Y坐标
      */
     handleMouseMove(x, y) {
-        if (this.isDragging && this.selectedBlock) {
-            // 实时跟随拖动：方块逐步移动到触摸位置
-            const gridPos = this.screenToGrid(x, y);
-            const currentPos = this.selectedBlock.position;
+        if (!this.isDragging || !this.selectedBlock) {
+            return;
+        }
+
+        const now = Date.now();
+        
+        // 频率限制：避免过于频繁的移动
+        if (this.lastMoveTime && (now - this.lastMoveTime) < 100) {
+            return;
+        }
+
+        const gridPos = this.screenToGrid(x, y);
+        const currentPos = this.selectedBlock.position;
+
+        // 如果触摸位置没有变化，跳过处理
+        if (gridPos.x === currentPos.x && gridPos.y === currentPos.y) {
+            return;
+        }
+
+        // 计算下一步最佳移动
+        const nextMove = this.calculateBestMove(currentPos, gridPos, now);
+        
+        if (nextMove && this.executeMove(currentPos, nextMove)) {
+            this.lastMoveTime = now;
+        }
+    }
+
+    /**
+     * 🔧 新增：计算最佳移动方向
+     * @param {Object} currentPos - 当前位置
+     * @param {Object} targetPos - 目标位置
+     * @param {number} timestamp - 时间戳
+     * @returns {Object|null} 下一步移动位置
+     */
+    calculateBestMove(currentPos, targetPos, timestamp) {
+        // 1. 简单情况：检查直接移动
+        const directMove = this.getDirectMove(currentPos, targetPos);
+        if (directMove && this.isValidMovePosition(directMove.x, directMove.y, this.selectedBlock)) {
+            return directMove;
+        }
+
+        // 2. 复杂情况：使用智能路径规划
+        const optimalPos = this.getOptimalPosition(currentPos, targetPos, timestamp);
+        if (!optimalPos) {
+            return null;
+        }
+
+        // 3. 计算朝向最优位置的一步移动
+        return this.getStepTowardsTarget(currentPos, optimalPos);
+    }
+
+    /**
+     * 🔧 新增：获取直接移动（优先级最高）
+     * @param {Object} current - 当前位置
+     * @param {Object} target - 目标位置
+     * @returns {Object|null} 直接移动位置
+     */
+    getDirectMove(current, target) {
+        const dx = target.x - current.x;
+        const dy = target.y - current.y;
+
+        // 只允许单步移动
+        if (Math.abs(dx) === 1 && dy === 0) {
+            return { x: target.x, y: current.y };
+        }
+        if (Math.abs(dy) === 1 && dx === 0) {
+            return { x: current.x, y: target.y };
+        }
+
+        // 选择主要方向
+        if (Math.abs(dx) >= Math.abs(dy) && dx !== 0) {
+            return { x: current.x + (dx > 0 ? 1 : -1), y: current.y };
+        }
+        if (Math.abs(dy) > Math.abs(dx) && dy !== 0) {
+            return { x: current.x, y: current.y + (dy > 0 ? 1 : -1) };
+        }
+
+        return null;
+    }
+
+    /**
+     * 🔧 新增：获取最优位置（使用缓存和A*）
+     * @param {Object} current - 当前位置
+     * @param {Object} target - 目标位置
+     * @param {number} timestamp - 时间戳
+     * @returns {Object|null} 最优位置
+     */
+    getOptimalPosition(current, target, timestamp) {
+        // 检查是否需要重新计算
+        if (this.shouldRecalculateOptimalPosition(target, timestamp)) {
+            const optimal = this.findOptimalPosition(current, target, this.selectedBlock);
+            this.updateOptimalPositionCache(target, optimal, timestamp);
+            return optimal;
+        }
+
+        return this.cachedOptimalPosition;
+    }
+
+    /**
+     * 🔧 新增：判断是否需要重新计算最优位置
+     * @param {Object} target - 目标位置
+     * @param {number} timestamp - 时间戳
+     * @returns {boolean} 是否需要重新计算
+     */
+    shouldRecalculateOptimalPosition(target, timestamp) {
+        // 1. 没有缓存
+        if (!this.cachedOptimalPosition || !this.cachedTargetPosition) {
+            return true;
+        }
+
+        // 2. 目标位置显著变化
+        const dx = Math.abs(target.x - this.cachedTargetPosition.x);
+        const dy = Math.abs(target.y - this.cachedTargetPosition.y);
+        if (dx > 2 || dy > 2) {
+            return true;
+        }
+
+        // 3. 时间超时（降低频率）
+        if (timestamp - this.lastAStarTime > 500) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * 🔧 新增：更新最优位置缓存
+     * @param {Object} target - 目标位置
+     * @param {Object} optimal - 最优位置
+     * @param {number} timestamp - 时间戳
+     */
+    updateOptimalPositionCache(target, optimal, timestamp) {
+        this.cachedTargetPosition = { x: target.x, y: target.y };
+        this.cachedOptimalPosition = optimal;
+        this.lastAStarTime = timestamp;
+    }
+
+    /**
+     * 🔧 新增：计算朝向目标的一步移动
+     * @param {Object} current - 当前位置
+     * @param {Object} target - 目标位置
+     * @returns {Object|null} 下一步位置
+     */
+    getStepTowardsTarget(current, target) {
+        if (!target) return null;
+
+        const dx = target.x - current.x;
+        const dy = target.y - current.y;
+
+        // 生成候选移动
+        const candidates = [];
+
+        // 主要方向
+        if (dx !== 0) {
+            candidates.push({
+                x: current.x + (dx > 0 ? 1 : -1),
+                y: current.y,
+                priority: 1,
+                distance: Math.abs(dx - (dx > 0 ? 1 : -1)) + Math.abs(dy)
+            });
+        }
+        if (dy !== 0) {
+            candidates.push({
+                x: current.x,
+                y: current.y + (dy > 0 ? 1 : -1),
+                priority: 1,
+                distance: Math.abs(dx) + Math.abs(dy - (dy > 0 ? 1 : -1))
+            });
+        }
+
+        // 备选方向
+        const directions = [
+            { x: 1, y: 0 }, { x: -1, y: 0 }, { x: 0, y: 1 }, { x: 0, y: -1 }
+        ];
+
+        for (const dir of directions) {
+            const newPos = { x: current.x + dir.x, y: current.y + dir.y };
+            const distance = Math.abs(target.x - newPos.x) + Math.abs(target.y - newPos.y);
             
-            console.log('[逐步移动调试] 当前位置:', currentPos, '目标位置:', gridPos);
-            
-            // 计算移动方向（只能上下左右移动一个格子）
-            const dx = gridPos.x - currentPos.x;
-            const dy = gridPos.y - currentPos.y;
-            
-            console.log('[逐步移动调试] 移动方向:', { dx, dy });
-            
-            // 如果移动距离超过1个格子，只移动一个格子
-            let nextX = currentPos.x;
-            let nextY = currentPos.y;
-            
-            if (Math.abs(dx) > 0) {
-                nextX = currentPos.x + (dx > 0 ? 1 : -1);
-            } else if (Math.abs(dy) > 0) {
-                nextY = currentPos.y + (dy > 0 ? 1 : -1);
+            if (!candidates.find(c => c.x === newPos.x && c.y === newPos.y)) {
+                candidates.push({
+                    x: newPos.x,
+                    y: newPos.y,
+                    priority: 2,
+                    distance: distance
+                });
+            }
+        }
+
+        // 按优先级和距离排序
+        candidates.sort((a, b) => {
+            if (a.priority !== b.priority) return a.priority - b.priority;
+            return a.distance - b.distance;
+        });
+
+        // 选择第一个有效移动
+        for (const candidate of candidates) {
+            if (this.isValidMovePosition(candidate.x, candidate.y, this.selectedBlock)) {
+                return { x: candidate.x, y: candidate.y };
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * 🔧 新增：执行移动操作
+     * @param {Object} currentPos - 当前位置
+     * @param {Object} nextPos - 下一步位置
+     * @returns {boolean} 移动是否成功
+     */
+    executeMove(currentPos, nextPos) {
+        // 最终安全检查
+        if (!this.isValidMovePosition(nextPos.x, nextPos.y, this.selectedBlock)) {
+            return false;
+        }
+
+        // 执行移动
+        try {
+            // 🔧 修复：清除方块所有格子的当前位置
+            const oldCells = this.selectedBlock.getCells();
+            for (const cell of oldCells) {
+                const cellX = currentPos.x + cell.x;
+                const cellY = currentPos.y + cell.y;
+                if (this.grid[cellY] && this.grid[cellY][cellX] === this.selectedBlock.id) {
+                    this.grid[cellY][cellX] = 0;
+                }
             }
             
-            console.log('[逐步移动调试] 下一个位置:', { nextX, nextY });
+            // 更新方块位置
+            this.selectedBlock.position.x = nextPos.x;
+            this.selectedBlock.position.y = nextPos.y;
             
-            // 检查下一个位置是否有效
-            if (this.collisionDetector.isValidPosition(nextX, nextY)) {
-                // 检查方块的每个格子是否都在0区域（游戏区域）
-                const cells = this.selectedBlock.getCells();
-                let canMove = true;
-                
-                for (const cell of cells) {
-                    const cellX = nextX + cell.x;
-                    const cellY = nextY + cell.y;
-                    
-                    // 检查边界
-                    if (!this.collisionDetector.isValidPosition(cellX, cellY)) {
-                        console.log('[逐步移动调试] 方块格子超出边界:', { cellX, cellY });
-                        canMove = false;
-                        break;
-                    }
-                    
-                    // 检查是否为0区域（游戏区域）
-                    const boardValue = this.getCellValue(cellX, cellY);
-                    if (boardValue !== 0) {
-                        console.log('[逐步移动调试] 方块格子不在游戏区域:', { cellX, cellY }, 'boardValue:', boardValue);
-                        canMove = false;
-                        break;
-                    }
-                    
-                    // 检查是否有其他方块占据
-                    const gridValue = this.grid[cellY][cellX];
-                    if (gridValue && gridValue !== this.selectedBlock.id) {
-                        console.log('[逐步移动调试] 方块格子被其他方块占据:', { cellX, cellY }, 'gridValue:', gridValue);
-                        canMove = false;
-                        break;
-                    }
-                }
-                
-                if (canMove) {
-                    console.log('[逐步移动调试] 开始移动到:', { nextX, nextY });
-                    
-                    // 临时清除当前方块在网格中的位置
-                    this.grid[currentPos.y][currentPos.x] = 0;
-                    
-                    // 更新方块位置
-                    this.selectedBlock.position.x = nextX;
-                    this.selectedBlock.position.y = nextY;
-                    
-                    // 更新网格中的方块位置
-                    this.grid[nextY][nextX] = this.selectedBlock.id;
-                    
-                    // 触发重绘
-                    this.triggerRedraw();
-                    
-                    console.log('[逐步移动调试] 移动完成，新位置:', this.selectedBlock.position);
-                } else {
-                    console.log('[逐步移动调试] 移动被阻止，存在碰撞');
-                }
-            } else {
-                console.log('[逐步移动调试] 下一个位置超出边界');
+            // 🔧 修复：更新方块所有格子的新位置
+            const newCells = this.selectedBlock.getCells();
+            for (const cell of newCells) {
+                const cellX = nextPos.x + cell.x;
+                const cellY = nextPos.y + cell.y;
+                this.grid[cellY][cellX] = this.selectedBlock.id;
             }
+            
+            // 验证移动结果
+            if (!this.validateMoveResult(nextPos.x, nextPos.y)) {
+                this.rollbackMove(currentPos, nextPos.x, nextPos.y);
+                return false;
+            }
+            
+            // 触发重绘
+            this.triggerRedraw();
+            return true;
+            
+        } catch (error) {
+            console.error('[移动] 执行移动时发生错误:', error);
+            this.rollbackMove(currentPos, nextPos.x, nextPos.y);
+            return false;
         }
     }
 
@@ -2236,6 +2413,425 @@ class MapEngine {
 
         // 只有值为0的位置才是可移动的游戏区域
         return value === GAME_CONFIG.BOARD_SYSTEM.ELEMENT_TYPES.BOARD;
+    }
+
+    /**
+     * 🔧 修复：严格检查方块是否可以移动到指定位置（包含方块间重叠检测）
+     * @param {number} x - X坐标
+     * @param {number} y - Y坐标
+     * @param {Block} block - 要移动的方块
+     * @returns {boolean} 是否可以移动
+     */
+    isValidMovePosition(x, y, block) {
+        if (!this.boardMatrix) return false;
+
+        // 基本边界检查
+        if (x < 0 || x >= this.boardWidth || y < 0 || y >= this.boardHeight) {
+            return false;
+        }
+
+        // 检查方块的所有格子是否都在有效区域内且不与其他方块重叠
+        const cells = block.getCells();
+        for (const cell of cells) {
+            const cellX = x + cell.x;
+            const cellY = y + cell.y;
+            
+            // 1. 检查边界
+            if (cellX < 0 || cellX >= this.boardWidth || cellY < 0 || cellY >= this.boardHeight) {
+                return false;
+            }
+            
+            // 2. 检查是否为0区域（游戏区域）
+            const boardValue = this.getCellValue(cellX, cellY);
+            if (boardValue !== 0) {
+                return false;
+            }
+
+            // 🔧 3. 严格检查方块间重叠（核心规则）
+            const gridValue = this.grid[cellY] && this.grid[cellY][cellX];
+            if (gridValue && gridValue !== block.id) {
+                // 发现方块重叠，记录详细信息
+                console.log(`[重叠检测] 方块 ${block.id} 无法移动到 (${x},${y})，格子 (${cellX},${cellY}) 被方块 ${gridValue} 占据`);
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * 🔧 优化：A*路径规划算法，找到最优可达位置
+     * @param {Object} start - 起始位置 {x, y}
+     * @param {Object} target - 目标位置 {x, y}
+     * @param {Block} block - 要移动的方块
+     * @returns {Object|null} 最优可达位置 {x, y} 或 null
+     */
+    findOptimalPosition(start, target, block) {
+        // 边界检查：验证起始和目标位置
+        if (!this.isValidMovePosition(start.x, start.y, block)) {
+            console.warn(`[A*路径] 起始位置无效: (${start.x}, ${start.y})`);
+            return null;
+        }
+        
+        if (!this.isValidMovePosition(target.x, target.y, block)) {
+            console.warn(`[A*路径] 目标位置无效: (${target.x}, ${target.y})`);
+            // 目标位置无效，但继续寻找最优可达位置
+        }
+
+        const openList = [];
+        const closedList = new Set();
+        let bestNode = null; // 记录最接近目标的节点
+
+        const startNode = {
+            position: start, 
+            g: 0, 
+            h: this.calculateHeuristic(start, target), 
+            f: 0, 
+            parent: null
+        };
+        startNode.f = startNode.g + startNode.h;
+        openList.push(startNode);
+        bestNode = startNode; // 初始最佳节点
+
+        while (openList.length > 0) {
+            // 优化性能：更高效地找到f值最小的节点
+            let currentIndex = 0;
+            let minF = openList[0].f;
+            for (let i = 1; i < openList.length; i++) {
+                if (openList[i].f < minF) {
+                    minF = openList[i].f;
+                    currentIndex = i;
+                }
+            }
+
+            const currentNode = openList.splice(currentIndex, 1)[0];
+            const currentPos = currentNode.position;
+            const currentKey = `${currentPos.x},${currentPos.y}`;
+
+            closedList.add(currentKey);
+
+            // 如果到达目标
+            if (currentPos.x === target.x && currentPos.y === target.y) {
+                console.log(`[A*路径] 成功找到路径: 从 (${start.x},${start.y}) 到 (${target.x},${target.y})`);
+                return target;
+            }
+
+            // 修复最佳节点选择逻辑：根据移动方向选择最佳对齐的节点
+            if (this.isBetterNode(currentNode, bestNode, start, target)) {
+                bestNode = currentNode;
+            }
+
+            // 检查四个方向
+            const directions = [
+                { dx: 0, dy: -1 }, // 上
+                { dx: 0, dy: 1 },  // 下
+                { dx: -1, dy: 0 }, // 左
+                { dx: 1, dy: 0 }   // 右
+            ];
+
+            for (const dir of directions) {
+                const newX = currentPos.x + dir.dx;
+                const newY = currentPos.y + dir.dy;
+                const newPos = {x: newX, y: newY};
+                const newKey = `${newX},${newY}`;
+
+                if (closedList.has(newKey)) continue;
+                // isValidMovePosition 已经包含完整的重叠检测，无需重复检查
+                if (!this.isValidMovePosition(newX, newY, block)) continue;
+
+                const tentativeG = currentNode.g + 1;
+
+                // 检查是否已在开放列表中
+                let existingNode = null;
+                for (let i = 0; i < openList.length; i++) {
+                    if (openList[i].position.x === newX && openList[i].position.y === newY) {
+                        existingNode = openList[i];
+                        break;
+                    }
+                }
+
+                if (existingNode) {
+                    if (tentativeG < existingNode.g) {
+                        existingNode.g = tentativeG;
+                        existingNode.f = existingNode.g + existingNode.h;
+                        existingNode.parent = currentNode;
+                    }
+                } else {
+                    const newNode = {
+                        position: newPos,
+                        g: tentativeG,
+                        h: this.calculateHeuristic(newPos, target),
+                        f: 0,
+                        parent: currentNode
+                    };
+                    newNode.f = newNode.g + newNode.h;
+                    openList.push(newNode);
+                }
+            }
+        }
+
+        // 如果无法到达目标，返回能到达的最远位置的路径
+        if (bestNode && bestNode !== startNode) {
+            const direction = this.getMainDirection(start, target);
+            const score = this.calculateDirectionalScore(bestNode, direction, target);
+            console.log(`[A*路径] 无法到达目标，返回最佳路径: 从 (${start.x},${start.y}) 到 (${bestNode.position.x},${bestNode.position.y})`);
+            console.log(`[A*路径] 移动方向: ${direction}, 方向得分: ${score}, h值: ${bestNode.h}, g值: ${bestNode.g}`);
+            return bestNode.position;
+        }
+
+        console.log(`[A*路径] 无法找到任何有效路径: 从 (${start.x},${start.y}) 到 (${target.x},${target.y})`);
+        return null;
+    }
+
+    /**
+     * 🔧 优化：计算启发式函数（曼哈顿距离）
+     */
+    calculateHeuristic(pos1, pos2) {
+        return Math.abs(pos1.x - pos2.x) + Math.abs(pos1.y - pos2.y);
+    }
+
+    /**
+     * 🔧 优化：判断节点是否更好（用于最佳节点选择）
+     * 根据移动方向选择最佳对齐的节点
+     */
+    isBetterNode(node, bestNode, startPos, targetPos) {
+        if (!bestNode) return true;
+        
+        // 计算主要移动方向
+        const direction = this.getMainDirection(startPos, targetPos);
+        
+        // 根据方向选择最佳节点
+        const nodeScore = this.calculateDirectionalScore(node, direction, targetPos);
+        const bestScore = this.calculateDirectionalScore(bestNode, direction, targetPos);
+        
+        // 优先选择方向得分更高的节点
+        if (nodeScore > bestScore) {
+            return true;
+        }
+        
+        // 如果方向得分相同，优先考虑启发式值(h值) - 距离目标更近
+        if (nodeScore === bestScore) {
+            if (node.h < bestNode.h) {
+                return true;
+            }
+            
+            // 如果启发式值相同，选择实际成本更低的节点(g值更小)
+            if (node.h === bestNode.h && node.g < bestNode.g) {
+                return true;
+            }
+        }
+        
+        return false;
+    }
+    
+    /**
+     * 🔧 优化：获取主要移动方向
+     */
+    getMainDirection(startPos, targetPos) {
+        const dx = targetPos.x - startPos.x;
+        const dy = targetPos.y - startPos.y;
+        
+        // 判断主要方向（绝对值较大的方向）
+        if (Math.abs(dx) > Math.abs(dy)) {
+            return dx > 0 ? 'right' : 'left';
+        } else if (Math.abs(dy) > Math.abs(dx)) {
+            return dy > 0 ? 'down' : 'up';
+        } else {
+            // 对角线移动，根据具体情况选择
+            if (dx > 0 && dy > 0) return 'down-right';
+            if (dx > 0 && dy < 0) return 'up-right';
+            if (dx < 0 && dy > 0) return 'down-left';
+            if (dx < 0 && dy < 0) return 'up-left';
+        }
+        
+        return 'none';
+    }
+    
+    /**
+     * 🔧 优化：计算基于方向的节点得分
+     */
+    calculateDirectionalScore(node, direction, targetPos) {
+        const pos = node.position;
+        let score = 0;
+        
+        // 基础得分：距离目标越近得分越高
+        const distance = this.calculateHeuristic(pos, targetPos);
+        score += Math.max(0, 20 - distance); // 距离得分
+        
+        // 方向对齐得分：根据移动方向给予额外得分
+        switch (direction) {
+            case 'up':
+                // 向上移动：y坐标越小（越靠上）得分越高
+                score += Math.max(0, 10 - pos.y);
+                break;
+            case 'down':
+                // 向下移动：y坐标越大（越靠下）得分越高
+                score += pos.y;
+                break;
+            case 'left':
+                // 向左移动：x坐标越小（越靠左）得分越高
+                score += Math.max(0, 10 - pos.x);
+                break;
+            case 'right':
+                // 向右移动：x坐标越大（越靠右）得分越高
+                score += pos.x;
+                break;
+            case 'up-left':
+                // 左上移动：x和y都越小得分越高
+                score += Math.max(0, 10 - pos.x) + Math.max(0, 10 - pos.y);
+                break;
+            case 'up-right':
+                // 右上移动：x越大，y越小得分越高
+                score += pos.x + Math.max(0, 10 - pos.y);
+                break;
+            case 'down-left':
+                // 左下移动：x越小，y越大得分越高
+                score += Math.max(0, 10 - pos.x) + pos.y;
+                break;
+            case 'down-right':
+                // 右下移动：x和y都越大得分越高
+                score += pos.x + pos.y;
+                break;
+        }
+        
+        return score;
+    }
+
+    /**
+     * 🔧 新增：智能判断是否需要调用A*算法
+     * @param {Object} currentPos - 当前位置
+     * @param {Object} targetPos - 目标位置
+     * @param {number} now - 当前时间
+     * @returns {boolean} 是否需要调用A*算法
+     */
+    shouldCallAStarAlgorithm(currentPos, targetPos, now) {
+        // 1. 时间限制：A*算法调用间隔至少300ms
+        if (this.lastAStarTime && (now - this.lastAStarTime) < 300) {
+            return false;
+        }
+        
+        // 2. 目标位置变化：如果目标位置没有变化，使用缓存
+        if (this.cachedTargetPosition && 
+            this.cachedTargetPosition.x === targetPos.x && 
+            this.cachedTargetPosition.y === targetPos.y) {
+            return false;
+        }
+        
+        // 3. 距离变化：如果目标位置变化很小，使用缓存
+        if (this.cachedTargetPosition) {
+            const dx = Math.abs(targetPos.x - this.cachedTargetPosition.x);
+            const dy = Math.abs(targetPos.y - this.cachedTargetPosition.y);
+            if (dx <= 1 && dy <= 1) {
+                return false;
+            }
+        }
+        
+        // 4. 简单路径检查：如果直线路径可达，不需要A*
+        if (this.isDirectPathReachable(currentPos, targetPos)) {
+            return false;
+        }
+        
+        return true;
+    }
+
+    /**
+     * 🔧 新增：检查直线路径是否可达
+     * @param {Object} start - 起始位置
+     * @param {Object} target - 目标位置
+     * @returns {boolean} 直线路径是否可达
+     */
+    isDirectPathReachable(start, target) {
+        const dx = target.x - start.x;
+        const dy = target.y - start.y;
+        
+        // 如果距离很近，直接检查
+        if (Math.abs(dx) <= 1 && Math.abs(dy) <= 1) {
+            return this.isValidMovePosition(target.x, target.y, this.selectedBlock);
+        }
+        
+        // 检查直线路径上的障碍物
+        const steps = Math.max(Math.abs(dx), Math.abs(dy));
+        const stepX = dx / steps;
+        const stepY = dy / steps;
+        
+        for (let i = 1; i <= steps; i++) {
+            const checkX = Math.round(start.x + stepX * i);
+            const checkY = Math.round(start.y + stepY * i);
+            
+            if (!this.isValidMovePosition(checkX, checkY, this.selectedBlock)) {
+                return false;
+            }
+        }
+        
+        return true;
+    }
+
+    /**
+     * 🔧 新增：验证移动结果
+     * @param {number} x - 移动后的X坐标
+     * @param {number} y - 移动后的Y坐标
+     * @returns {boolean} 移动结果是否有效
+     */
+    validateMoveResult(x, y) {
+        if (!this.selectedBlock) return false;
+        
+        const cells = this.selectedBlock.getCells();
+        for (const cell of cells) {
+            const cellX = x + cell.x;
+            const cellY = y + cell.y;
+            
+            // 检查网格状态是否一致
+            if (this.grid[cellY][cellX] !== this.selectedBlock.id) {
+                console.error('[移动验证] 网格状态不一致:', {
+                    position: { cellX, cellY },
+                    expected: this.selectedBlock.id,
+                    actual: this.grid[cellY][cellX]
+                });
+                return false;
+            }
+        }
+        
+        return true;
+    }
+
+    /**
+     * 🔧 新增：回滚移动操作
+     * @param {Object} originalPos - 原始位置
+     * @param {number} failedX - 失败的X坐标
+     * @param {number} failedY - 失败的Y坐标
+     */
+    rollbackMove(originalPos, failedX, failedY) {
+        if (!this.selectedBlock) return;
+        
+        try {
+            // 🔧 修复：清除失败位置的所有格子
+            const currentCells = this.selectedBlock.getCells();
+            for (const cell of currentCells) {
+                const cellX = this.selectedBlock.position.x + cell.x;
+                const cellY = this.selectedBlock.position.y + cell.y;
+                if (this.grid[cellY] && this.grid[cellY][cellX] === this.selectedBlock.id) {
+                    this.grid[cellY][cellX] = 0;
+                }
+            }
+            
+            // 恢复原始位置
+            this.selectedBlock.position.x = originalPos.x;
+            this.selectedBlock.position.y = originalPos.y;
+            
+            // 🔧 修复：恢复原始位置的所有格子
+            const originalCells = this.selectedBlock.getCells();
+            for (const cell of originalCells) {
+                const cellX = originalPos.x + cell.x;
+                const cellY = originalPos.y + cell.y;
+                if (this.grid[cellY] && this.grid[cellY][cellX] !== undefined) {
+                    this.grid[cellY][cellX] = this.selectedBlock.id;
+                }
+            }
+            
+            console.log('[回滚] 已恢复到原始位置:', originalPos);
+        } catch (error) {
+            console.error('[回滚] 回滚操作失败:', error);
+        }
     }
 }
 

@@ -3,10 +3,7 @@
   <component name="ChangeListManager">
     <list default="true" id="842b0837-53e1-475e-965f-f46a59ec03bf" name="Changes" comment="init">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/js/block.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/js/block.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/js/collision.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/js/collision.js" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/js/map-engine.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/js/map-engine.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/js/movement.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/js/movement.js" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -58,21 +55,7 @@
       <workItem from="1757141668417" duration="817000" />
       <workItem from="1757160499781" duration="32856000" />
       <workItem from="1757292812096" duration="4412000" />
-      <workItem from="1757349357807" duration="130649000" />
-    </task>
-    <task id="LOCAL-00072" summary="init">
-      <created>1757825410737</created>
-      <option name="number" value="00072" />
-      <option name="presentableId" value="LOCAL-00072" />
-      <option name="project" value="LOCAL" />
-      <updated>1757825410737</updated>
-    </task>
-    <task id="LOCAL-00073" summary="init">
-      <created>1757825890467</created>
-      <option name="number" value="00073" />
-      <option name="presentableId" value="LOCAL-00073" />
-      <option name="project" value="LOCAL" />
-      <updated>1757825890467</updated>
+      <workItem from="1757349357807" duration="132630000" />
     </task>
     <task id="LOCAL-00074" summary="init">
       <created>1757826159745</created>
@@ -403,11 +386,36 @@
       <option name="project" value="LOCAL" />
       <updated>1758633431995</updated>
     </task>
-    <option name="localTasksCounter" value="121" />
+    <task id="LOCAL-00121" summary="init">
+      <created>1758638783522</created>
+      <option name="number" value="00121" />
+      <option name="presentableId" value="LOCAL-00121" />
+      <option name="project" value="LOCAL" />
+      <updated>1758638783522</updated>
+    </task>
+    <task id="LOCAL-00122" summary="init">
+      <created>1758638806524</created>
+      <option name="number" value="00122" />
+      <option name="presentableId" value="LOCAL-00122" />
+      <option name="project" value="LOCAL" />
+      <updated>1758638806524</updated>
+    </task>
+    <option name="localTasksCounter" value="123" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
     <option name="version" value="3" />
+  </component>
+  <component name="Vcs.Log.History.Properties">
+    <option name="COLUMN_ID_ORDER">
+      <list>
+        <option value="Default.Root" />
+        <option value="Default.Author" />
+        <option value="Default.Date" />
+        <option value="Default.Subject" />
+        <option value="Space.CommitStatus" />
+      </list>
+    </option>
   </component>
   <component name="Vcs.Log.Tabs.Properties">
     <option name="TAB_STATES">
