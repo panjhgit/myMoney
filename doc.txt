@@ -45,21 +45,16 @@ exports.sayGoodbye = sayGoodbye
 JS文件中声明的变量/函数默认具有文件级作用域，不同文件中的同名变量不会相互影响。
 全局对象
 抖音小游戏提供全局对象GameGlobal（类比浏览器的window对象），可用于跨文件数据共享：
-// a.js
 GameGlobal.appConfig = {
  version: '1.0.0'
 }
 
-// b.js
-console.log(GameGlobal.appConfig.version) // 输出"1.0.0"
 注意事项
 1. 模块加载采用CommonJS规范
 2. 循环引用可能导致未定义行为
 3. 全局变量应谨慎使用，避免命名冲突
 
-
 渲染
-
 画布类型说明
 抖音小游戏采用单上屏画布+多离屏画布的设计模式
 // 创建画布对象（首个创建默认为上屏画布）

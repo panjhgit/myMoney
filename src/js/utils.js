@@ -400,9 +400,24 @@ const EventManager = {
      * @returns {Object} 包含x, y坐标的对象
      */
     getEventCoordinates(event) {
+        console.log('[EventManager] 获取事件坐标:', {
+            type: event.type,
+            hasTouches: !!event.touches,
+            hasChangedTouches: !!event.changedTouches,
+            touchesLength: event.touches ? event.touches.length : 0,
+            changedTouchesLength: event.changedTouches ? event.changedTouches.length : 0
+        });
+        
         if (event.touches && event.touches.length > 0) {
-            // 触摸事件
+            // 触摸开始/移动事件
             return GameUtils.getTouchCoordinates(event);
+        } else if (event.changedTouches && event.changedTouches.length > 0) {
+            // 触摸结束事件
+            const touch = event.changedTouches[0];
+            const x = touch.clientX || touch.pageX || touch.x || 0;
+            const y = touch.clientY || touch.pageY || touch.y || 0;
+            console.log('[EventManager] 触摸结束坐标:', { x, y });
+            return {x: x, y: y};
         } else {
             // 鼠标事件
             return GameUtils.getEventCoordinates(event);
@@ -413,11 +428,11 @@ const EventManager = {
 // 动画管理器 - 统一动画处理
 const AnimationManager = {
     /**
-     * 检查GSAP是否可用
+     * 检查GSAP是否可用（抖音小游戏环境不支持）
      * @returns {boolean} GSAP是否可用
      */
     isGSAPAvailable() {
-        return typeof gsap !== 'undefined';
+        return false; // 抖音小游戏环境不支持GSAP
     },
     
     /**
@@ -474,25 +489,17 @@ const AnimationManager = {
     },
     
     /**
-     * 创建动画（自动选择GSAP或备用方案）
+     * 创建动画（使用原生动画）
      * @param {Object} target - 动画目标对象
      * @param {Object} properties - 动画属性
      * @param {Object} options - 动画选项
      * @returns {Object} 动画对象
      */
     createAnimation(target, properties, options = {}) {
-        if (this.isGSAPAvailable()) {
-            // 使用GSAP
-            return gsap.to(target, {
-                ...properties,
-                ...options
-            });
-        } else {
-            // 使用备用动画
-            const duration = (options.duration || 0.3) * 1000; // 转换为毫秒
-            this.createFallbackAnimation(target, properties, duration, options.onComplete);
-            return { kill: () => {} }; // 返回一个兼容的对象
-        }
+        // 抖音小游戏环境只使用原生动画
+        const duration = (options.duration || 0.3) * 1000; // 转换为毫秒
+        this.createFallbackAnimation(target, properties, duration, options.onComplete);
+        return { kill: () => {} }; // 返回一个兼容的对象
     },
     
     /**
@@ -501,25 +508,21 @@ const AnimationManager = {
      * @returns {Object} 时间线对象
      */
     createTimeline(options = {}) {
-        if (this.isGSAPAvailable()) {
-            return gsap.timeline(options);
-        } else {
-            // 返回一个简化的时间线对象
-            return {
-                to: (target, properties) => {
-                    const duration = (properties.duration || 0.3) * 1000;
-                    this.createFallbackAnimation(target, properties, duration, properties.onComplete);
-                    return this;
-                },
-                call: (callback, params, delay) => {
-                    setTimeout(() => {
-                        if (callback) callback(...(params || []));
-                    }, (delay || 0) * 1000);
-                    return this;
-                },
-                kill: () => {}
-            };
-        }
+        // 抖音小游戏环境只使用原生时间线
+        return {
+            to: (target, properties) => {
+                const duration = (properties.duration || 0.3) * 1000;
+                this.createFallbackAnimation(target, properties, duration, properties.onComplete);
+                return this;
+            },
+            call: (callback, params, delay) => {
+                setTimeout(() => {
+                    if (callback) callback(...(params || []));
+                }, (delay || 0) * 1000);
+                return this;
+            },
+            kill: () => {}
+        };
     },
     
     /**
@@ -530,25 +533,18 @@ const AnimationManager = {
      * @param {Function} onComplete - 完成回调
      */
     createParticleAnimation(particle, properties, onUpdate, onComplete) {
-        if (this.isGSAPAvailable()) {
-            return gsap.to(particle, {
-                ...properties,
-                onUpdate: onUpdate,
-                onComplete: onComplete
-            });
-        } else {
-            const duration = (properties.duration || 0.5) * 1000;
-            this.createFallbackAnimation(particle, properties, duration, onComplete);
-            return { kill: () => {} };
-        }
+        // 抖音小游戏环境只使用原生动画
+        const duration = (properties.duration || 0.5) * 1000;
+        this.createFallbackAnimation(particle, properties, duration, onComplete);
+        return { kill: () => {} };
     },
 
     /**
-     * 检查GSAP是否可用
+     * 检查GSAP是否可用（抖音小游戏环境不支持）
      * @returns {boolean} GSAP是否可用
      */
     isGSAPAvailable: function() {
-        return typeof gsap !== 'undefined' && gsap !== null;
+        return false; // 抖音小游戏环境不支持GSAP
     }
 };
 

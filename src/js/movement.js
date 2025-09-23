@@ -288,12 +288,8 @@ class MovementManager {
         block.isMoving = true;
         block.state = 'moving';
         
-        // 检查是否有动画系统
-        if (typeof gsap === 'undefined') {
-            // 没有动画系统，直接移动到最终位置
-            this.moveToFinalPosition(block, endPos, gameEngine);
-            return;
-        }
+        // 抖音小游戏环境使用原生动画
+        console.log('使用原生动画播放移动效果');
         
         // 创建格子化移动动画
         this.createGridBasedAnimation(block, path, gameEngine, animationId);
@@ -303,14 +299,25 @@ class MovementManager {
      * 创建基于格子的移动动画
      */
     createGridBasedAnimation(block, path, gameEngine, animationId) {
-        const timeline = gsap.timeline({
-            onUpdate: () => {
-                // 动画进行时持续重绘
-                if (typeof markNeedsRedraw === 'function') {
-                    markNeedsRedraw();
+        // 使用原生动画实现移动效果
+        let currentStep = 0;
+        const stepDuration = 200; // 每步200ms
+        
+        const animateStep = () => {
+            if (currentStep < path.length) {
+                const nextPos = path[currentStep];
+                block.position.x = nextPos.x;
+                block.position.y = nextPos.y;
+                
+                // 触发重绘
+                if (typeof globalThis.markNeedsRedraw === 'function') {
+                    globalThis.markNeedsRedraw();
                 }
-            },
-            onComplete: () => {
+                
+                currentStep++;
+                setTimeout(animateStep, stepDuration);
+            } else {
+                // 动画完成
                 block.isMoving = false;
                 block.state = 'idle';
                 
@@ -325,32 +332,17 @@ class MovementManager {
                 gameEngine.checkGateExit(block);
                 
                 // 动画完成后触发重绘
-                if (typeof markNeedsRedraw === 'function') {
-                    markNeedsRedraw();
+                if (typeof globalThis.markNeedsRedraw === 'function') {
+                    globalThis.markNeedsRedraw();
                 }
                 
                 if (gameEngine.animations) {
                     gameEngine.animations.delete(animationId);
                 }
             }
-        });
+        };
         
-        if (gameEngine.animations) {
-            gameEngine.animations.set(animationId, timeline);
-        }
-        
-        // 格子化移动：每个格子都有明确的移动步骤
-        path.forEach((step, index) => {
-            if (index === 0) return; // 跳过起始位置
-            
-            const stepDuration = GAME_CONFIG.MOVEMENT.STEP_DURATION || 0.3; // 每格移动时间
-            const delay = index * stepDuration;
-            
-            // 移动到下一个格子
-            timeline.call(() => {
-                this.moveToGridPosition(block, step, gameEngine);
-            }, [], delay);
-        });
+        animateStep();
     }
     
     /**
