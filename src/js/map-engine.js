@@ -634,7 +634,7 @@ class MapEngine {
             }
         }
 
-        // 🔧 修复：只处理第0层的方块（可移动的方块）
+        // 🔧 修复：处理所有第0层的方块（包括显露后的冰块）
         const topLayerBlocks = this.getBlocksByLayer(0);
         console.log(`[网格重新初始化] 找到 ${topLayerBlocks.length} 个第0层方块`);
 
@@ -669,8 +669,15 @@ class MapEngine {
                 }
                 
                 if (canPlace) {
-                    // 设置网格状态
-                    this.grid[pos.y][pos.x] = block.id;
+                    // 🔧 修复：设置方块所有格子的网格状态
+                    const cells = block.getCells();
+                    cells.forEach(cell => {
+                        const cellX = pos.x + cell.x;
+                        const cellY = pos.y + cell.y;
+                        if (this.isInBounds(cellX, cellY)) {
+                            this.grid[cellY][cellX] = block.id;
+                        }
+                    });
                     console.log(`[网格重新初始化] 方块 ${block.id} 位置设置成功:`, pos);
                 } else {
                     console.warn(`[网格重新初始化] 方块 ${block.id} 无法放置，跳过`);
@@ -1082,7 +1089,8 @@ class MapEngine {
         const lowerBlocks = this.getLowerLayerBlocks();
 
         lowerBlocks.forEach(block => {
-            if (!this.collisionDetector.isBlockFullyRevealed(block, this.grid, this.blocks)) {
+            // 🔧 修复：检查冰块是否仍然被遮挡
+            if (this.isBlockStillCovered(block)) {
                 const cells = this.collisionDetector.getBlockCells(block);
 
                 // 使用统一的冰块样式绘制
@@ -1095,19 +1103,43 @@ class MapEngine {
     }
 
     /**
+     * 🔧 新增：检查方块是否仍然被遮挡
+     * @param {Block} block - 要检查的方块
+     * @returns {boolean} 是否仍然被遮挡
+     */
+    isBlockStillCovered(block) {
+        // 如果方块已经显露，不再被遮挡
+        if (block.layer === 0 && !block.ice.isIce) {
+            return false;
+        }
+        
+        // 检查方块的每个格子是否被其他方块遮挡
+        const cells = this.collisionDetector.getBlockCells(block);
+        
+        return cells.some(cell => {
+            const gridValue = this.grid[cell.y] && this.grid[cell.y][cell.x];
+            // 如果网格中有其他方块的ID，说明被遮挡
+            return gridValue && gridValue !== block.id;
+        });
+    }
+
+    /**
      * 绘制冰层
      */
     drawIceLayers() {
-        // 绘制冰层效果，显示被遮挡的方块
+        // 🔧 修复：只绘制仍然被遮挡的冰块，避免重复绘制
         const lowerBlocks = this.getLowerLayerBlocks();
 
         lowerBlocks.forEach(block => {
-            const cells = this.collisionDetector.getBlockCells(block);
-            cells.forEach(cell => {
-                const pos = this.getCellScreenPosition(cell);
-                // 使用统一的冰块样式绘制（不包含纹理）
-                this.drawIceStyle(pos.x, pos.y, false);
-            });
+            // 只绘制仍然被遮挡的冰块
+            if (this.isBlockStillCovered(block)) {
+                const cells = this.collisionDetector.getBlockCells(block);
+                cells.forEach(cell => {
+                    const pos = this.getCellScreenPosition(cell);
+                    // 使用统一的冰块样式绘制（不包含纹理）
+                    this.drawIceStyle(pos.x, pos.y, false);
+                });
+            }
         });
     }
 
@@ -2097,6 +2129,9 @@ class MapEngine {
                 this.rollbackMove(currentPos, nextPos.x, nextPos.y);
                 return false;
             }
+            
+            // 🔧 修复：在移动过程中处理冰块显露
+            this.processIceBlocks(this.selectedBlock);
             
             // 触发重绘
             this.triggerRedraw();

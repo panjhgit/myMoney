@@ -309,6 +309,10 @@ class MovementManager {
                 block.position.x = nextPos.x;
                 block.position.y = nextPos.y;
                 
+                // 🔧 修复：在每一步移动时都更新网格和处理冰块显露
+                gameEngine.updateGrid();
+                gameEngine.processIceBlocks(block);
+                
                 // 触发重绘
                 if (typeof globalThis.markNeedsRedraw === 'function') {
                     globalThis.markNeedsRedraw();
@@ -327,6 +331,7 @@ class MovementManager {
                     gameEngine.selectedBlock = null;
                 }
                 
+                // 🔧 修复：动画完成后再次确保网格和冰块状态正确
                 gameEngine.updateGrid();
                 gameEngine.processIceBlocks(block);
                 gameEngine.checkGateExit(block);
