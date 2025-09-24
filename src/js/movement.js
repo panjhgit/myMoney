@@ -582,16 +582,21 @@ class MovementManager {
 
         const now = Date.now();
         
-        // 频率限制：避免过于频繁的移动
-        if (this.lastMoveTime && (now - this.lastMoveTime) < 100) {
+        // 🔧 修复抽搐：增加频率限制时间
+        if (this.lastMoveTime && (now - this.lastMoveTime) < 150) {
             return;
         }
 
         const gridPos = gameEngine.screenToGrid(x, y);
         const currentPos = selectedBlock.position;
 
-        // 如果触摸位置没有变化，跳过处理
-        if (gridPos.x === currentPos.x && gridPos.y === currentPos.y) {
+        // 🔧 修复抽搐：增加移动阈值检测
+        if (this.isPositionTooClose(currentPos, gridPos)) {
+            return;
+        }
+
+        // 🔧 修复抽搐：检查是否在格子边界附近
+        if (this.isNearGridBoundary(x, y, gameEngine)) {
             return;
         }
 
@@ -601,6 +606,50 @@ class MovementManager {
         if (nextMove && this.executeInstantMove(currentPos, nextMove, gameEngine, selectedBlock)) {
             this.lastMoveTime = now;
         }
+    }
+    
+    /**
+     * 检查位置是否太接近（防抽搐）
+     * @param {Object} currentPos - 当前位置
+     * @param {Object} targetPos - 目标位置
+     * @returns {boolean} 是否太接近
+     */
+    isPositionTooClose(currentPos, targetPos) {
+        const dx = Math.abs(targetPos.x - currentPos.x);
+        const dy = Math.abs(targetPos.y - currentPos.y);
+        
+        // 如果目标位置就是当前位置，跳过
+        if (dx === 0 && dy === 0) {
+            return true;
+        }
+        
+        // 如果距离太近（小于0.5个格子），跳过移动
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        return distance < 0.5;
+    }
+    
+    /**
+     * 检查是否在格子边界附近（防抽搐）
+     * @param {number} x - 屏幕X坐标
+     * @param {number} y - 屏幕Y坐标
+     * @param {Object} gameEngine - 游戏引擎
+     * @returns {boolean} 是否在边界附近
+     */
+    isNearGridBoundary(x, y, gameEngine) {
+        // 获取格子大小
+        const cellSize = gameEngine.GRID_SIZE || 50;
+        
+        // 计算在格子内的相对位置
+        const gridX = x / cellSize;
+        const gridY = y / cellSize;
+        
+        // 计算距离格子中心的偏移
+        const offsetX = Math.abs(gridX - Math.floor(gridX) - 0.5);
+        const offsetY = Math.abs(gridY - Math.floor(gridY) - 0.5);
+        
+        // 如果距离格子中心太近（在格子中心附近），跳过移动
+        // 这样可以避免在格子边界附近频繁切换
+        return offsetX < 0.15 || offsetY < 0.15;
     }
     
     /**
@@ -630,7 +679,7 @@ class MovementManager {
     }
     
     /**
-     * 获取直接移动（优先级最高）
+     * 获取直接移动（优先级最高，防抽搐优化）
      * @param {Object} current - 当前位置
      * @param {Object} target - 目标位置
      * @returns {Object|null} 直接移动位置
@@ -638,6 +687,11 @@ class MovementManager {
     getDirectMove(current, target) {
         const dx = target.x - current.x;
         const dy = target.y - current.y;
+
+        // 🔧 防抽搐：如果距离太近，不移动
+        if (Math.abs(dx) < 0.8 && Math.abs(dy) < 0.8) {
+            return null;
+        }
 
         // 只允许单步移动
         if (Math.abs(dx) === 1 && dy === 0) {
@@ -647,8 +701,8 @@ class MovementManager {
             return { x: current.x, y: target.y };
         }
 
-        // 选择主要方向
-        if (Math.abs(dx) >= Math.abs(dy) && dx !== 0) {
+        // 🔧 防抽搐：优先选择距离更大的方向
+        if (Math.abs(dx) > Math.abs(dy) && dx !== 0) {
             return { x: current.x + (dx > 0 ? 1 : -1), y: current.y };
         }
         if (Math.abs(dy) > Math.abs(dx) && dy !== 0) {
