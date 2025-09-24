@@ -14,6 +14,12 @@ class MovementManager {
             {dx: -1, dy: 0}, // 左
             {dx: 1, dy: 0}   // 右
         ];
+        
+        // 实时移动相关状态
+        this.lastMoveTime = 0;
+        this.lastAStarTime = 0;
+        this.cachedOptimalPosition = null;
+        this.cachedTargetPosition = null;
     }
 
     /**
@@ -270,9 +276,9 @@ class MovementManager {
     }
 
     /**
-     * 执行移动 - 真正的格子化移动
+     * 执行路径移动 - 真正的格子化移动
      */
-    executeMove(block, path, gameEngine) {
+    executePathMove(block, path, gameEngine) {
         if (path.length < 2) return;
         
         const startPos = path[0];
@@ -454,7 +460,7 @@ class MovementManager {
             gameEngine.rocks);
         
         if (path && path.length > 1) {
-            this.executeMove(block, path, gameEngine);
+            this.executePathMove(block, path, gameEngine);
             return true;
         } else {
             return false;
@@ -517,7 +523,7 @@ class MovementManager {
             gameEngine.blocks, gameEngine.rocks);
         
         if (path && path.length > 1) {
-            this.executeMove(block, path, gameEngine);
+            this.executePathMove(block, path, gameEngine);
             return true;
         }
         return false;
@@ -559,8 +565,344 @@ class MovementManager {
         return true;
     }
     
+    // ==================== 实时移动系统 ====================
+    
+    /**
+     * 处理鼠标移动（实时移动）
+     * @param {number} x - X坐标
+     * @param {number} y - Y坐标
+     * @param {Object} gameEngine - 游戏引擎
+     * @param {Block} selectedBlock - 选中的方块
+     * @param {boolean} isDragging - 是否正在拖动
+     */
+    handleMouseMove(x, y, gameEngine, selectedBlock, isDragging) {
+        if (!isDragging || !selectedBlock) {
+            return;
+        }
 
+        const now = Date.now();
+        
+        // 频率限制：避免过于频繁的移动
+        if (this.lastMoveTime && (now - this.lastMoveTime) < 100) {
+            return;
+        }
 
+        const gridPos = gameEngine.screenToGrid(x, y);
+        const currentPos = selectedBlock.position;
+
+        // 如果触摸位置没有变化，跳过处理
+        if (gridPos.x === currentPos.x && gridPos.y === currentPos.y) {
+            return;
+        }
+
+        // 计算下一步最佳移动
+        const nextMove = this.calculateBestMove(currentPos, gridPos, now, gameEngine, selectedBlock);
+        
+        if (nextMove && this.executeInstantMove(currentPos, nextMove, gameEngine, selectedBlock)) {
+            this.lastMoveTime = now;
+        }
+    }
+    
+    /**
+     * 计算最佳移动方向（实时移动）
+     * @param {Object} currentPos - 当前位置
+     * @param {Object} targetPos - 目标位置
+     * @param {number} timestamp - 时间戳
+     * @param {Object} gameEngine - 游戏引擎
+     * @param {Block} selectedBlock - 选中的方块
+     * @returns {Object|null} 下一步移动位置
+     */
+    calculateBestMove(currentPos, targetPos, timestamp, gameEngine, selectedBlock) {
+        // 1. 简单情况：检查直接移动
+        const directMove = this.getDirectMove(currentPos, targetPos);
+        if (directMove && gameEngine.isValidMovePosition(directMove.x, directMove.y, selectedBlock)) {
+            return directMove;
+        }
+
+        // 2. 复杂情况：使用智能路径规划
+        const optimalPos = this.getOptimalPosition(currentPos, targetPos, timestamp, gameEngine, selectedBlock);
+        if (!optimalPos) {
+            return null;
+        }
+
+        // 3. 计算朝向最优位置的一步移动
+        return this.getStepTowardsTarget(currentPos, optimalPos, gameEngine, selectedBlock);
+    }
+    
+    /**
+     * 获取直接移动（优先级最高）
+     * @param {Object} current - 当前位置
+     * @param {Object} target - 目标位置
+     * @returns {Object|null} 直接移动位置
+     */
+    getDirectMove(current, target) {
+        const dx = target.x - current.x;
+        const dy = target.y - current.y;
+
+        // 只允许单步移动
+        if (Math.abs(dx) === 1 && dy === 0) {
+            return { x: target.x, y: current.y };
+        }
+        if (Math.abs(dy) === 1 && dx === 0) {
+            return { x: current.x, y: target.y };
+        }
+
+        // 选择主要方向
+        if (Math.abs(dx) >= Math.abs(dy) && dx !== 0) {
+            return { x: current.x + (dx > 0 ? 1 : -1), y: current.y };
+        }
+        if (Math.abs(dy) > Math.abs(dx) && dy !== 0) {
+            return { x: current.x, y: current.y + (dy > 0 ? 1 : -1) };
+        }
+
+        return null;
+    }
+    
+    /**
+     * 获取最优位置（使用缓存和A*）
+     * @param {Object} current - 当前位置
+     * @param {Object} target - 目标位置
+     * @param {number} timestamp - 时间戳
+     * @param {Object} gameEngine - 游戏引擎
+     * @param {Block} selectedBlock - 选中的方块
+     * @returns {Object|null} 最优位置
+     */
+    getOptimalPosition(current, target, timestamp, gameEngine, selectedBlock) {
+        // 检查是否需要重新计算
+        if (this.shouldRecalculateOptimalPosition(target, timestamp)) {
+            const optimal = this.findOptimalPosition(current, target, selectedBlock, gameEngine);
+            this.updateOptimalPositionCache(target, optimal, timestamp);
+            return optimal;
+        }
+
+        return this.cachedOptimalPosition;
+    }
+    
+    /**
+     * 判断是否需要重新计算最优位置
+     * @param {Object} target - 目标位置
+     * @param {number} timestamp - 时间戳
+     * @returns {boolean} 是否需要重新计算
+     */
+    shouldRecalculateOptimalPosition(target, timestamp) {
+        // 1. 没有缓存
+        if (!this.cachedOptimalPosition || !this.cachedTargetPosition) {
+            return true;
+        }
+
+        // 2. 目标位置显著变化
+        const dx = Math.abs(target.x - this.cachedTargetPosition.x);
+        const dy = Math.abs(target.y - this.cachedTargetPosition.y);
+        if (dx > 2 || dy > 2) {
+            return true;
+        }
+
+        // 3. 时间超时（降低频率）
+        if (timestamp - this.lastAStarTime > 500) {
+            return true;
+        }
+
+        return false;
+    }
+    
+    /**
+     * 更新最优位置缓存
+     * @param {Object} target - 目标位置
+     * @param {Object} optimal - 最优位置
+     * @param {number} timestamp - 时间戳
+     */
+    updateOptimalPositionCache(target, optimal, timestamp) {
+        this.cachedTargetPosition = { x: target.x, y: target.y };
+        this.cachedOptimalPosition = optimal;
+        this.lastAStarTime = timestamp;
+    }
+    
+    /**
+     * 计算朝向目标的一步移动
+     * @param {Object} current - 当前位置
+     * @param {Object} target - 目标位置
+     * @param {Object} gameEngine - 游戏引擎
+     * @param {Block} selectedBlock - 选中的方块
+     * @returns {Object|null} 下一步位置
+     */
+    getStepTowardsTarget(current, target, gameEngine, selectedBlock) {
+        if (!target) return null;
+
+        const dx = target.x - current.x;
+        const dy = target.y - current.y;
+
+        // 生成候选移动
+        const candidates = [];
+
+        // 主要方向
+        if (dx !== 0) {
+            candidates.push({
+                x: current.x + (dx > 0 ? 1 : -1),
+                y: current.y,
+                priority: 1,
+                distance: Math.abs(dx - (dx > 0 ? 1 : -1)) + Math.abs(dy)
+            });
+        }
+        if (dy !== 0) {
+            candidates.push({
+                x: current.x,
+                y: current.y + (dy > 0 ? 1 : -1),
+                priority: 1,
+                distance: Math.abs(dx) + Math.abs(dy - (dy > 0 ? 1 : -1))
+            });
+        }
+
+        // 备选方向
+        for (const dir of this.DIRECTIONS) {
+            const newPos = { x: current.x + dir.x, y: current.y + dir.y };
+            const distance = Math.abs(target.x - newPos.x) + Math.abs(target.y - newPos.y);
+            
+            if (!candidates.find(c => c.x === newPos.x && c.y === newPos.y)) {
+                candidates.push({
+                    x: newPos.x,
+                    y: newPos.y,
+                    priority: 2,
+                    distance: distance
+                });
+            }
+        }
+
+        // 按优先级和距离排序
+        candidates.sort((a, b) => {
+            if (a.priority !== b.priority) return a.priority - b.priority;
+            return a.distance - b.distance;
+        });
+
+        // 选择第一个有效移动
+        for (const candidate of candidates) {
+            if (gameEngine.isValidMovePosition(candidate.x, candidate.y, selectedBlock)) {
+                return { x: candidate.x, y: candidate.y };
+            }
+        }
+
+        return null;
+    }
+    
+    /**
+     * 执行即时移动操作（实时移动）
+     * @param {Object} currentPos - 当前位置
+     * @param {Object} nextPos - 下一步位置
+     * @param {Object} gameEngine - 游戏引擎
+     * @param {Block} selectedBlock - 选中的方块
+     * @returns {boolean} 移动是否成功
+     */
+    executeInstantMove(currentPos, nextPos, gameEngine, selectedBlock) {
+        // 最终安全检查
+        if (!gameEngine.isValidMovePosition(nextPos.x, nextPos.y, selectedBlock)) {
+            return false;
+        }
+
+        // 执行移动
+        try {
+            // 使用通用方法更新网格
+            gameEngine.updateBlockGridState(selectedBlock, currentPos, 0); // 清除旧位置
+            selectedBlock.position.x = nextPos.x;
+            selectedBlock.position.y = nextPos.y;
+            gameEngine.updateBlockGridState(selectedBlock, nextPos, selectedBlock.id); // 设置新位置
+            
+            // 验证移动结果
+            if (!this.validateMoveResult(nextPos.x, nextPos.y, gameEngine, selectedBlock)) {
+                this.rollbackMove(currentPos, nextPos.x, nextPos.y, gameEngine, selectedBlock);
+                return false;
+            }
+            
+            // 在移动过程中处理冰块显露
+            gameEngine.processIceBlocks(selectedBlock);
+            
+            // 触发重绘
+            gameEngine.triggerRedraw();
+            return true;
+            
+        } catch (error) {
+            console.error('[移动] 执行移动时发生错误:', error);
+            this.rollbackMove(currentPos, nextPos.x, nextPos.y, gameEngine, selectedBlock);
+            return false;
+        }
+    }
+    
+    /**
+     * 验证移动结果
+     * @param {number} x - 移动后的X坐标
+     * @param {number} y - 移动后的Y坐标
+     * @param {Object} gameEngine - 游戏引擎
+     * @param {Block} selectedBlock - 选中的方块
+     * @returns {boolean} 移动结果是否有效
+     */
+    validateMoveResult(x, y, gameEngine, selectedBlock) {
+        if (!selectedBlock) return false;
+        
+        const cells = selectedBlock.getCells();
+        for (const cell of cells) {
+            const cellX = x + cell.x;
+            const cellY = y + cell.y;
+            
+            // 检查网格状态是否一致
+            if (gameEngine.grid[cellY][cellX] !== selectedBlock.id) {
+                console.error('[移动验证] 网格状态不一致:', {
+                    position: { cellX, cellY },
+                    expected: selectedBlock.id,
+                    actual: gameEngine.grid[cellY][cellX]
+                });
+                return false;
+            }
+        }
+        
+        return true;
+    }
+    
+    /**
+     * 回滚移动操作
+     * @param {Object} originalPos - 原始位置
+     * @param {number} failedX - 失败的X坐标
+     * @param {number} failedY - 失败的Y坐标
+     * @param {Object} gameEngine - 游戏引擎
+     * @param {Block} selectedBlock - 选中的方块
+     */
+    rollbackMove(originalPos, failedX, failedY, gameEngine, selectedBlock) {
+        if (!selectedBlock) return;
+        
+        try {
+            // 使用通用方法清除失败位置
+            gameEngine.updateBlockGridState(selectedBlock, selectedBlock.position, 0);
+            
+            // 恢复原始位置
+            selectedBlock.position.x = originalPos.x;
+            selectedBlock.position.y = originalPos.y;
+            
+            // 使用通用方法恢复原始位置
+            gameEngine.updateBlockGridState(selectedBlock, originalPos, selectedBlock.id);
+            
+            console.log('[回滚] 已恢复到原始位置:', originalPos);
+        } catch (error) {
+            console.error('[回滚] 回滚操作失败:', error);
+        }
+    }
+    
+    /**
+     * 使用A*算法找到最优位置
+     * @param {Object} start - 起始位置
+     * @param {Object} target - 目标位置
+     * @param {Block} block - 要移动的方块
+     * @param {Object} gameEngine - 游戏引擎
+     * @returns {Object|null} 最优位置
+     */
+    findOptimalPosition(start, target, block, gameEngine) {
+        // 使用现有的A*算法
+        const path = this.calculatePath(block, start, target, 
+            gameEngine.collisionDetector, gameEngine.grid, 
+            gameEngine.blocks, gameEngine.rocks);
+        
+        if (path && path.length > 1) {
+            return path[path.length - 1]; // 返回路径的最后一个位置
+        }
+        
+        return null;
+    }
 
 }
 
