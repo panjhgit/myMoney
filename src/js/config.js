@@ -121,7 +121,7 @@ const ConfigUtils = {
   
   // 获取固定格子大小（与CELL_SIZE相同）
   getFixedCellSize: function() {
-    return GAME_CONFIG.CELL_SIZE;
+    return this.getCellSize(); // 使用已有的getCellSize方法
   },
   
   // 检查配置一致性
